@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>nanobot Desktop</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="print" onload="this.media='all'" />
+</head>
+<body>
+  <!-- Loading splash -->
+  <div class="splash" id="splash">
+    <div class="splash-inner">
+      <div class="splash-icon">🐈</div>
+      <div class="splash-text">nanobot Desktop</div>
+      <div class="splash-dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
+
+  <div class="app" id="app-root" style="opacity:0;">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-icon">🐈</span>
+        <span class="brand-text">nanobot</span>
+      </div>
+      <button class="new-chat-btn" onclick="newChat()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <span data-i18n="nav.newChat">新对话</span>
+      </button>
+      <div class="session-list" id="session-list"></div>
+      <div class="sidebar-divider"></div>
+      <nav class="sidebar-nav sidebar-nav-bottom">
+        <a class="nav-item" data-page="settings" onclick="switchPage('settings')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span data-i18n="nav.settings">设置</span>
+        </a>
+        <a class="nav-item" data-page="status" onclick="switchPage('status')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+          <span data-i18n="nav.status">状态</span>
+        </a>
+        <a class="nav-item" data-page="gateway" onclick="switchPage('gateway')">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span data-i18n="nav.gateway">网关</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <select class="lang-select" id="lang-select" onchange="setLanguage(this.value)">
+          <option value="auto" data-i18n="settings.langAuto">跟随系统</option>
+          <option value="zh">中文</option>
+          <option value="en">English</option>
+        </select>
+        <span class="version-text">v1.0</span>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Setup Page -->
+      <div class="page" id="page-setup" style="display:none;">
+        <div class="setup-container">
+          <div class="setup-icon">🐈</div>
+          <h1 data-i18n="setup.welcome">欢迎使用 nanobot Desktop</h1>
+          <div id="setup-status"></div>
+          <div class="setup-steps">
+            <div class="setup-step" id="step-install">
+              <div class="step-number">1</div>
+              <div class="step-content">
+                <h3 data-i18n="setup.install.title">安装 nanobot</h3>
+                <p data-i18n="setup.install.desc">在终端运行以下命令：</p>
+                <code class="setup-code">pip install nanobot-ai</code>
+              </div>
+            </div>
+            <div class="setup-step" id="step-onboard">
+              <div class="step-number">2</div>
+              <div class="step-content">
+                <h3 data-i18n="setup.onboard.title">初始化配置</h3>
+                <p data-i18n="setup.onboard.desc">点击下方按钮自动初始化。</p>
+                <button class="btn btn-primary" onclick="doOnboard()" data-i18n="setup.onboard.btn">初始化 nanobot</button>
+              </div>
+            </div>
+            <div class="setup-step" id="step-apikey">
+              <div class="step-number">3</div>
+              <div class="step-content">
+                <h3 data-i18n="setup.apikey.title">配置 API Key</h3>
+                <p data-i18n="setup.apikey.desc">前往「设置」页面填写您的 API Key。</p>
+                <button class="btn btn-primary" onclick="switchPage('settings')" data-i18n="setup.apikey.btn">前往设置</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat Page -->
+      <div class="page" id="page-chat">
+        <div class="chat-container">
+          <div class="chat-messages" id="chat-messages">
+            <div class="welcome-message">
+              <div class="welcome-icon">🐈</div>
+              <h2 data-i18n="chat.ready">nanobot 已就绪</h2>
+              <p data-i18n="chat.readyDesc">输入消息开始对话，我可以帮你搜索信息、编写代码、管理文件等。</p>
+            </div>
+          </div>
+          <div class="chat-input-area">
+            <div class="chat-input-wrapper">
+              <textarea id="chat-input" data-i18n-ph="chat.placeholder" placeholder="输入消息… (Enter 发送, Shift+Enter 换行)" rows="1"></textarea>
+              <button class="send-btn" id="send-btn" onclick="sendMessage()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings Page -->
+      <div class="page" id="page-settings" style="display:none;">
+        <div class="page-header">
+          <h1 data-i18n="settings.title">设置</h1>
+          <button class="btn btn-primary" onclick="saveConfig()" data-i18n="settings.save">保存配置</button>
+        </div>
+        <div class="settings-scroll">
+          <!-- Language -->
+          <div class="settings-card">
+            <h2 data-i18n="settings.language">界面语言</h2>
+            <div class="lang-options">
+              <label class="lang-option">
+                <input type="radio" name="lang-radio" value="auto" onchange="setLanguage('auto')" checked />
+                <span data-i18n="settings.langAuto">跟随系统</span>
+              </label>
+              <label class="lang-option">
+                <input type="radio" name="lang-radio" value="zh" onchange="setLanguage('zh')" />
+                <span>中文</span>
+              </label>
+              <label class="lang-option">
+                <input type="radio" name="lang-radio" value="en" onchange="setLanguage('en')" />
+                <span>English</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Model Settings -->
+          <div class="settings-card">
+            <h2 data-i18n="settings.model">模型设置</h2>
+            <div class="form-grid">
+              <div class="form-group">
+                <label data-i18n="settings.modelName">模型名称</label>
+                <input type="text" id="cfg-model" placeholder="例如: anthropic/claude-opus-4-5" />
+              </div>
+              <div class="form-group">
+                <label>Temperature <span class="label-value" id="temp-value">0.7</span></label>
+                <input type="range" id="cfg-temperature" min="0" max="2" step="0.1" value="0.7" oninput="document.getElementById('temp-value').textContent=this.value" />
+              </div>
+              <div class="form-group">
+                <label data-i18n="settings.maxTokens">Max Tokens</label>
+                <input type="number" id="cfg-max-tokens" placeholder="8192" />
+              </div>
+              <div class="form-group">
+                <label data-i18n="settings.maxIter">最大工具迭代次数</label>
+                <input type="number" id="cfg-max-iterations" placeholder="20" />
+              </div>
+              <div class="form-group">
+                <label data-i18n="settings.memoryWindow">记忆窗口大小</label>
+                <input type="number" id="cfg-memory-window" placeholder="50" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Provider API Keys -->
+          <div class="settings-card">
+            <h2 data-i18n="settings.apiKeys">API 密钥</h2>
+            <div class="form-grid">
+              <div class="form-group"><label>OpenRouter</label><input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-xxx" /></div>
+              <div class="form-group"><label>Anthropic</label><input type="password" id="cfg-anthropic-key" placeholder="sk-ant-xxx" /></div>
+              <div class="form-group"><label>OpenAI</label><input type="password" id="cfg-openai-key" placeholder="sk-xxx" /></div>
+              <div class="form-group"><label>DeepSeek</label><input type="password" id="cfg-deepseek-key" placeholder="sk-xxx" /></div>
+              <div class="form-group"><label>Gemini</label><input type="password" id="cfg-gemini-key" placeholder="AI..." /></div>
+              <div class="form-group"><label>Groq</label><input type="password" id="cfg-groq-key" placeholder="gsk_xxx" /></div>
+              <div class="form-group"><label>Moonshot / Kimi</label><input type="password" id="cfg-moonshot-key" placeholder="sk-xxx" /></div>
+              <div class="form-group"><label>Zhipu (智谱)</label><input type="password" id="cfg-zhipu-key" placeholder="xxx.xxx" /></div>
+              <div class="form-group"><label>DashScope (通义千问)</label><input type="password" id="cfg-dashscope-key" placeholder="sk-xxx" /></div>
+              <div class="form-group"><label>SiliconFlow (硅基流动)</label><input type="password" id="cfg-siliconflow-key" placeholder="sk-xxx" /></div>
+              <div class="form-group"><label>MiniMax</label><input type="password" id="cfg-minimax-key" placeholder="xxx" /></div>
+              <div class="form-group"><label>AiHubMix</label><input type="password" id="cfg-aihubmix-key" placeholder="xxx" /></div>
+            </div>
+          </div>
+
+          <!-- Search & Tools -->
+          <div class="settings-card">
+            <h2 data-i18n="settings.searchTools">搜索与工具</h2>
+            <div class="form-grid">
+              <div class="form-group">
+                <label data-i18n="settings.braveKey">Brave Search API Key</label>
+                <input type="password" id="cfg-brave-key" placeholder="BSA..." />
+              </div>
+              <div class="form-group">
+                <label data-i18n="settings.shellTimeout">Shell 超时 (秒)</label>
+                <input type="number" id="cfg-exec-timeout" placeholder="60" />
+              </div>
+              <div class="form-group form-group-checkbox">
+                <label>
+                  <input type="checkbox" id="cfg-restrict-workspace" />
+                  <span data-i18n="settings.restrictWorkspace">限制工具在工作区内操作</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- MCP Servers -->
+          <div class="settings-card">
+            <div class="card-header-row">
+              <h2>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                <span data-i18n="mcp.title">MCP 工具服务</span>
+              </h2>
+              <button class="btn btn-sm" onclick="addMcpServer()" data-i18n="mcp.addServer">+ 添加服务</button>
+            </div>
+            <p class="mcp-desc" data-i18n="mcp.desc">连接外部 MCP 服务器，扩展 Agent 的工具能力（如浏览器、数据库等）。</p>
+            <div class="mcp-server-list" id="mcp-server-list">
+              <div class="mcp-empty" data-i18n="mcp.empty">暂未配置 MCP 服务</div>
+            </div>
+          </div>
+
+          <!-- Channels -->
+          <div class="settings-card">
+            <h2 data-i18n="settings.channels">频道</h2>
+            <div class="channels-grid" id="channels-grid"></div>
+          </div>
+
+          <!-- Advanced JSON -->
+          <div class="settings-card">
+            <div class="card-header-row">
+              <h2 data-i18n="settings.advancedJson">高级 JSON 编辑</h2>
+              <button class="btn btn-sm" onclick="toggleJsonEditor()" data-i18n="settings.toggleJson">展开/折叠</button>
+            </div>
+            <div id="json-editor-wrap" style="display:none;">
+              <textarea id="cfg-json-raw" spellcheck="false"></textarea>
+              <button class="btn btn-primary" onclick="applyRawJson()" style="margin-top:8px;" data-i18n="settings.applyJson">应用 JSON</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Status Page -->
+      <div class="page" id="page-status" style="display:none;">
+        <div class="page-header">
+          <h1 data-i18n="status.title">系统状态</h1>
+          <button class="btn btn-sm" onclick="loadStatus()" data-i18n="status.refresh">刷新</button>
+        </div>
+        <div class="status-grid" id="status-grid">
+          <div class="status-card"><div class="status-label" data-i18n="status.loading">加载中…</div></div>
+        </div>
+      </div>
+
+      <!-- Gateway Page -->
+      <div class="page" id="page-gateway" style="display:none;">
+        <div class="page-header"><h1 data-i18n="gw.title">网关控制</h1></div>
+        <div class="gateway-container">
+          <div class="gateway-status-card" id="gateway-card">
+            <div class="gateway-indicator off" id="gw-indicator"></div>
+            <div class="gateway-info">
+              <h3 id="gw-status-text" data-i18n="gw.stopped">网关已停止</h3>
+              <p id="gw-status-sub" data-i18n="gw.stoppedDesc">启动网关以连接 Telegram、Discord 等平台</p>
+            </div>
+          </div>
+          <div class="gateway-actions">
+            <button class="btn btn-primary btn-lg" id="gw-start-btn" onclick="startGateway()" data-i18n="gw.start">启动网关</button>
+            <button class="btn btn-danger btn-lg" id="gw-stop-btn" onclick="stopGateway()" style="display:none;" data-i18n="gw.stop">停止网关</button>
+          </div>
+          <div class="gateway-log" id="gateway-log" style="display:none;">
+            <h3 data-i18n="gw.logs">网关日志</h3>
+            <pre id="gw-log-content"></pre>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Async libs -->
+  <script>
+    (function(){
+      function loadScript(src){
+        return new Promise(function(resolve){
+          var s = document.createElement('script');
+          s.src = src; s.async = true;
+          s.onload = resolve; s.onerror = resolve;
+          document.head.appendChild(s);
+        });
+      }
+      var libsP = loadScript('https://cdn.jsdelivr.net/npm/marked/marked.min.js')
+        .then(function(){ return loadScript('https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/highlight.min.js'); });
+      var timeout = new Promise(function(resolve){ setTimeout(resolve, 3000); });
+      window.__libsReady = Promise.race([libsP, timeout]);
+    })();
+  </script>
+  <script src="/static/app.js"></script>
+  <script>
+    // Sync lang radio buttons on load
+    document.addEventListener("DOMContentLoaded", function(){
+      var stored = localStorage.getItem("nanobot_lang") || "auto";
+      var radio = document.querySelector('input[name="lang-radio"][value="' + stored + '"]');
+      if (radio) radio.checked = true;
+    });
+  </script>
+</body>
+</html>
