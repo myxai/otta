@@ -1,0 +1,19 @@
+# Python编译文件
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 虚拟环境
+venv/
+env/
+.env/
+ENV/
+
+# 日志文件
+*.log
+logs/
+
+# 其他无用文件
+.DS_Store  # macOS特有
+.idea/     # PyCharm配置
+.vscode/   # VSCode配置
