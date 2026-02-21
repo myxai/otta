@@ -51,9 +51,13 @@ _agent = None
 _agent_lock = threading.Lock()
 _session_counter = 0
 _gateway_process: subprocess.Popen | None = None
+_cron_service = None
 
 _mcp_log: list[dict] = []
 _mcp_log_lock = threading.Lock()
+
+_notifications: list[dict] = []
+_notifications_lock = threading.Lock()
 
 
 def _mcp_record(server: str, level: str, message: str):
@@ -127,7 +131,10 @@ def _make_provider(config):
 
 def _reset_agent():
     """Destroy the current agent, properly closing MCP connections."""
-    global _agent
+    global _agent, _cron_service
+    if _cron_service is not None:
+        _cron_service.stop()
+        _cron_service = None
     with _agent_lock:
         old = _agent
         _agent = None
@@ -143,8 +150,261 @@ def _reset_agent():
         _mcp_log.clear()
 
 
+def _push_notification(title: str, content: str, level: str = "info"):
+    """Push a notification to the frontend queue."""
+    entry = {
+        "id": f"n-{int(time.time()*1000)}",
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "title": title,
+        "content": content,
+        "level": level,
+        "read": False,
+    }
+    with _notifications_lock:
+        _notifications.append(entry)
+        if len(_notifications) > 100:
+            _notifications[:] = _notifications[-50:]
+
+
+import re as _re
+
+_EXEC_TRIGGER = _re.compile(
+    r"提醒|定时|闹钟|计划|取消|删除|清除|移除|搜索|查找|查询|"
+    r"打开|访问|下载|安装|执行|运行|创建|新建|添加|设置|修改|"
+    r"编辑|写入|保存|发送|列出|查看任务|查看提醒|有哪些",
+)
+_FAKE_EXEC = _re.compile(
+    r"已成功|已设置|已创建|已删除|已取消|已清除|已移除|已完成|已执行|"
+    r"设置成功|创建成功|删除成功|取消成功|任务已|提醒已|"
+    r"Executed tools|Created job|Removed job",
+)
+
+_EXEC_NUDGE = (
+    "请通过工具调用来完成这个操作。"
+)
+_EXEC_FALLBACK = (
+    "抱歉，本次操作未能通过工具执行。请尝试重新描述您的需求，"
+    "或新建一个对话重试。"
+)
+
+
+def _is_exec_mode(user_msg: str) -> bool:
+    """Determine if the user's request requires tool execution (EXEC mode)."""
+    return bool(_EXEC_TRIGGER.search(user_msg))
+
+
+def _is_fake_execution(reply: str) -> bool:
+    """Detect if the LLM's response simulates a tool action in plain text."""
+    return bool(_FAKE_EXEC.search(reply))
+
+
+def _compress_history(messages: list[dict], keep_recent: int = 4) -> list[dict]:
+    """Compress older history into a brief summary to reduce LLM pattern mimicking.
+
+    Keeps the most recent ``keep_recent`` messages verbatim.  Older messages
+    are collapsed into a single system-style summary that provides factual
+    context without the original wording that the LLM might copy.
+    """
+    if len(messages) <= keep_recent:
+        return messages
+
+    old = messages[:-keep_recent]
+    recent = messages[-keep_recent:]
+
+    summaries = []
+    for m in old:
+        role = m["role"]
+        text = (m.get("content") or "")[:80]
+        if text:
+            summaries.append(f"- {role}: {text}")
+
+    if summaries:
+        summary_text = (
+            "[Earlier conversation summary]\n" + "\n".join(summaries[-8:])
+        )
+        return [{"role": "assistant", "content": summary_text}] + recent
+    return recent
+
+
+def _patch_agent_tool_history(agent):
+    """Monkey-patch the agent's _process_message for execution governance.
+
+    1. EXEC mode detection: keyword-based check on user input.
+    2. Inline agent loop: runs LLM + tool calls directly so we control the flow.
+    3. Fake-execution interception: if EXEC mode and the LLM returns text that
+       looks like a simulated result (no actual tool_calls), inject a nudge
+       message and retry (up to 2 times).
+    4. History compression: older messages are summarized to prevent the LLM
+       from pattern-matching past responses.
+    5. Plain-text session save: avoids structured tool_calls in history that
+       would cause the LLM to skip or mimic.
+    """
+    import types as _types
+    from nanobot.bus.events import OutboundMessage
+
+    _orig_build_system_prompt = agent.context.build_system_prompt
+
+    def _enhanced_system_prompt(skill_names=None):
+        base = _orig_build_system_prompt(skill_names)
+        return base + (
+            "\n\n## Tool Usage Rules\n"
+            "1. When the user requests an action (create/cancel/delete/search/modify), "
+            "you MUST call the appropriate tool. Do not describe or simulate the result.\n"
+            "2. To cancel or modify a previous task, refer to the conversation history "
+            "for the relevant job ID, then call the tool with that ID.\n"
+            "3. If the user repeats a request that was done before, call the tool again "
+            "— the previous result may have expired.\n"
+            "4. Keep responses concise and natural."
+        )
+
+    agent.context.build_system_prompt = _enhanced_system_prompt
+
+    async def _patched_process_message(self, msg, session_key=None, on_progress=None):
+        import json as _json
+
+        if msg.channel == "system":
+            return await self._process_system_message(msg)
+
+        key = session_key or msg.session_key
+        session = self.sessions.get_or_create(key)
+
+        cmd = msg.content.strip().lower()
+        if cmd == "/new":
+            messages_to_archive = session.messages.copy()
+            session.clear()
+            self.sessions.save(session)
+            self.sessions.invalidate(session.key)
+            import asyncio as _aio
+            from nanobot.session.manager import Session
+            async def _consolidate():
+                temp = Session(key=session.key)
+                temp.messages = messages_to_archive
+                await self._consolidate_memory(temp, archive_all=True)
+            _aio.create_task(_consolidate())
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content="New session started. Memory consolidation in progress.")
+        if cmd == "/help":
+            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
+                                  content="\U0001f408 nanobot commands:\n/new \u2014 Start a new conversation\n/help \u2014 Show available commands")
+
+        if len(session.messages) > self.memory_window:
+            import asyncio as _aio
+            _aio.create_task(self._consolidate_memory(session))
+
+        self._set_tool_context(msg.channel, msg.chat_id)
+        raw_history = session.get_history(max_messages=self.memory_window)
+        clean_history = [
+            m for m in raw_history
+            if m["role"] != "tool" and "tool_calls" not in m
+        ]
+        clean_history = _compress_history(clean_history, keep_recent=10)
+        initial_messages = self.context.build_messages(
+            history=clean_history,
+            current_message=msg.content,
+            media=msg.media if msg.media else None,
+            channel=msg.channel,
+            chat_id=msg.chat_id,
+        )
+
+        async def _bus_progress(content):
+            await self.bus.publish_outbound(OutboundMessage(
+                channel=msg.channel, chat_id=msg.chat_id, content=content,
+                metadata=msg.metadata or {},
+            ))
+
+        # --- Run the agent loop with EXEC governance ---
+        exec_mode = _is_exec_mode(msg.content)
+        messages = list(initial_messages)
+        n_initial = len(messages)
+        iteration = 0
+        final_content = None
+        tools_used = []
+        progress = on_progress or _bus_progress
+        nudge_count = 0
+        max_nudges = 1
+
+        tool_defs = self.tools.get_definitions()
+        print(f"[agent] exec_mode={exec_mode}, tools={len(tool_defs)}, "
+              f"history={n_initial}, model={self.model}")
+
+        try:
+            while iteration < self.max_iterations:
+                iteration += 1
+                response = await self.provider.chat(
+                    messages=messages,
+                    tools=tool_defs,
+                    model=self.model,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens,
+                )
+                if response.has_tool_calls:
+                    if progress:
+                        clean = self._strip_think(response.content)
+                        await progress(clean or self._tool_hint(response.tool_calls))
+
+                    tc_dicts = [
+                        {"id": tc.id, "type": "function",
+                         "function": {"name": tc.name,
+                                      "arguments": _json.dumps(tc.arguments)}}
+                        for tc in response.tool_calls
+                    ]
+                    messages = self.context.add_assistant_message(
+                        messages, response.content, tc_dicts,
+                        reasoning_content=response.reasoning_content,
+                    )
+                    for tc in response.tool_calls:
+                        tools_used.append(tc.name)
+                        print(f"[agent] tool: {tc.name}({str(tc.arguments)[:100]})")
+                        result = await self.tools.execute(tc.name, tc.arguments)
+                        print(f"[agent] result: {str(result)[:100]}")
+                        messages = self.context.add_tool_result(
+                            messages, tc.id, tc.name, result,
+                        )
+                else:
+                    text = self._strip_think(response.content)
+                    if (exec_mode
+                            and nudge_count < max_nudges
+                            and _is_fake_execution(text)):
+                        nudge_count += 1
+                        print(f"[agent] nudge: fake exec detected, retrying")
+                        messages.append({"role": "assistant", "content": text})
+                        messages.append({"role": "user", "content": _EXEC_NUDGE})
+                        continue
+                    final_content = text
+                    break
+        except Exception as _loop_err:
+            print(f"[agent] error: {_loop_err}")
+            if final_content is None:
+                final_content = f"Error during processing: {_loop_err}"
+
+        if final_content is None:
+            final_content = "I've completed processing but have no response to give."
+
+        if exec_mode and not tools_used and nudge_count >= max_nudges:
+            print(f"[agent] EXEC fallback: {max_nudges} nudges exhausted, no tool calls")
+            final_content = _EXEC_FALLBACK
+
+        # --- Save to session: plain text only ---
+        # Saving structured tool_calls or text annotations causes the LLM
+        # to pattern-match and skip actual tool calls or mimic annotations.
+        # Plain text is safest: the system prompt + tool definitions are
+        # sufficient for the LLM to know it can/should call tools.
+        session.add_message("user", msg.content)
+        session.add_message("assistant", final_content,
+                            tools_used=tools_used if tools_used else None)
+
+        self.sessions.save(session)
+
+        return OutboundMessage(
+            channel=msg.channel, chat_id=msg.chat_id,
+            content=final_content,
+        )
+
+    agent._process_message = _types.MethodType(_patched_process_message, agent)
+
+
 def _get_or_create_agent():
-    global _agent
+    global _agent, _cron_service
     with _agent_lock:
         if _agent is not None:
             return _agent
@@ -163,6 +423,7 @@ def _get_or_create_agent():
 
         cron_store = get_data_dir() / "cron" / "jobs.json"
         cron = CronService(cron_store)
+        _cron_service = cron
 
         _agent = AgentLoop(
             bus=bus,
@@ -179,6 +440,76 @@ def _get_or_create_agent():
             restrict_to_workspace=config.tools.restrict_to_workspace,
             mcp_servers=config.tools.mcp_servers,
         )
+
+        _patch_agent_tool_history(_agent)
+        agent_ref = _agent
+
+        async def _on_cron_job(job):
+            """Cron callback: process job through agent and push notification."""
+            print(f"[cron] on_job callback: '{job.name}' ({job.id}), msg={job.payload.message[:60]}")
+            try:
+                response = await agent_ref.process_direct(
+                    job.payload.message,
+                    session_key=f"cron:{job.id}",
+                    channel=job.payload.channel or "cli",
+                    chat_id=job.payload.to or "cron",
+                )
+                print(f"[cron] on_job response: {(response or '')[:80]}")
+                _push_notification(
+                    title=job.name,
+                    content=response or job.payload.message,
+                    level="info",
+                )
+                return response
+            except Exception as e:
+                print(f"[cron] on_job error: {e}")
+                _push_notification(
+                    title=job.name,
+                    content=f"执行失败: {e}",
+                    level="error",
+                )
+                raise
+
+        cron.on_job = _on_cron_job
+
+        _orig_add_job = cron.add_job
+        _orig_arm_timer = cron._arm_timer
+        _orig_execute_job = cron._execute_job
+
+        def _traced_add_job(*args, **kwargs):
+            print(f"[cron] add_job called: args={args}, kwargs_keys={list(kwargs.keys())}")
+            job = _orig_add_job(*args, **kwargs)
+            print(f"[cron] add_job result: id={job.id}, schedule={job.schedule.kind}, "
+                  f"at_ms={job.schedule.at_ms}, next_run={job.state.next_run_at_ms}, "
+                  f"delete_after={job.delete_after_run}")
+            return job
+
+        cron.add_job = _traced_add_job
+
+        def _traced_arm_timer():
+            nw = cron._get_next_wake_ms()
+            if nw:
+                delay = max(0, nw - int(time.time() * 1000))
+                print(f"[cron] _arm_timer: next_wake in {delay}ms, running={cron._running}")
+            else:
+                print(f"[cron] _arm_timer: no next wake, running={cron._running}")
+            _orig_arm_timer()
+
+        async def _traced_execute_job(job):
+            print(f"[cron] executing job '{job.name}' ({job.id}), delete_after={job.delete_after_run}")
+            await _orig_execute_job(job)
+            print(f"[cron] job '{job.name}' done, status={job.state.last_status}, error={job.state.last_error}")
+
+        cron._arm_timer = _traced_arm_timer
+        cron._execute_job = _traced_execute_job
+
+        cron._running = True
+        cron._load_store()
+
+        _ensure_loop()
+        asyncio.run_coroutine_threadsafe(cron.start(), _async_loop)
+        print(f"[cron] service initialized, store={cron.store_path}, jobs={len(cron._store.jobs if cron._store else [])}")
+
         return _agent
 
 
@@ -590,6 +921,26 @@ def api_mcp_log():
 
 
 # ---------------------------------------------------------------------------
+# Routes — notifications (cron reminders, etc.)
+# ---------------------------------------------------------------------------
+
+@flask_app.route("/api/notifications")
+def api_notifications():
+    """Return unread notifications and mark them read."""
+    with _notifications_lock:
+        unread = [n for n in _notifications if not n["read"]]
+        for n in unread:
+            n["read"] = True
+    return jsonify(unread)
+
+
+@flask_app.route("/api/notifications/all")
+def api_notifications_all():
+    with _notifications_lock:
+        return jsonify(list(_notifications))
+
+
+# ---------------------------------------------------------------------------
 # Routes — chat (SSE streaming)
 # ---------------------------------------------------------------------------
 
@@ -947,7 +1298,12 @@ def api_gateway_logs():
 
 def _shutdown():
     """Terminate all background resources before exit."""
-    global _gateway_process, _agent, _async_loop
+    global _gateway_process, _agent, _async_loop, _cron_service
+
+    # 0. Stop cron service
+    if _cron_service is not None:
+        _cron_service.stop()
+        _cron_service = None
 
     # 1. Stop gateway subprocess
     if _gateway_process is not None:

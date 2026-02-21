@@ -560,6 +560,8 @@ a:hover { text-decoration: underline; }
   cursor: default;
 }
 .feedback-btn.dimmed { opacity: .3; cursor: default; pointer-events: none; }
+.regenerate-btn { font-size: 13px !important; }
+.regenerate-btn:hover { background: rgba(137,180,250,.15) !important; color: var(--blue) !important; border-color: var(--blue) !important; }
 .feedback-comment {
   font-size: 11px;
   color: var(--text-dim);
@@ -1089,6 +1091,8 @@ a:hover { text-decoration: underline; }
   box-shadow: 0 4px 24px rgba(0,0,0,.4);
   animation: slideIn .3s ease;
   pointer-events: auto;
+  white-space: pre-line;
+  max-width: 380px;
 }
 .toast.success { background: var(--green); color: var(--bg-crust); }
 .toast.error   { background: var(--red);   color: var(--bg-crust); }

@@ -15,6 +15,7 @@ const I18N = {
     "chat.placeholder":"输入消息… (Enter 发送, Shift+Enter 换行)",
     "chat.you":"你","chat.noHistory":"暂无历史对话","chat.newChat":"新对话",
     "chat.rename":"重命名","chat.renameTitle":"修改对话标题","chat.renamePlaceholder":"输入新标题",
+    "chat.regenerate":"重新回答",
     "chat.rated":"已评价","chat.thankFeedback":"感谢反馈！","chat.willImprove":"已记录，会改进",
     "chat.askDislike":"可以说说哪里不满意吗？（可留空）",
     "chat.error":"错误: ","chat.requestFail":"请求失败: ",
@@ -61,6 +62,7 @@ const I18N = {
     "chat.placeholder":"Type a message… (Enter to send, Shift+Enter for newline)",
     "chat.you":"You","chat.noHistory":"No chat history","chat.newChat":"New Chat",
     "chat.rename":"Rename","chat.renameTitle":"Rename chat","chat.renamePlaceholder":"Enter new title",
+    "chat.regenerate":"Regenerate",
     "chat.rated":"Rated","chat.thankFeedback":"Thanks for the feedback!","chat.willImprove":"Noted, will improve",
     "chat.askDislike":"What could be better? (optional)",
     "chat.error":"Error: ","chat.requestFail":"Request failed: ",
@@ -190,11 +192,27 @@ async function checkSystem() {
     switchPage("chat");
     applyLanguage();
     hideSplash();
+    startNotificationPoll();
   } catch (e) {
     hideSplash();
     applyLanguage();
     showSetup("install");
   }
+}
+
+let _notifTimer = null;
+function startNotificationPoll() {
+  if (_notifTimer) return;
+  _notifTimer = setInterval(pollNotifications, 5000);
+}
+async function pollNotifications() {
+  try {
+    const items = await api("/api/notifications");
+    if (!items || !items.length) return;
+    items.forEach(n => {
+      toast(`🔔 ${n.title}\n${n.content}`, n.level === "error" ? "error" : "success", 8000);
+    });
+  } catch (_) {}
 }
 
 function showSetup(stage) {
@@ -470,13 +488,14 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
   const rendered = renderMd ? renderMarkdown(content) : escapeHtml(content);
 
   let feedbackHtml = "";
-  if (isBotFinal) {
+  if (isBotFinal && msgIndex >= 0) {
     const likeClass = existingFeedback === "like" ? " selected-like" : existingFeedback === "dislike" ? " dimmed" : "";
     const dislikeClass = existingFeedback === "dislike" ? " selected-dislike" : existingFeedback === "like" ? " dimmed" : "";
     const commentText = existingFeedback ? `<span class="feedback-comment">${t("chat.rated")}</span>` : "";
     feedbackHtml = `<div class="message-feedback" data-msgindex="${msgIndex}">
       <button class="feedback-btn${likeClass}" data-rating="like" onclick="handleFeedback(this)">👍</button>
       <button class="feedback-btn${dislikeClass}" data-rating="dislike" onclick="handleFeedback(this)">👎</button>
+      <button class="feedback-btn regenerate-btn" onclick="regenerateMessage(${msgIndex})" title="${t("chat.regenerate")}">🔄</button>
       ${commentText}
     </div>`;
   }
@@ -521,6 +540,77 @@ async function handleFeedback(btn) {
   let commentEl = feedbackDiv.querySelector(".feedback-comment");
   if (!commentEl) { commentEl = document.createElement("span"); commentEl.className = "feedback-comment"; feedbackDiv.appendChild(commentEl); }
   commentEl.textContent = rating === "like" ? t("chat.thankFeedback") : t("chat.willImprove");
+}
+
+async function regenerateMessage(botMsgIndex) {
+  if (chatBusy) return;
+
+  let userText = "";
+  for (let i = botMsgIndex - 1; i >= 0; i--) {
+    if (chatMessages[i].role === "user") { userText = chatMessages[i].content; break; }
+  }
+  if (!userText) return;
+
+  chatMessages.splice(botMsgIndex, 1);
+  renderChatFromHistory();
+
+  chatBusy = true;
+  document.getElementById("send-btn").disabled = true;
+  const thinkingId = appendThinking();
+
+  let finalContent = null;
+  try {
+    const response = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: userText, session_id: sessionId }),
+    });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let progressEl = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const data = JSON.parse(line.slice(6));
+          if (data.type === "progress") {
+            if (!progressEl) { removeElement(thinkingId); progressEl = appendMessageDOM("bot progress", "↳ " + data.content); }
+            else updateMessageContent(progressEl, "↳ " + data.content);
+          } else if (data.type === "done") {
+            finalContent = data.content;
+          } else if (data.type === "error") {
+            removeElement(thinkingId);
+            if (progressEl) removeElement(progressEl);
+            appendMessageDOM("bot", t("chat.error") + data.content);
+            finalContent = t("chat.error") + data.content;
+          }
+        } catch (_) {}
+      }
+    }
+
+    removeElement(thinkingId);
+    if (progressEl) removeElement(progressEl);
+    if (finalContent !== null) {
+      chatMessages.push({ role: "bot", content: finalContent, markdown: true, feedback: null });
+      appendMessageDOM("bot", finalContent, true, chatMessages.length - 1, null);
+    }
+  } catch (e) {
+    removeElement(thinkingId);
+    finalContent = t("chat.requestFail") + e.message;
+    chatMessages.push({ role: "bot", content: finalContent, markdown: false, feedback: null });
+    appendMessageDOM("bot", finalContent, false, chatMessages.length - 1, null);
+  }
+  await persistCurrentSession();
+  chatBusy = false;
+  document.getElementById("send-btn").disabled = false;
 }
 
 function appendThinking() {
@@ -1034,11 +1124,11 @@ async function api(url, method = "GET", body = null) {
   return res.json();
 }
 
-function toast(message, type = "info") {
+function toast(message, type = "info", duration = 4000) {
   const container = document.getElementById("toast-container");
   const div = document.createElement("div");
   div.className = `toast ${type}`;
   div.textContent = message;
   container.appendChild(div);
-  setTimeout(() => div.remove(), 4000);
+  setTimeout(() => div.remove(), duration);
 }
