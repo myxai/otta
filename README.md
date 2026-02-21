@@ -7,11 +7,33 @@ A Windows desktop GUI client for [nanobot](https://github.com/HKUDS/nanobot) —
 ## Features
 
 - **Chat** — Real-time conversation with the nanobot AI agent, with Markdown rendering and code highlighting
+- **Apps** — Extensible app center; install, configure, and manage automated tasks
+  - **Daily Digest** — AI-powered personal interest recommendation engine based on browser history
 - **Settings** — Visual configuration for API keys, model parameters, MCP tool servers, channel toggles, and more
 - **Status** — Overview of system status: providers, channels, model config, MCP tools, and feedback cases
 - **Gateway** — Start / stop the nanobot gateway with one click to connect Telegram, Discord, Feishu, etc.
 - **MCP Integration** — Connect external tool servers (e.g. Playwright for browser automation) via MCP protocol
 - **i18n** — Bilingual UI (Chinese / English), defaults to system language
+
+## Daily Digest App
+
+An automated daily recommendation engine that analyzes your browser history and searches the web for high-quality content tailored to your interests.
+
+**How it works:**
+
+1. **Collect** — Reads Chrome / Edge browsing history (titles & URLs only, no page content)
+2. **Analyse** — LLM identifies your real interests and classifies them (work / study / life)
+3. **Search** — Generates semantic search queries and searches the web (Brave → Bing → DuckDuckGo auto-fallback)
+4. **Curate** — LLM selects the best content from search results, generates an HTML report with real links
+
+**Key design:**
+
+- No browser plugins required; works with local history database
+- AI-powered interest extraction (falls back to rule-based when LLM unavailable)
+- Multi-engine web search with automatic failover
+- Structured HTML report with card layout
+- Scheduled auto-generation or manual trigger
+- Interest preview for quick analysis without full report
 
 ## Prerequisites
 
@@ -56,6 +78,8 @@ A native Windows window will open. If `pywebview` is not installed, it will fall
 | Markdown rendering | marked.js |
 | Code highlighting | highlight.js |
 | AI engine | nanobot-ai |
+| LLM routing | litellm (auto provider detection) |
+| Web search | Brave API / Bing / DuckDuckGo (auto-fallback) |
 
 ## Project Structure
 
@@ -65,6 +89,9 @@ myai/
 ├── requirements.txt    # Python dependencies
 ├── README.md           # English documentation
 ├── README_CN.md        # Chinese documentation
+├── apps/
+│   ├── __init__.py
+│   └── daily_digest.py # Daily Digest app: full pipeline
 └── frontend/
     ├── index.html      # Frontend page
     ├── style.css       # Styles (Catppuccin Mocha dark theme)

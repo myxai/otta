@@ -49,6 +49,7 @@ _async_loop: asyncio.AbstractEventLoop | None = None
 _async_thread: threading.Thread | None = None
 _agent = None
 _agent_lock = threading.Lock()
+_session_epoch = int(time.time())
 _session_counter = 0
 _gateway_process: subprocess.Popen | None = None
 _cron_service = None
@@ -254,7 +255,9 @@ def _patch_agent_tool_history(agent):
             "for the relevant job ID, then call the tool with that ID.\n"
             "3. If the user repeats a request that was done before, call the tool again "
             "— the previous result may have expired.\n"
-            "4. Keep responses concise and natural."
+            "4. Keep responses concise and natural.\n"
+            "5. NEVER proactively create tasks/reminders unless the user explicitly asks. "
+            "If the user asks to 'check' or 'verify', only use list — do NOT create new ones."
         )
 
     agent.context.build_system_prompt = _enhanced_system_prompt
@@ -313,7 +316,8 @@ def _patch_agent_tool_history(agent):
             ))
 
         # --- Run the agent loop with EXEC governance ---
-        exec_mode = _is_exec_mode(msg.content)
+        is_cron = key.startswith("cron:")
+        exec_mode = not is_cron and _is_exec_mode(msg.content)
         messages = list(initial_messages)
         n_initial = len(messages)
         iteration = 0
@@ -445,30 +449,18 @@ def _get_or_create_agent():
         agent_ref = _agent
 
         async def _on_cron_job(job):
-            """Cron callback: process job through agent and push notification."""
-            print(f"[cron] on_job callback: '{job.name}' ({job.id}), msg={job.payload.message[:60]}")
-            try:
-                response = await agent_ref.process_direct(
-                    job.payload.message,
-                    session_key=f"cron:{job.id}",
-                    channel=job.payload.channel or "cli",
-                    chat_id=job.payload.to or "cron",
-                )
-                print(f"[cron] on_job response: {(response or '')[:80]}")
-                _push_notification(
-                    title=job.name,
-                    content=response or job.payload.message,
-                    level="info",
-                )
-                return response
-            except Exception as e:
-                print(f"[cron] on_job error: {e}")
-                _push_notification(
-                    title=job.name,
-                    content=f"执行失败: {e}",
-                    level="error",
-                )
-                raise
+            """Cron callback: directly push notification without LLM processing.
+
+            Passing cron messages through the LLM causes it to misinterpret
+            notifications as user requests, creating new tasks in a loop.
+            """
+            print(f"[cron] on_job: '{job.name}' ({job.id})")
+            _push_notification(
+                title=job.name,
+                content=job.payload.message,
+                level="info",
+            )
+            return job.payload.message
 
         cron.on_job = _on_cron_job
 
@@ -950,7 +942,7 @@ def api_chat():
         return jsonify({"error": "nanobot 未安装"}), 400
 
     message = (request.json or {}).get("message", "").strip()
-    session_id = (request.json or {}).get("session_id", f"desktop:{_session_counter}")
+    session_id = (request.json or {}).get("session_id", f"desktop:{_session_epoch}_{_session_counter}")
     if not message:
         return jsonify({"error": "消息不能为空"}), 400
 
@@ -1010,7 +1002,7 @@ def api_chat():
 def api_new_chat():
     global _session_counter
     _session_counter += 1
-    return jsonify({"success": True, "session_id": f"desktop:{_session_counter}"})
+    return jsonify({"success": True, "session_id": f"desktop:{_session_epoch}_{_session_counter}"})
 
 
 # ---------------------------------------------------------------------------
@@ -1112,6 +1104,414 @@ def api_history_delete(session_id):
         del data[session_id]
         _save_all_history(data)
     return jsonify({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Routes — Apps management
+# ---------------------------------------------------------------------------
+
+_APPS_DIR = Path.home() / ".nanobot" / "apps"
+_APPS_REGISTRY = _APPS_DIR / "registry.json"
+
+_digest_task_lock = threading.Lock()
+_digest_task_status: dict = {}  # {"status": "idle"|"running"|"done"|"error", ...}
+
+# Built-in app catalog
+_APP_CATALOG = {
+    "daily_digest": {
+        "id": "daily_digest",
+        "name": "推荐日报",
+        "name_en": "Daily Digest",
+        "icon": "📰",
+        "description": "基于浏览器历史，自动分析个人兴趣，每日推荐工作、学习、生活相关内容",
+        "description_en": "Analyze browser history to discover interests, generate daily recommendations for work, study and life",
+        "version": "1.0.0",
+        "author": "nanobot",
+        "category": "productivity",
+    },
+    "web_monitor": {
+        "id": "web_monitor",
+        "name": "网页监控",
+        "name_en": "Web Monitor",
+        "icon": "🔍",
+        "description": "监控指定网页变化，有更新时自动提醒",
+        "description_en": "Monitor web pages for changes, notify on updates",
+        "version": "0.1.0",
+        "author": "nanobot",
+        "category": "tools",
+        "coming_soon": True,
+    },
+    "email_summary": {
+        "id": "email_summary",
+        "name": "邮件摘要",
+        "name_en": "Email Summary",
+        "icon": "📧",
+        "description": "自动汇总未读邮件，生成每日邮件摘要",
+        "description_en": "Auto-summarize unread emails into a daily digest",
+        "version": "0.1.0",
+        "author": "nanobot",
+        "category": "productivity",
+        "coming_soon": True,
+    },
+    "focus_timer": {
+        "id": "focus_timer",
+        "name": "专注计时",
+        "name_en": "Focus Timer",
+        "icon": "⏱️",
+        "description": "番茄钟工作法，自动记录专注时间并统计",
+        "description_en": "Pomodoro timer with automatic focus time tracking",
+        "version": "0.1.0",
+        "author": "nanobot",
+        "category": "productivity",
+        "coming_soon": True,
+    },
+}
+
+_DEFAULT_DIGEST_CONFIG = {
+    "browser": "auto",
+    "history_hours": 24,
+    "schedule_time": "22:00",
+    "push_notification": True,
+    "push_email": "",
+}
+
+
+def _load_apps_registry() -> dict:
+    _APPS_DIR.mkdir(parents=True, exist_ok=True)
+    if _APPS_REGISTRY.exists():
+        try:
+            return json.loads(_APPS_REGISTRY.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def _save_apps_registry(data: dict):
+    _APPS_DIR.mkdir(parents=True, exist_ok=True)
+    _APPS_REGISTRY.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _get_model_config() -> dict:
+    """Read model/api_key/api_base/brave_api_key from nanobot config."""
+    if not NANOBOT_AVAILABLE:
+        return {}
+    try:
+        from nanobot.config.loader import load_config
+        config = load_config()
+        model = config.agents.defaults.model
+        p = config.get_provider(model)
+        brave_key = config.tools.web.search.api_key if config.tools.web.search else None
+        return {
+            "model": model,
+            "api_key": p.api_key if p else None,
+            "api_base": config.get_api_base(model) or None,
+            "brave_api_key": brave_key or None,
+        }
+    except Exception:
+        return {}
+
+
+@flask_app.route("/api/apps")
+def api_apps_list():
+    """Return all apps: catalog + installation status."""
+    registry = _load_apps_registry()
+    result = []
+    for app_id, catalog in _APP_CATALOG.items():
+        entry = {**catalog}
+        installed = registry.get(app_id)
+        entry["installed"] = installed is not None
+        entry["enabled"] = installed.get("enabled", False) if installed else False
+        entry["config"] = installed.get("config", {}) if installed else {}
+        entry["last_run"] = installed.get("last_run") if installed else None
+        result.append(entry)
+    return jsonify(result)
+
+
+@flask_app.route("/api/apps/<app_id>/install", methods=["POST"])
+def api_app_install(app_id):
+    if app_id not in _APP_CATALOG:
+        return jsonify({"error": "应用不存在"}), 404
+    if _APP_CATALOG[app_id].get("coming_soon"):
+        return jsonify({"error": "该应用即将推出，暂不可安装"}), 400
+    registry = _load_apps_registry()
+    if app_id in registry:
+        return jsonify({"error": "应用已安装"}), 400
+    default_configs = {"daily_digest": _DEFAULT_DIGEST_CONFIG}
+    registry[app_id] = {
+        "installed_at": datetime.now(timezone.utc).isoformat(),
+        "enabled": True,
+        "config": default_configs.get(app_id, {}),
+    }
+    _save_apps_registry(registry)
+    return jsonify({"success": True})
+
+
+@flask_app.route("/api/apps/<app_id>/uninstall", methods=["POST"])
+def api_app_uninstall(app_id):
+    registry = _load_apps_registry()
+    if app_id not in registry:
+        return jsonify({"error": "应用未安装"}), 404
+    del registry[app_id]
+    _save_apps_registry(registry)
+    return jsonify({"success": True})
+
+
+@flask_app.route("/api/apps/<app_id>/enable", methods=["POST"])
+def api_app_enable(app_id):
+    registry = _load_apps_registry()
+    if app_id not in registry:
+        return jsonify({"error": "应用未安装"}), 404
+    registry[app_id]["enabled"] = True
+    _save_apps_registry(registry)
+    return jsonify({"success": True})
+
+
+@flask_app.route("/api/apps/<app_id>/disable", methods=["POST"])
+def api_app_disable(app_id):
+    registry = _load_apps_registry()
+    if app_id not in registry:
+        return jsonify({"error": "应用未安装"}), 404
+    registry[app_id]["enabled"] = False
+    _save_apps_registry(registry)
+    return jsonify({"success": True})
+
+
+@flask_app.route("/api/apps/<app_id>/config", methods=["GET"])
+def api_app_get_config(app_id):
+    registry = _load_apps_registry()
+    if app_id not in registry:
+        return jsonify({"error": "应用未安装"}), 404
+    return jsonify(registry[app_id].get("config", {}))
+
+
+@flask_app.route("/api/apps/<app_id>/config", methods=["POST"])
+def api_app_save_config(app_id):
+    registry = _load_apps_registry()
+    if app_id not in registry:
+        return jsonify({"error": "应用未安装"}), 404
+    new_config = request.json or {}
+    registry[app_id]["config"] = new_config
+    _save_apps_registry(registry)
+    return jsonify({"success": True})
+
+
+@flask_app.route("/api/apps/daily_digest/run", methods=["POST"])
+def api_digest_run():
+    """Start a daily digest run in the background."""
+    registry = _load_apps_registry()
+    if "daily_digest" not in registry:
+        return jsonify({"error": "推荐日报应用未安装"}), 400
+
+    with _digest_task_lock:
+        if _digest_task_status.get("status") == "running":
+            return jsonify({"error": "日报正在生成中，请稍候"}), 409
+        _digest_task_status.update({"status": "running", "progress": "正在采集浏览器历史…"})
+
+    def _run():
+        try:
+            from apps.daily_digest import run_daily_digest
+            app_config = registry["daily_digest"].get("config", {})
+            model_cfg = _get_model_config()
+            merged = {**app_config, **model_cfg}
+
+            def _progress(msg):
+                with _digest_task_lock:
+                    _digest_task_status["progress"] = msg
+
+            result = run_daily_digest(merged, progress_cb=_progress)
+
+            if result["status"] == "ok":
+                reg = _load_apps_registry()
+                if "daily_digest" in reg:
+                    reg["daily_digest"]["last_run"] = datetime.now(timezone.utc).isoformat()
+                    _save_apps_registry(reg)
+
+                stats = result.get("stats", {})
+                _push_notification(
+                    title="📰 推荐日报已生成",
+                    content=(
+                        f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
+                        f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
+                    ),
+                    level="info",
+                )
+
+            with _digest_task_lock:
+                _digest_task_status.update({
+                    "status": "done" if result["status"] == "ok" else "error",
+                    "result": result,
+                })
+        except Exception as exc:
+            print(f"[daily_digest] run error: {exc}")
+            with _digest_task_lock:
+                _digest_task_status.update({"status": "error", "result": {"message": str(exc)}})
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "running"})
+
+
+@flask_app.route("/api/apps/daily_digest/status")
+def api_digest_status():
+    with _digest_task_lock:
+        return jsonify(dict(_digest_task_status) if _digest_task_status else {"status": "idle"})
+
+
+@flask_app.route("/api/apps/daily_digest/reports")
+def api_digest_reports():
+    from apps.daily_digest import list_reports
+    return jsonify(list_reports())
+
+
+@flask_app.route("/api/apps/daily_digest/report/<date_str>")
+def api_digest_report(date_str):
+    from apps.daily_digest import load_report
+    report = load_report(date_str)
+    if not report:
+        return jsonify({"error": "报告不存在"}), 404
+    return jsonify(report)
+
+
+@flask_app.route("/api/apps/daily_digest/browsers")
+def api_digest_browsers():
+    from apps.daily_digest import find_browser_history_paths
+    return jsonify(find_browser_history_paths())
+
+
+@flask_app.route("/api/apps/daily_digest/preview")
+def api_digest_preview():
+    """Quick preview: read history + extract interests without generating full report.
+
+    Uses LLM analysis when model config is available, falls back to rule-based.
+    """
+    registry = _load_apps_registry()
+    if "daily_digest" not in registry:
+        return jsonify({"error": "推荐日报应用未安装"}), 400
+
+    from apps.daily_digest import (
+        read_browser_history, filter_history,
+        extract_keywords, classify_interests,
+        llm_analyze_interests,
+    )
+    app_config = registry["daily_digest"].get("config", {})
+    browser = app_config.get("browser", "auto")
+    hours = app_config.get("history_hours", 24)
+
+    raw = read_browser_history(hours=hours, browser=browser)
+    filtered = filter_history(raw)
+
+    model_cfg = _get_model_config()
+    model = model_cfg.get("model")
+    api_key = model_cfg.get("api_key")
+    api_base = model_cfg.get("api_base")
+    analysis_method = "rule"
+
+    if model and api_key:
+        llm_result = llm_analyze_interests(filtered, model, api_key, api_base)
+        if llm_result:
+            analysis_method = "llm"
+            interests = {
+                cat: [{"keyword": kw, "count": 0} for kw in entry["interests"]]
+                for cat, entry in llm_result.items()
+            }
+            queries = {
+                cat: entry["queries"]
+                for cat, entry in llm_result.items()
+            }
+            return jsonify({
+                "raw_count": len(raw),
+                "filtered_count": len(filtered),
+                "keyword_count": sum(len(v) for v in interests.values()),
+                "interests": interests,
+                "queries": queries,
+                "method": analysis_method,
+            })
+
+    keywords = extract_keywords(filtered)
+    categories = classify_interests(keywords)
+    interests = {
+        cat: [{"keyword": i["keyword"], "count": i["count"]} for i in items[:10]]
+        for cat, items in categories.items()
+    }
+    return jsonify({
+        "raw_count": len(raw),
+        "filtered_count": len(filtered),
+        "keyword_count": len(keywords),
+        "interests": interests,
+        "method": analysis_method,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Apps scheduler (background timer)
+# ---------------------------------------------------------------------------
+
+_app_scheduler_timer = None
+
+
+def _start_app_scheduler():
+    """Start a background timer that checks scheduled apps every 60 seconds."""
+    global _app_scheduler_timer
+
+    def _tick():
+        global _app_scheduler_timer
+        try:
+            _check_scheduled_apps()
+        except Exception as exc:
+            print(f"[app_scheduler] tick error: {exc}")
+        _app_scheduler_timer = threading.Timer(60, _tick)
+        _app_scheduler_timer.daemon = True
+        _app_scheduler_timer.start()
+
+    _app_scheduler_timer = threading.Timer(60, _tick)
+    _app_scheduler_timer.daemon = True
+    _app_scheduler_timer.start()
+    print("[app_scheduler] started")
+
+
+def _check_scheduled_apps():
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    today = now.strftime("%Y-%m-%d")
+
+    registry = _load_apps_registry()
+    for app_id, app in registry.items():
+        if not app.get("enabled"):
+            continue
+        schedule_time = app.get("config", {}).get("schedule_time")
+        if not schedule_time or current_time != schedule_time:
+            continue
+        last_run = app.get("last_run", "")
+        if last_run and last_run.startswith(today):
+            continue
+
+        if app_id == "daily_digest":
+            with _digest_task_lock:
+                if _digest_task_status.get("status") == "running":
+                    continue
+            print(f"[app_scheduler] triggering daily_digest at {current_time}")
+            # Trigger via the API endpoint logic
+            try:
+                from apps.daily_digest import run_daily_digest
+                app_config = app.get("config", {})
+                model_cfg = _get_model_config()
+                merged = {**app_config, **model_cfg}
+                result = run_daily_digest(merged)
+                if result["status"] == "ok":
+                    registry[app_id]["last_run"] = datetime.now(timezone.utc).isoformat()
+                    _save_apps_registry(registry)
+                    stats = result.get("stats", {})
+                    _push_notification(
+                        title="📰 推荐日报已生成",
+                        content=(
+                            f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
+                            f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
+                        ),
+                        level="info",
+                    )
+            except Exception as exc:
+                print(f"[app_scheduler] daily_digest error: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -1298,7 +1698,12 @@ def api_gateway_logs():
 
 def _shutdown():
     """Terminate all background resources before exit."""
-    global _gateway_process, _agent, _async_loop, _cron_service
+    global _gateway_process, _agent, _async_loop, _cron_service, _app_scheduler_timer
+
+    # 0a. Stop app scheduler
+    if _app_scheduler_timer is not None:
+        _app_scheduler_timer.cancel()
+        _app_scheduler_timer = None
 
     # 0. Stop cron service
     if _cron_service is not None:
@@ -1345,6 +1750,8 @@ atexit.register(_shutdown)
 # ---------------------------------------------------------------------------
 
 def main():
+    _start_app_scheduler()
+
     try:
         import webview
     except ImportError:
@@ -1386,8 +1793,36 @@ def main():
         width=1280,
         height=860,
         min_size=(960, 640),
+        maximized=True,
     )
-    webview.start()
+
+    def _grant_media_permissions(win):
+        """Auto-allow microphone/camera permissions in WebView2."""
+        win.events.loaded.wait(30)
+        try:
+            from webview.platforms.winforms import BrowserView
+            from System import Func, Type
+
+            bv = BrowserView.instances.get(win.uid)
+            if not bv or not getattr(bv, 'browser', None):
+                return
+
+            def _setup():
+                core = bv.browser.webview.CoreWebView2
+                if not core:
+                    return
+                from Microsoft.Web.WebView2.Core import CoreWebView2PermissionState
+
+                def _on_perm(sender, args):
+                    args.State = CoreWebView2PermissionState.Allow
+
+                core.PermissionRequested += _on_perm
+
+            bv.Invoke(Func[Type](_setup))
+        except Exception as e:
+            print(f"[webview] auto-allow permissions failed: {e}")
+
+    webview.start(func=_grant_media_permissions, args=[window])
     _shutdown()
     os._exit(0)
 

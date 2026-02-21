@@ -51,6 +51,34 @@ const I18N = {
     "gw.start":"启动网关","gw.stop":"停止网关","gw.logs":"网关日志",
     "gw.started":"网关已启动","gw.startFail":"启动失败","gw.stopFail":"停止失败","gw.stoppedMsg":"网关已停止",
     "common.onboardOk":"初始化成功！","common.onboardFail":"初始化失败",
+    "voice.ttsToggle":"语音提醒","voice.listening":"正在聆听…","voice.unsupported":"浏览器不支持语音输入",
+    "voice.ttsOn":"语音提醒已开启","voice.ttsOff":"语音提醒已关闭",
+    "nav.apps":"应用",
+    "apps.title":"应用中心","apps.search":"搜索应用…","apps.back":"返回",
+    "apps.installed":"已安装","apps.notInstalled":"未安装","apps.comingSoon":"即将推出",
+    "apps.install":"安装","apps.uninstall":"卸载","apps.configure":"配置",
+    "apps.enabled":"已启用","apps.disabled":"已停用",
+    "apps.enable":"启用","apps.disable":"停用",
+    "apps.installOk":"应用安装成功","apps.uninstallOk":"应用已卸载",
+    "apps.installFail":"安装失败","apps.uninstallFail":"卸载失败",
+    "apps.version":"版本","apps.author":"作者",
+    "digest.title":"推荐日报","digest.subtitle":"基于浏览器历史，AI 自动分析兴趣并全网搜索推荐",
+    "digest.status":"状态","digest.config":"配置",
+    "digest.browser":"浏览器","digest.browserAuto":"自动检测","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
+    "digest.historyHours":"历史范围（小时）","digest.scheduleTime":"每日生成时间",
+    "digest.pushNotification":"弹窗提醒","digest.pushEmail":"邮箱推送",
+    "digest.runNow":"立即生成","digest.running":"正在生成…","digest.saveConfig":"保存设置",
+    "digest.configSaved":"设置已保存","digest.configFail":"保存失败",
+    "digest.reports":"历史报告","digest.noReports":"暂无报告",
+    "digest.preview":"兴趣预览","digest.previewDesc":"快速分析当前浏览器历史中的兴趣分布（优先使用 AI 分析）",
+    "digest.previewBtn":"预览兴趣","digest.previewLoading":"正在分析…",
+    "digest.previewMethod":"分析方式","digest.previewRuleBased":"规则",
+    "digest.work":"工作","digest.study":"学习","digest.life":"生活",
+    "digest.rawCount":"原始记录","digest.filteredCount":"有效记录","digest.keywordCount":"兴趣数","digest.searchResults":"搜索推荐",
+    "digest.viewReport":"查看","digest.lastRun":"上次运行",
+    "digest.generating":"日报生成中，请稍候…","digest.generateOk":"日报生成完成！",
+    "digest.generateFail":"日报生成失败","digest.noHistory":"未找到浏览记录",
+    "digest.latestReport":"最新报告",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
@@ -98,6 +126,34 @@ const I18N = {
     "gw.start":"Start Gateway","gw.stop":"Stop Gateway","gw.logs":"Gateway Logs",
     "gw.started":"Gateway started","gw.startFail":"Failed to start","gw.stopFail":"Failed to stop","gw.stoppedMsg":"Gateway stopped",
     "common.onboardOk":"Initialization successful!","common.onboardFail":"Initialization failed",
+    "voice.ttsToggle":"Voice alerts","voice.listening":"Listening…","voice.unsupported":"Voice input not supported",
+    "voice.ttsOn":"Voice alerts enabled","voice.ttsOff":"Voice alerts disabled",
+    "nav.apps":"Apps",
+    "apps.title":"App Center","apps.search":"Search apps…","apps.back":"Back",
+    "apps.installed":"Installed","apps.notInstalled":"Not installed","apps.comingSoon":"Coming Soon",
+    "apps.install":"Install","apps.uninstall":"Uninstall","apps.configure":"Configure",
+    "apps.enabled":"Enabled","apps.disabled":"Disabled",
+    "apps.enable":"Enable","apps.disable":"Disable",
+    "apps.installOk":"App installed successfully","apps.uninstallOk":"App uninstalled",
+    "apps.installFail":"Install failed","apps.uninstallFail":"Uninstall failed",
+    "apps.version":"Version","apps.author":"Author",
+    "digest.title":"Daily Digest","digest.subtitle":"AI-powered interest analysis and web search based on browser history",
+    "digest.status":"Status","digest.config":"Settings",
+    "digest.browser":"Browser","digest.browserAuto":"Auto detect","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
+    "digest.historyHours":"History range (hours)","digest.scheduleTime":"Daily generation time",
+    "digest.pushNotification":"Push notification","digest.pushEmail":"Email push",
+    "digest.runNow":"Generate Now","digest.running":"Generating…","digest.saveConfig":"Save Settings",
+    "digest.configSaved":"Settings saved","digest.configFail":"Save failed",
+    "digest.reports":"Report History","digest.noReports":"No reports yet",
+    "digest.preview":"Interest Preview","digest.previewDesc":"Quick analysis of current browser history interests (AI-powered when available)",
+    "digest.previewBtn":"Preview Interests","digest.previewLoading":"Analyzing…",
+    "digest.previewMethod":"Method","digest.previewRuleBased":"Rule-based",
+    "digest.work":"Work","digest.study":"Study","digest.life":"Life",
+    "digest.rawCount":"Raw records","digest.filteredCount":"Valid records","digest.keywordCount":"Interests","digest.searchResults":"Recommendations",
+    "digest.viewReport":"View","digest.lastRun":"Last run",
+    "digest.generating":"Generating digest, please wait…","digest.generateOk":"Digest generated!",
+    "digest.generateFail":"Generation failed","digest.noHistory":"No browser history found",
+    "digest.latestReport":"Latest Report",
   },
 };
 
@@ -248,11 +304,13 @@ function switchPage(page) {
   const target = document.getElementById(`page-${page}`);
   if (target) target.style.display = "flex";
   document.querySelectorAll(".nav-item").forEach((n) => {
-    n.classList.toggle("active", n.dataset.page === page);
+    const np = n.dataset.page;
+    n.classList.toggle("active", np === page || (np === "apps" && page === "app-detail"));
   });
   if (page === "settings") loadConfig();
   if (page === "status") loadStatus();
   if (page === "gateway") loadGatewayStatus();
+  if (page === "apps") loadApps();
 }
 
 // ── Session list (sidebar) ────────────────────────────────────────────
@@ -1131,4 +1189,663 @@ function toast(message, type = "info", duration = 4000) {
   div.textContent = message;
   container.appendChild(div);
   setTimeout(() => div.remove(), duration);
+}
+
+// ── Voice Input (STT) ────────────────────────────────────────────────
+let _recognition = null;
+let _voiceActive = false;
+
+function _initSpeechRecognition() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    const btn = document.getElementById("voice-btn");
+    if (btn) btn.classList.add("unsupported");
+    return null;
+  }
+  const rec = new SR();
+  rec.continuous = false;
+  rec.interimResults = true;
+  rec.lang = _lang === "en" ? "en-US" : "zh-CN";
+
+  rec.onresult = (e) => {
+    const input = document.getElementById("chat-input");
+    let transcript = "";
+    for (let i = 0; i < e.results.length; i++) {
+      transcript += e.results[i][0].transcript;
+    }
+    input.value = transcript;
+    input.dispatchEvent(new Event("input"));
+  };
+
+  rec.onend = () => {
+    _voiceActive = false;
+    const btn = document.getElementById("voice-btn");
+    if (btn) btn.classList.remove("recording");
+    const input = document.getElementById("chat-input");
+    if (input && input.value.trim()) {
+      sendMessage();
+    }
+  };
+
+  rec.onerror = (e) => {
+    _voiceActive = false;
+    const btn = document.getElementById("voice-btn");
+    if (btn) btn.classList.remove("recording");
+    if (e.error !== "aborted" && e.error !== "no-speech") {
+      console.warn("Speech recognition error:", e.error);
+    }
+  };
+
+  return rec;
+}
+
+function toggleVoiceInput() {
+  if (!_recognition) _recognition = _initSpeechRecognition();
+  if (!_recognition) { toast(t("voice.unsupported"), "error"); return; }
+
+  _recognition.lang = _lang === "en" ? "en-US" : "zh-CN";
+
+  const btn = document.getElementById("voice-btn");
+  if (_voiceActive) {
+    _recognition.stop();
+    _voiceActive = false;
+    btn.classList.remove("recording");
+  } else {
+    _recognition.start();
+    _voiceActive = true;
+    btn.classList.add("recording");
+    toast(t("voice.listening"), "info", 2000);
+  }
+}
+
+// ── Voice Notification (TTS) ─────────────────────────────────────────
+let _ttsVoices = [];
+
+const _PREFERRED_ZH = [
+  "Xiaoxiao", "Yunyang", "Xiaoyi", "Yunxi",
+  "Xiaoxuan", "Yunfeng", "Xiaomo",
+];
+const _PREFERRED_EN = [
+  "Jenny", "Aria", "Guy", "Sara", "Nancy",
+];
+
+function _isTTSEnabled() {
+  const v = localStorage.getItem("nanobot_tts");
+  return v === null || v === "true";
+}
+
+function _loadVoices() {
+  if (!window.speechSynthesis) return;
+  const populate = () => {
+    _ttsVoices = speechSynthesis.getVoices();
+    _populateVoiceSelect();
+  };
+  populate();
+  if (!_ttsVoices.length) {
+    speechSynthesis.onvoiceschanged = populate;
+  }
+}
+
+function _populateVoiceSelect() {
+  const sel = document.getElementById("tts-voice");
+  if (!sel) return;
+  sel.innerHTML = "";
+
+  const langPrefix = _lang === "en" ? "en" : "zh";
+  const preferred = _lang === "en" ? _PREFERRED_EN : _PREFERRED_ZH;
+
+  const matched = _ttsVoices.filter(v => v.lang.toLowerCase().startsWith(langPrefix));
+  const others = _ttsVoices.filter(v => !v.lang.toLowerCase().startsWith(langPrefix));
+
+  const scored = matched.map(v => {
+    const name = v.name;
+    let score = 0;
+    if (/online/i.test(name)) score += 100;
+    if (/natural/i.test(name)) score += 80;
+    if (/neural/i.test(name)) score += 60;
+    const prefIdx = preferred.findIndex(p => name.includes(p));
+    if (prefIdx >= 0) score += 50 - prefIdx;
+    return { voice: v, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+
+  const savedName = localStorage.getItem("nanobot_tts_voice");
+  let hasSelected = false;
+
+  scored.forEach(({ voice }) => {
+    const opt = document.createElement("option");
+    const tag = /online/i.test(voice.name) ? " ✨" : "";
+    opt.value = voice.name;
+    opt.textContent = _shortVoiceName(voice.name) + tag;
+    opt.title = voice.name;
+    if (voice.name === savedName) { opt.selected = true; hasSelected = true; }
+    sel.appendChild(opt);
+  });
+
+  if (others.length) {
+    const sep = document.createElement("option");
+    sep.disabled = true;
+    sep.textContent = "────";
+    sel.appendChild(sep);
+    others.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.name;
+      opt.textContent = _shortVoiceName(v.name);
+      opt.title = v.name;
+      if (v.name === savedName) { opt.selected = true; hasSelected = true; }
+      sel.appendChild(opt);
+    });
+  }
+
+  if (!hasSelected && scored.length) {
+    sel.value = scored[0].voice.name;
+    localStorage.setItem("nanobot_tts_voice", scored[0].voice.name);
+  }
+}
+
+function _shortVoiceName(name) {
+  return name
+    .replace(/^Microsoft\s+/i, "")
+    .replace(/\s+Online\s*(\(Natural\))?/i, "")
+    .replace(/\s*-\s*Chinese.*$/i, "")
+    .replace(/\s*-\s*English.*$/i, "");
+}
+
+function _getSelectedVoice() {
+  const savedName = localStorage.getItem("nanobot_tts_voice");
+  if (savedName) {
+    const found = _ttsVoices.find(v => v.name === savedName);
+    if (found) return found;
+  }
+  const langPrefix = _lang === "en" ? "en" : "zh";
+  const preferred = _lang === "en" ? _PREFERRED_EN : _PREFERRED_ZH;
+  const matched = _ttsVoices.filter(v => v.lang.toLowerCase().startsWith(langPrefix));
+  for (const p of preferred) {
+    const v = matched.find(v => v.name.includes(p) && /online/i.test(v.name));
+    if (v) return v;
+  }
+  for (const p of preferred) {
+    const v = matched.find(v => v.name.includes(p));
+    if (v) return v;
+  }
+  return matched[0] || null;
+}
+
+function saveVoiceSetting() {
+  const sel = document.getElementById("tts-voice");
+  if (sel) localStorage.setItem("nanobot_tts_voice", sel.value);
+}
+
+function previewVoice() {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const sample = _lang === "en"
+    ? "Hello! I'm your assistant, ready to help."
+    : "你好！我是你的智能助手，随时为你服务。";
+  const utter = new SpeechSynthesisUtterance(sample);
+  const voice = _getSelectedVoice();
+  if (voice) { utter.voice = voice; utter.lang = voice.lang; }
+  else { utter.lang = _lang === "en" ? "en-US" : "zh-CN"; }
+  utter.rate = 1.0;
+  utter.pitch = 1.0;
+  window.speechSynthesis.speak(utter);
+}
+
+function saveTTSSetting() {
+  const enabled = document.getElementById("tts-enabled").checked;
+  localStorage.setItem("nanobot_tts", enabled ? "true" : "false");
+  toast(enabled ? t("voice.ttsOn") : t("voice.ttsOff"), "info", 2000);
+}
+
+function _loadTTSSetting() {
+  const cb = document.getElementById("tts-enabled");
+  if (cb) cb.checked = _isTTSEnabled();
+  _loadVoices();
+}
+
+function speakText(text) {
+  if (!_isTTSEnabled() || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const clean = text.replace(/[#*`_~\[\](){}|<>]/g, "");
+  let truncated = clean;
+  if (clean.length > 60) {
+    const cutPoints = /[。！？；\n.!?;]/g;
+    let lastCut = 0;
+    let m;
+    while ((m = cutPoints.exec(clean)) !== null) {
+      if (m.index + 1 <= 60) lastCut = m.index + 1;
+      else break;
+    }
+    truncated = lastCut > 0 ? clean.slice(0, lastCut) : clean.slice(0, 60);
+  }
+  if (!truncated.trim()) return;
+  const utter = new SpeechSynthesisUtterance(truncated);
+  const voice = _getSelectedVoice();
+  if (voice) { utter.voice = voice; utter.lang = voice.lang; }
+  else { utter.lang = _lang === "en" ? "en-US" : "zh-CN"; }
+  utter.rate = 1.0;
+  utter.pitch = 1.0;
+  window.speechSynthesis.speak(utter);
+}
+
+function stopSpeech() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
+// Hook into notification polling to trigger TTS
+const _origPollNotifications = pollNotifications;
+pollNotifications = async function() {
+  try {
+    const items = await api("/api/notifications");
+    if (!items || !items.length) return;
+    items.forEach(n => {
+      toast(`🔔 ${n.title}\n${n.content}`, n.level === "error" ? "error" : "success", 8000);
+    });
+    const last = items[items.length - 1];
+    speakText(`${last.title}。${last.content}`);
+  } catch (_) {}
+};
+
+document.addEventListener("DOMContentLoaded", _loadTTSSetting);
+
+// ── Apps ──────────────────────────────────────────────────────────────
+
+let _appsCache = [];
+
+async function loadApps() {
+  try {
+    _appsCache = await api("/api/apps");
+  } catch (_) {
+    _appsCache = [];
+  }
+  renderApps(_appsCache);
+}
+
+function filterApps(query) {
+  if (!query) { renderApps(_appsCache); return; }
+  const q = query.toLowerCase();
+  const filtered = _appsCache.filter(a =>
+    (a.name || "").toLowerCase().includes(q) ||
+    (a.name_en || "").toLowerCase().includes(q) ||
+    (a.description || "").toLowerCase().includes(q) ||
+    (a.description_en || "").toLowerCase().includes(q)
+  );
+  renderApps(filtered);
+}
+
+function _appName(a) { return _lang === "en" ? (a.name_en || a.name) : a.name; }
+function _appDesc(a) { return _lang === "en" ? (a.description_en || a.description) : a.description; }
+
+function renderApps(apps) {
+  const grid = document.getElementById("apps-grid");
+  if (!apps.length) {
+    grid.innerHTML = `<div class="apps-empty">${t("apps.search")}</div>`;
+    return;
+  }
+
+  grid.innerHTML = apps.map(a => {
+    const name = escapeHtml(_appName(a));
+    const desc = escapeHtml(_appDesc(a));
+    const ver = escapeHtml(a.version || "1.0.0");
+    const icon = a.icon || "📦";
+    const isInstalled = a.installed;
+    const isEnabled = a.enabled;
+    const comingSoon = a.coming_soon;
+
+    let statusBadge = "";
+    let actions = "";
+
+    if (comingSoon) {
+      statusBadge = `<span class="app-badge app-badge-soon">${t("apps.comingSoon")}</span>`;
+    } else if (isInstalled) {
+      statusBadge = isEnabled
+        ? `<span class="app-badge app-badge-on">${t("apps.enabled")}</span>`
+        : `<span class="app-badge app-badge-off">${t("apps.disabled")}</span>`;
+      actions = `
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">${t("apps.configure")}</button>
+        <button class="btn btn-sm" onclick="event.stopPropagation();uninstallApp('${a.id}')">${t("apps.uninstall")}</button>`;
+    } else {
+      statusBadge = `<span class="app-badge app-badge-new">${t("apps.notInstalled")}</span>`;
+      actions = `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();installApp('${a.id}')">${t("apps.install")}</button>`;
+    }
+
+    return `<div class="app-card${isInstalled ? ' installed' : ''}${comingSoon ? ' coming-soon' : ''}" onclick="${isInstalled && !comingSoon ? `openAppDetail('${a.id}')` : ''}">
+      <div class="app-card-header">
+        <div class="app-card-icon">${icon}</div>
+        ${statusBadge}
+      </div>
+      <div class="app-card-body">
+        <h3 class="app-card-name">${name}</h3>
+        <p class="app-card-desc">${desc}</p>
+        <div class="app-card-meta">
+          <span>${t("apps.version")} ${ver}</span>
+        </div>
+      </div>
+      <div class="app-card-actions">${actions}</div>
+    </div>`;
+  }).join("");
+}
+
+async function installApp(appId) {
+  try {
+    const res = await api(`/api/apps/${appId}/install`, "POST");
+    if (res.success) {
+      toast(t("apps.installOk"), "success");
+      await loadApps();
+    } else {
+      toast(res.error || t("apps.installFail"), "error");
+    }
+  } catch (e) { toast(t("apps.installFail") + ": " + e.message, "error"); }
+}
+
+async function uninstallApp(appId) {
+  if (!confirm(_lang === "zh" ? "确定要卸载此应用吗？" : "Uninstall this app?")) return;
+  try {
+    const res = await api(`/api/apps/${appId}/uninstall`, "POST");
+    if (res.success) {
+      toast(t("apps.uninstallOk"), "info");
+      await loadApps();
+    } else {
+      toast(res.error || t("apps.uninstallFail"), "error");
+    }
+  } catch (e) { toast(t("apps.uninstallFail") + ": " + e.message, "error"); }
+}
+
+// ── App Detail (Daily Digest) ─────────────────────────────────────────
+
+async function openAppDetail(appId) {
+  if (appId === "daily_digest") {
+    await openDigestDetail();
+    return;
+  }
+  toast("This app has no configuration page yet.", "info");
+}
+
+async function openDigestDetail() {
+  document.getElementById("app-detail-title").textContent = `📰 ${t("digest.title")}`;
+  switchPage("app-detail");
+
+  const container = document.getElementById("app-detail-content");
+  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+
+  let appData = _appsCache.find(a => a.id === "daily_digest");
+  if (!appData) { await loadApps(); appData = _appsCache.find(a => a.id === "daily_digest"); }
+  if (!appData || !appData.installed) {
+    container.innerHTML = `<div class="app-detail-loading">${t("apps.notInstalled")}</div>`;
+    return;
+  }
+
+  const config = appData.config || {};
+  const browser = config.browser || "auto";
+  const hours = config.history_hours || 24;
+  const scheduleTime = config.schedule_time || "22:00";
+  const pushNotif = config.push_notification !== false;
+  const pushEmail = config.push_email || "";
+  const isEnabled = appData.enabled;
+
+  let reportsHtml = "";
+  try {
+    const reports = await api("/api/apps/daily_digest/reports");
+    if (reports.length) {
+      reportsHtml = reports.map(r =>
+        `<div class="digest-report-item" onclick="viewDigestReport('${escapeAttr(r.date)}')">
+          <span class="digest-report-date">📄 ${escapeHtml(r.date)}</span>
+          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T", " ").slice(0, 19) : "")}</span>
+          <button class="btn btn-sm">${t("digest.viewReport")}</button>
+        </div>`
+      ).join("");
+    } else {
+      reportsHtml = `<div class="digest-empty">${t("digest.noReports")}</div>`;
+    }
+  } catch (_) {
+    reportsHtml = `<div class="digest-empty">${t("digest.noReports")}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="app-detail-section">
+      <div class="digest-status-bar">
+        <div class="digest-status-left">
+          <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
+          <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="digest-enabled" ${isEnabled ? "checked" : ""} onchange="toggleDigestEnabled()" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("digest.config")}</h3>
+      <div class="digest-config-grid">
+        <div class="form-group">
+          <label>${t("digest.browser")}</label>
+          <select id="digest-browser" class="digest-select">
+            <option value="auto" ${browser === "auto" ? "selected" : ""}>${t("digest.browserAuto")}</option>
+            <option value="chrome" ${browser === "chrome" ? "selected" : ""}>${t("digest.browserChrome")}</option>
+            <option value="edge" ${browser === "edge" ? "selected" : ""}>${t("digest.browserEdge")}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>${t("digest.historyHours")}</label>
+          <input type="number" id="digest-hours" value="${hours}" min="1" max="168" />
+        </div>
+        <div class="form-group">
+          <label>${t("digest.scheduleTime")}</label>
+          <input type="time" id="digest-schedule" value="${escapeAttr(scheduleTime)}" />
+        </div>
+        <div class="form-group">
+          <label>${t("digest.pushEmail")}</label>
+          <input type="email" id="digest-email" value="${escapeAttr(pushEmail)}" placeholder="user@example.com" />
+        </div>
+        <div class="form-group form-group-checkbox">
+          <label>
+            <input type="checkbox" id="digest-push-notif" ${pushNotif ? "checked" : ""} />
+            <span>${t("digest.pushNotification")}</span>
+          </label>
+        </div>
+      </div>
+      <div class="digest-actions">
+        <button class="btn btn-primary" onclick="saveDigestConfig()">${t("digest.saveConfig")}</button>
+        <button class="btn btn-primary" id="digest-run-btn" onclick="runDigestNow()">🚀 ${t("digest.runNow")}</button>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("digest.preview")}</h3>
+      <p class="digest-preview-desc">${t("digest.previewDesc")}</p>
+      <button class="btn btn-sm" id="digest-preview-btn" onclick="previewDigest()">🔍 ${t("digest.previewBtn")}</button>
+      <div id="digest-preview-result" class="digest-preview-result"></div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("digest.reports")}</h3>
+      <div class="digest-report-list" id="digest-report-list">${reportsHtml}</div>
+    </div>
+
+    <div class="app-detail-section" id="digest-report-view" style="display:none;">
+      <h3 id="digest-report-view-title">${t("digest.latestReport")}</h3>
+      <div class="digest-report-content" id="digest-report-content"></div>
+    </div>
+  `;
+}
+
+async function toggleDigestEnabled() {
+  const cb = document.getElementById("digest-enabled");
+  const enabled = cb.checked;
+  const endpoint = enabled ? "enable" : "disable";
+  try {
+    await api(`/api/apps/daily_digest/${endpoint}`, "POST");
+    const app = _appsCache.find(a => a.id === "daily_digest");
+    if (app) app.enabled = enabled;
+  } catch (_) { cb.checked = !enabled; }
+}
+
+async function saveDigestConfig() {
+  const config = {
+    browser: document.getElementById("digest-browser").value,
+    history_hours: parseInt(document.getElementById("digest-hours").value) || 24,
+    schedule_time: document.getElementById("digest-schedule").value || "22:00",
+    push_notification: document.getElementById("digest-push-notif").checked,
+    push_email: document.getElementById("digest-email").value.trim(),
+  };
+  try {
+    const res = await api("/api/apps/daily_digest/config", "POST", config);
+    if (res.success) {
+      toast(t("digest.configSaved"), "success");
+      const app = _appsCache.find(a => a.id === "daily_digest");
+      if (app) app.config = config;
+    } else {
+      toast(res.error || t("digest.configFail"), "error");
+    }
+  } catch (e) { toast(t("digest.configFail") + ": " + e.message, "error"); }
+}
+
+async function runDigestNow() {
+  const btn = document.getElementById("digest-run-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ " + t("digest.running");
+
+  try {
+    const res = await api("/api/apps/daily_digest/run", "POST");
+    if (res.error) { toast(res.error, "error"); btn.disabled = false; btn.textContent = "🚀 " + t("digest.runNow"); return; }
+
+    _pollDigestStatus(btn);
+  } catch (e) {
+    toast(t("digest.generateFail") + ": " + e.message, "error");
+    btn.disabled = false;
+    btn.textContent = "🚀 " + t("digest.runNow");
+  }
+}
+
+function _pollDigestStatus(btn) {
+  const poll = setInterval(async () => {
+    try {
+      const status = await api("/api/apps/daily_digest/status");
+      if (status.status === "done") {
+        clearInterval(poll);
+        btn.disabled = false;
+        btn.textContent = "🚀 " + t("digest.runNow");
+        const sr = status.result?.stats?.search_results;
+        const msg = sr ? `${t("digest.generateOk")} (${sr} ${t("digest.searchResults")})` : t("digest.generateOk");
+        toast(msg, "success");
+
+        if (status.result && status.result.report) {
+          _showDigestReport(status.result.report);
+        }
+        _refreshDigestReports();
+      } else if (status.status === "error") {
+        clearInterval(poll);
+        btn.disabled = false;
+        btn.textContent = "🚀 " + t("digest.runNow");
+        const msg = status.result?.message || t("digest.generateFail");
+        toast(msg, "error");
+      } else {
+        btn.textContent = "⏳ " + (status.progress || t("digest.running"));
+      }
+    } catch (_) {}
+  }, 2000);
+
+  setTimeout(() => clearInterval(poll), 300000);
+}
+
+function _showDigestReport(reportData) {
+  const section = document.getElementById("digest-report-view");
+  const content = document.getElementById("digest-report-content");
+  const title = document.getElementById("digest-report-view-title");
+  if (!section || !content) return;
+
+  title.textContent = `📅 ${reportData.date || ""} ${t("digest.latestReport")}`;
+  const raw = reportData.content || "";
+  // New reports are HTML (start with "<"); legacy reports may be Markdown
+  content.innerHTML = raw.trimStart().startsWith("<") ? raw : renderMarkdown(raw);
+  section.style.display = "block";
+  section.scrollIntoView({ behavior: "smooth" });
+}
+
+async function viewDigestReport(dateStr) {
+  try {
+    const report = await api(`/api/apps/daily_digest/report/${encodeURIComponent(dateStr)}`);
+    if (report.error) { toast(report.error, "error"); return; }
+    _showDigestReport(report);
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function _refreshDigestReports() {
+  try {
+    const reports = await api("/api/apps/daily_digest/reports");
+    const list = document.getElementById("digest-report-list");
+    if (!list) return;
+    if (reports.length) {
+      list.innerHTML = reports.map(r =>
+        `<div class="digest-report-item" onclick="viewDigestReport('${escapeAttr(r.date)}')">
+          <span class="digest-report-date">📄 ${escapeHtml(r.date)}</span>
+          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T", " ").slice(0, 19) : "")}</span>
+          <button class="btn btn-sm">${t("digest.viewReport")}</button>
+        </div>`
+      ).join("");
+    } else {
+      list.innerHTML = `<div class="digest-empty">${t("digest.noReports")}</div>`;
+    }
+  } catch (_) {}
+}
+
+async function previewDigest() {
+  const btn = document.getElementById("digest-preview-btn");
+  const box = document.getElementById("digest-preview-result");
+  btn.disabled = true;
+  btn.textContent = "⏳ " + t("digest.previewLoading");
+  box.innerHTML = `<div class="digest-preview-loading">${t("digest.previewLoading")}</div>`;
+
+  try {
+    const data = await api("/api/apps/daily_digest/preview");
+    if (data.error) { box.innerHTML = `<div class="digest-preview-error">${escapeHtml(data.error)}</div>`; return; }
+
+    const methodLabel = data.method === "llm" ? "AI" : t("digest.previewRuleBased");
+    let html = `<div class="digest-preview-stats">
+      <div class="digest-stat"><span class="digest-stat-num">${data.raw_count}</span><span class="digest-stat-label">${t("digest.rawCount")}</span></div>
+      <div class="digest-stat"><span class="digest-stat-num">${data.filtered_count}</span><span class="digest-stat-label">${t("digest.filteredCount")}</span></div>
+      <div class="digest-stat"><span class="digest-stat-num">${data.keyword_count}</span><span class="digest-stat-label">${t("digest.keywordCount")}</span></div>
+      <div class="digest-stat"><span class="digest-stat-num">${methodLabel}</span><span class="digest-stat-label">${t("digest.previewMethod")}</span></div>
+    </div>`;
+
+    const cats = [
+      { key: "work", emoji: "🧠", label: t("digest.work") },
+      { key: "study", emoji: "📚", label: t("digest.study") },
+      { key: "life", emoji: "🌿", label: t("digest.life") },
+    ];
+    html += '<div class="digest-preview-cats">';
+    for (const cat of cats) {
+      const items = (data.interests && data.interests[cat.key]) || [];
+      const queries = (data.queries && data.queries[cat.key]) || [];
+      html += `<div class="digest-preview-cat">
+        <h4>${cat.emoji} ${cat.label}</h4>
+        <div class="digest-keyword-tags">`;
+      if (items.length) {
+        for (const it of items) {
+          const countBadge = it.count ? ` <small>(${it.count})</small>` : "";
+          html += `<span class="digest-keyword-tag">${escapeHtml(it.keyword)}${countBadge}</span>`;
+        }
+      } else {
+        html += `<span class="digest-keyword-empty">—</span>`;
+      }
+      html += `</div>`;
+      if (queries.length) {
+        html += `<div class="digest-query-tags">`;
+        for (const q of queries) {
+          html += `<span class="digest-query-tag">🔍 ${escapeHtml(q)}</span>`;
+        }
+        html += `</div>`;
+      }
+      html += `</div>`;
+    }
+    html += "</div>";
+
+    box.innerHTML = html;
+  } catch (e) {
+    box.innerHTML = `<div class="digest-preview-error">${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔍 " + t("digest.previewBtn");
+  }
 }

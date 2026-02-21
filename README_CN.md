@@ -7,11 +7,33 @@
 ## 功能
 
 - **对话** — 与 nanobot AI 助手实时聊天，支持 Markdown 渲染和代码高亮
+- **应用中心** — 可扩展的应用管理；安装、配置和管理自动化任务
+  - **推荐日报** — 基于浏览器历史的 AI 个人兴趣推荐引擎
 - **设置** — 可视化配置 API 密钥、模型参数、MCP 工具服务、频道开关等
 - **状态** — 一览当前系统状态：提供商、频道、模型配置、MCP 工具、反馈案例
 - **网关** — 一键启停 nanobot gateway，连接 Telegram / Discord / 飞书等平台
 - **MCP 集成** — 通过 MCP 协议连接外部工具服务（如 Playwright 浏览器自动化）
 - **中英双语** — 界面支持中文 / English 切换，默认跟随系统语言
+
+## 推荐日报
+
+自动分析浏览器历史，识别你的真实兴趣，全网搜索高质量内容，生成个性化推荐报告。
+
+**工作流程：**
+
+1. **采集** — 读取 Chrome / Edge 浏览历史（仅标题和 URL，不读取页面内容）
+2. **分析** — LLM 识别真实兴趣并分类（工作 / 学习 / 生活）
+3. **搜索** — 生成语义完整的搜索词，全网搜索（Brave → Bing → DuckDuckGo 自动降级）
+4. **策展** — LLM 从搜索结果中精选最优内容，生成带真实链接的 HTML 卡片报告
+
+**设计特点：**
+
+- 无需安装浏览器插件，直接读取本地历史数据库
+- AI 驱动的兴趣提取（LLM 不可用时自动降级为规则方案）
+- 多搜索引擎自动降级（Brave API → Bing → DuckDuckGo）
+- 结构化 HTML 卡片报告，美观易读
+- 支持定时自动生成或手动触发
+- 兴趣预览功能，快速查看分析结果
 
 ## 环境要求
 
@@ -56,6 +78,8 @@ python app.py
 | Markdown 渲染 | marked.js |
 | 代码高亮 | highlight.js |
 | AI 引擎 | nanobot-ai |
+| LLM 路由 | litellm（自动识别 provider） |
+| 全网搜索 | Brave API / Bing / DuckDuckGo（自动降级） |
 
 ## 项目结构
 
@@ -65,6 +89,9 @@ myai/
 ├── requirements.txt    # Python 依赖
 ├── README.md           # 英文文档
 ├── README_CN.md        # 中文文档
+├── apps/
+│   ├── __init__.py
+│   └── daily_digest.py # 推荐日报：完整 pipeline
 └── frontend/
     ├── index.html      # 前端页面
     ├── style.css       # 样式 (Catppuccin Mocha 暗色主题)
