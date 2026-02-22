@@ -1,5 +1,5 @@
 /* ===================================================================
-   nanobot Desktop — Catppuccin Mocha-inspired dark theme
+   MyxAI Desk — Catppuccin Mocha-inspired dark theme
    =================================================================== */
 
 :root {
@@ -1636,6 +1636,469 @@ a:hover { text-decoration: underline; }
 .dr-actions li {
   margin-bottom: 4px;
   font-size: 13px;
+}
+
+/* ── Web Monitor styles ─────────────────────────────────────────────── */
+.monitor-add-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.monitor-input {
+  padding: 8px 12px;
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  background: var(--bg-crust);
+  color: var(--text);
+  font-size: 13px;
+  flex: 1;
+  min-width: 180px;
+}
+.monitor-input-sm { flex: 0 0 140px; min-width: 100px; }
+.monitor-site-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  background: var(--bg-crust);
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  gap: 12px;
+}
+.monitor-site-item.monitor-changed { border-left: 3px solid var(--green); }
+.monitor-site-item.monitor-error { border-left: 3px solid var(--red); }
+.monitor-site-info { flex: 1; min-width: 0; }
+.monitor-site-name { font-weight: 600; font-size: 14px; margin-bottom: 2px; }
+.monitor-site-url {
+  font-size: 12px; color: var(--text-dim);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 400px;
+}
+.monitor-site-meta {
+  display: flex; gap: 8px; align-items: center; margin-top: 4px; font-size: 12px;
+}
+.monitor-mode-badge {
+  background: var(--bg-surface0);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 8px;
+  padding: 0 6px;
+  font-size: 11px;
+}
+.monitor-status-badge {
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+.monitor-status-badge.monitor-changed { background: var(--green); color: var(--bg-dark); }
+.monitor-status-badge.monitor-ok { background: var(--bg-surface0); color: var(--text-dim); }
+.monitor-status-badge.monitor-error { background: var(--red); color: #fff; }
+.monitor-status-badge.monitor-pending { background: var(--bg-surface1); color: var(--text-dim); }
+.monitor-last-check { color: var(--text-dim); }
+.monitor-site-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.monitor-history-item {
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  background: var(--bg-crust);
+  border-radius: var(--radius);
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+}
+.monitor-history-item.changed { border-left: 3px solid var(--green); }
+.monitor-history-time { color: var(--text-dim); flex-shrink: 0; }
+.monitor-history-summary { flex: 1; }
+.btn-danger {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid var(--red);
+}
+.btn-danger:hover { background: rgba(243,139,168,.15); }
+
+/* ── Email Summary styles ──────────────────────────────────────────── */
+.email-presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+  flex-wrap: wrap;
+}
+.email-preset-btn {
+  font-size: 12px !important;
+  padding: 2px 10px !important;
+}
+/* Email report HTML styles */
+.es-group { margin-bottom: 16px; }
+.es-group-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--bg-surface1);
+}
+.es-item {
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  background: var(--bg-crust);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.es-subject { font-weight: 600; font-size: 13px; }
+.es-from { font-size: 12px; color: var(--text-dim); }
+.es-summary { font-size: 12px; color: var(--text); opacity: .8; }
+.es-overview {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: var(--bg-crust);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+/* ── Focus Timer styles ────────────────────────────────────────────── */
+.focus-timer-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.focus-timer-ring {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.focus-ring-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.focus-ring-bg {
+  fill: none;
+  stroke: var(--bg-surface1);
+  stroke-width: 8;
+}
+.focus-ring-progress {
+  fill: none;
+  stroke: var(--blue);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease;
+}
+.focus-timer-display {
+  text-align: center;
+  z-index: 1;
+}
+.focus-timer-time {
+  font-size: 42px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 2px;
+}
+.focus-timer-label {
+  font-size: 13px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.focus-timer-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.focus-tag-select { min-width: 120px; }
+.focus-timer-controls {
+  display: flex;
+  gap: 10px;
+}
+.btn-lg {
+  padding: 10px 28px !important;
+  font-size: 15px !important;
+}
+
+/* Focus stats */
+.focus-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+.focus-stat-card {
+  background: var(--bg-crust);
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  padding: 14px;
+  text-align: center;
+}
+.focus-stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.focus-stat-label {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+.focus-stat-sub {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Focus trend chart */
+.focus-trend-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 120px;
+  padding: 8px 0;
+}
+.focus-trend-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+.focus-trend-bar {
+  width: 100%;
+  max-width: 28px;
+  background: var(--blue);
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+  transition: height .3s;
+}
+.focus-trend-label {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+/* Focus tag distribution */
+.focus-tag-bars { display: flex; flex-direction: column; gap: 6px; }
+.focus-tag-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+.focus-tag-bar-label {
+  width: 80px;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.focus-tag-bar-track {
+  flex: 1;
+  height: 14px;
+  background: var(--bg-surface0);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.focus-tag-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 7px;
+  transition: width .3s;
+}
+.focus-tag-bar-value {
+  width: 60px;
+  color: var(--text-dim);
+}
+
+/* Focus history */
+.focus-history-item {
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 4px;
+  background: var(--bg-crust);
+  border-radius: var(--radius);
+  font-size: 13px;
+  align-items: center;
+}
+.focus-history-tag {
+  background: var(--bg-surface0);
+  border-radius: 8px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: var(--accent);
+}
+.focus-history-dur { font-weight: 600; }
+.focus-history-time { color: var(--text-dim); margin-left: auto; }
+
+/* ── Custom App Wizard ──────────────────────────────────────────────── */
+.wizard-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, .55);
+}
+.wizard-panel {
+  background: var(--bg-mantle);
+  border: 1px solid var(--bg-surface0);
+  border-radius: var(--radius-lg);
+  width: 600px;
+  max-width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.wizard-steps {
+  display: flex;
+  border-bottom: 1px solid var(--bg-surface1);
+  padding: 14px 20px 0;
+  gap: 4px;
+}
+.wizard-step {
+  padding: 8px 16px;
+  font-size: 13px;
+  color: var(--text-dim);
+  border-bottom: 2px solid transparent;
+  cursor: default;
+}
+.wizard-step.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.wizard-step.done {
+  color: var(--green);
+}
+.wizard-body {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+}
+.wizard-help {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+.wizard-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  background: var(--bg-crust);
+  color: var(--text);
+  font-size: 13px;
+  font-family: monospace;
+  resize: vertical;
+  line-height: 1.5;
+}
+.wizard-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--bg-surface1);
+}
+.wizard-param-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: var(--bg-crust);
+  border-radius: var(--radius);
+}
+.wizard-param-name {
+  font-family: monospace;
+  font-size: 13px;
+  color: var(--accent);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.wizard-param-label,
+.wizard-param-default {
+  padding: 6px 10px;
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  background: var(--bg-dark);
+  color: var(--text);
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+}
+.wizard-param-type {
+  flex: 0 0 80px;
+}
+
+/* Custom app card in app center */
+.app-card-create {
+  border: 2px dashed var(--bg-surface2);
+  cursor: pointer;
+  opacity: .7;
+  transition: opacity .2s, border-color .2s;
+}
+.app-card-create:hover {
+  opacity: 1;
+  border-color: var(--accent);
+}
+.app-badge-custom {
+  background: var(--mauve);
+  color: var(--bg-dark);
+}
+
+/* Custom app detail */
+.custom-template-preview {
+  padding: 12px 14px;
+  background: var(--bg-crust);
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Save-as-app button in chat */
+.save-app-btn {
+  opacity: .5;
+}
+.save-app-btn:hover {
+  opacity: 1;
+}
+
+/* Confirm bar on report view */
+.capp-confirm-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+}
+.capp-confirm-bar .wizard-help {
+  margin: 0;
+  flex: 1;
+}
+
+/* Enhanced prompt preview */
+.capp-enhanced-preview {
+  border-left: 3px solid var(--green);
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 /* ── Scrollbar global ──────────────────────────────────────────────── */

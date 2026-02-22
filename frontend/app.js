@@ -1,5 +1,5 @@
 /* ===================================================================
-   nanobot Desktop — Frontend Logic
+   MyxAI Desk — Frontend Logic
    =================================================================== */
 
 // ── i18n ──────────────────────────────────────────────────────────────
@@ -7,7 +7,7 @@
 const I18N = {
   zh: {
     "nav.newChat":"新对话","nav.settings":"设置","nav.status":"状态","nav.gateway":"网关",
-    "setup.welcome":"欢迎使用 nanobot Desktop",
+    "setup.welcome":"欢迎使用 MyxAI Desk",
     "setup.install.title":"安装 nanobot","setup.install.desc":"在终端运行以下命令：",
     "setup.onboard.title":"初始化配置","setup.onboard.desc":"点击下方按钮自动初始化。","setup.onboard.btn":"初始化 nanobot",
     "setup.apikey.title":"配置 API Key","setup.apikey.desc":"前往「设置」页面填写您的 API Key。","setup.apikey.btn":"前往设置",
@@ -62,7 +62,7 @@ const I18N = {
     "apps.installOk":"应用安装成功","apps.uninstallOk":"应用已卸载",
     "apps.installFail":"安装失败","apps.uninstallFail":"卸载失败",
     "apps.version":"版本","apps.author":"作者",
-    "digest.title":"推荐日报","digest.subtitle":"基于浏览器历史，AI 自动分析兴趣并全网搜索推荐",
+    "digest.title":"今日私读","digest.subtitle":"基于浏览器历史和对话内容，AI 自动分析兴趣并全网搜索推荐",
     "digest.status":"状态","digest.config":"配置",
     "digest.browser":"浏览器","digest.browserAuto":"自动检测","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
     "digest.historyHours":"历史范围（小时）","digest.scheduleTime":"每日生成时间",
@@ -74,15 +74,62 @@ const I18N = {
     "digest.previewBtn":"预览兴趣","digest.previewLoading":"正在分析…",
     "digest.previewMethod":"分析方式","digest.previewRuleBased":"规则",
     "digest.work":"工作","digest.study":"学习","digest.life":"生活",
-    "digest.rawCount":"原始记录","digest.filteredCount":"有效记录","digest.keywordCount":"兴趣数","digest.searchResults":"搜索推荐",
+    "digest.rawCount":"原始记录","digest.filteredCount":"有效记录","digest.chatCount":"对话/消息","digest.keywordCount":"兴趣数","digest.searchResults":"搜索推荐",
     "digest.viewReport":"查看","digest.lastRun":"上次运行",
     "digest.generating":"日报生成中，请稍候…","digest.generateOk":"日报生成完成！",
     "digest.generateFail":"日报生成失败","digest.noHistory":"未找到浏览记录",
     "digest.latestReport":"最新报告",
+    "monitor.title":"网页监控","monitor.subtitle":"监控指定网页变化，有更新时自动提醒",
+    "monitor.sites":"监控站点","monitor.addSite":"添加站点",
+    "monitor.url":"网页 URL","monitor.name":"名称（可选）","monitor.mode":"检测模式",
+    "monitor.modeHash":"哈希对比","monitor.modeLlm":"LLM 智能分析",
+    "monitor.add":"添加","monitor.checkAll":"检查全部","monitor.checking":"检查中…",
+    "monitor.noSites":"暂无监控站点","monitor.lastCheck":"上次检查","monitor.status":"状态",
+    "monitor.changed":"有变化","monitor.unchanged":"无变化","monitor.pending":"待检查","monitor.error":"错误",
+    "monitor.history":"变化历史","monitor.delete":"删除","monitor.checkOne":"检查",
+    "monitor.interval":"检查间隔（分钟）","monitor.scheduleEnabled":"定时检查","monitor.defaultMode":"默认模式",
+    "email.title":"邮件摘要","email.subtitle":"连接邮箱，自动汇总未读邮件",
+    "email.imapConfig":"IMAP 配置","email.host":"服务器","email.port":"端口",
+    "email.user":"账号","email.password":"密码/授权码","email.ssl":"SSL",
+    "email.folder":"文件夹","email.hours":"时间范围（小时）","email.maxEmails":"最大邮件数",
+    "email.scheduleTime":"每日生成时间","email.presets":"快速填入",
+    "email.testConn":"测试连接","email.testing":"测试中…","email.testOk":"连接成功",
+    "email.testFail":"连接失败","email.runNow":"立即生成","email.running":"正在生成…",
+    "email.saveConfig":"保存设置","email.configSaved":"设置已保存",
+    "email.reports":"历史报告","email.noReports":"暂无报告","email.viewReport":"查看",
+    "focus.title":"专注计时","focus.subtitle":"番茄钟工作法，记录专注时间",
+    "focus.timer":"计时器","focus.start":"开始专注","focus.pause":"暂停",
+    "focus.resume":"继续","focus.reset":"重置","focus.skip":"跳过",
+    "focus.working":"专注中","focus.breaking":"休息中","focus.longBreaking":"长休息",
+    "focus.focusMin":"专注时长（分钟）","focus.breakMin":"休息时长","focus.longBreakMin":"长休息时长",
+    "focus.longBreakInterval":"长休息间隔（轮）","focus.tag":"任务标签","focus.newTag":"新标签…",
+    "focus.saveConfig":"保存设置","focus.configSaved":"设置已保存",
+    "focus.stats":"统计","focus.today":"今日","focus.thisWeek":"本周","focus.thisMonth":"本月",
+    "focus.sessions":"个番茄钟","focus.totalMin":"分钟","focus.dailyAvg":"日均",
+    "focus.byTag":"按标签","focus.trend":"每日趋势","focus.history":"历史记录",
+    "focus.noSessions":"暂无记录","focus.completed":"已完成！","focus.breakTime":"休息时间到",
+    "custom.title":"自定义应用","custom.create":"新建自定义应用","custom.createFromChat":"保存为应用",
+    "custom.name":"应用名称","custom.icon":"图标","custom.template":"Prompt 模板",
+    "custom.templateHelp":"用 {{变量名}} 标记可变部分，如：搜索{{keywords}}的最新资讯",
+    "custom.params":"参数定义","custom.paramName":"变量名","custom.paramLabel":"显示名称",
+    "custom.paramType":"类型","custom.paramDefault":"默认值",
+    "custom.schedule":"定时执行","custom.scheduleTime":"执行时间","custom.scheduleEnabled":"启用定时",
+    "custom.save":"保存应用","custom.saving":"保存中…","custom.saved":"应用已保存",
+    "custom.run":"立即执行","custom.running":"执行中…","custom.runDone":"执行完成",
+    "custom.runFail":"执行失败","custom.edit":"编辑","custom.delete":"删除",
+    "custom.reports":"执行报告","custom.noReports":"暂无报告","custom.viewReport":"查看",
+    "custom.step1":"编辑模板","custom.step2":"定义参数","custom.step3":"基本信息",
+    "custom.next":"下一步","custom.prev":"上一步","custom.cancel":"取消",
+    "custom.source":"来源对话","custom.toolsUsed":"使用的工具",
+    "custom.badge":"自定义",
+    "custom.confirm":"确认结果并生成增强","custom.confirming":"正在分析…",
+    "custom.enhanced":"已增强","custom.notEnhanced":"未增强",
+    "custom.enhancedPrompt":"执行约束指令","custom.enhancedHelp":"基于已确认的成功执行自动生成，后续运行将自动附带",
+    "custom.clearEnhanced":"清除增强","custom.refRun":"参考执行","custom.confirmedAt":"确认时间",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
-    "setup.welcome":"Welcome to nanobot Desktop",
+    "setup.welcome":"Welcome to MyxAI Desk",
     "setup.install.title":"Install nanobot","setup.install.desc":"Run the following command in terminal:",
     "setup.onboard.title":"Initialize","setup.onboard.desc":"Click the button below to auto-initialize.","setup.onboard.btn":"Initialize nanobot",
     "setup.apikey.title":"Configure API Key","setup.apikey.desc":"Go to Settings page to enter your API Key.","setup.apikey.btn":"Go to Settings",
@@ -137,7 +184,7 @@ const I18N = {
     "apps.installOk":"App installed successfully","apps.uninstallOk":"App uninstalled",
     "apps.installFail":"Install failed","apps.uninstallFail":"Uninstall failed",
     "apps.version":"Version","apps.author":"Author",
-    "digest.title":"Daily Digest","digest.subtitle":"AI-powered interest analysis and web search based on browser history",
+    "digest.title":"Today's Reading","digest.subtitle":"AI-powered interest analysis from browser history and chat, with web search recommendations",
     "digest.status":"Status","digest.config":"Settings",
     "digest.browser":"Browser","digest.browserAuto":"Auto detect","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
     "digest.historyHours":"History range (hours)","digest.scheduleTime":"Daily generation time",
@@ -149,11 +196,58 @@ const I18N = {
     "digest.previewBtn":"Preview Interests","digest.previewLoading":"Analyzing…",
     "digest.previewMethod":"Method","digest.previewRuleBased":"Rule-based",
     "digest.work":"Work","digest.study":"Study","digest.life":"Life",
-    "digest.rawCount":"Raw records","digest.filteredCount":"Valid records","digest.keywordCount":"Interests","digest.searchResults":"Recommendations",
+    "digest.rawCount":"Raw records","digest.filteredCount":"Valid records","digest.chatCount":"Chats/Msgs","digest.keywordCount":"Interests","digest.searchResults":"Recommendations",
     "digest.viewReport":"View","digest.lastRun":"Last run",
     "digest.generating":"Generating digest, please wait…","digest.generateOk":"Digest generated!",
     "digest.generateFail":"Generation failed","digest.noHistory":"No browser history found",
     "digest.latestReport":"Latest Report",
+    "monitor.title":"Web Monitor","monitor.subtitle":"Monitor web pages for changes, notify on updates",
+    "monitor.sites":"Sites","monitor.addSite":"Add Site",
+    "monitor.url":"Page URL","monitor.name":"Name (optional)","monitor.mode":"Detection Mode",
+    "monitor.modeHash":"Hash Compare","monitor.modeLlm":"LLM Analysis",
+    "monitor.add":"Add","monitor.checkAll":"Check All","monitor.checking":"Checking…",
+    "monitor.noSites":"No sites monitored","monitor.lastCheck":"Last Check","monitor.status":"Status",
+    "monitor.changed":"Changed","monitor.unchanged":"No Change","monitor.pending":"Pending","monitor.error":"Error",
+    "monitor.history":"Change History","monitor.delete":"Delete","monitor.checkOne":"Check",
+    "monitor.interval":"Check Interval (min)","monitor.scheduleEnabled":"Scheduled Check","monitor.defaultMode":"Default Mode",
+    "email.title":"Email Summary","email.subtitle":"Connect your mailbox, auto-summarize unread emails",
+    "email.imapConfig":"IMAP Settings","email.host":"Server","email.port":"Port",
+    "email.user":"Username","email.password":"Password / App Key","email.ssl":"SSL",
+    "email.folder":"Folder","email.hours":"Time Range (hours)","email.maxEmails":"Max Emails",
+    "email.scheduleTime":"Daily Generation Time","email.presets":"Quick Fill",
+    "email.testConn":"Test Connection","email.testing":"Testing…","email.testOk":"Connected",
+    "email.testFail":"Connection Failed","email.runNow":"Generate Now","email.running":"Generating…",
+    "email.saveConfig":"Save Settings","email.configSaved":"Settings Saved",
+    "email.reports":"Report History","email.noReports":"No reports yet","email.viewReport":"View",
+    "focus.title":"Focus Timer","focus.subtitle":"Pomodoro technique with focus time tracking",
+    "focus.timer":"Timer","focus.start":"Start Focus","focus.pause":"Pause",
+    "focus.resume":"Resume","focus.reset":"Reset","focus.skip":"Skip",
+    "focus.working":"Focusing","focus.breaking":"Break","focus.longBreaking":"Long Break",
+    "focus.focusMin":"Focus Duration (min)","focus.breakMin":"Break Duration","focus.longBreakMin":"Long Break Duration",
+    "focus.longBreakInterval":"Long Break Interval","focus.tag":"Task Tag","focus.newTag":"New tag…",
+    "focus.saveConfig":"Save Settings","focus.configSaved":"Settings Saved",
+    "focus.stats":"Statistics","focus.today":"Today","focus.thisWeek":"This Week","focus.thisMonth":"This Month",
+    "focus.sessions":"sessions","focus.totalMin":"minutes","focus.dailyAvg":"Daily Avg",
+    "focus.byTag":"By Tag","focus.trend":"Daily Trend","focus.history":"History",
+    "focus.noSessions":"No records yet","focus.completed":"Completed!","focus.breakTime":"Break time!",
+    "custom.title":"Custom App","custom.create":"New Custom App","custom.createFromChat":"Save as App",
+    "custom.name":"App Name","custom.icon":"Icon","custom.template":"Prompt Template",
+    "custom.templateHelp":"Use {{variable}} for dynamic parts, e.g.: Search {{keywords}} for latest news",
+    "custom.params":"Parameters","custom.paramName":"Variable","custom.paramLabel":"Label",
+    "custom.paramType":"Type","custom.paramDefault":"Default",
+    "custom.schedule":"Schedule","custom.scheduleTime":"Run Time","custom.scheduleEnabled":"Enable Schedule",
+    "custom.save":"Save App","custom.saving":"Saving…","custom.saved":"App saved",
+    "custom.run":"Run Now","custom.running":"Running…","custom.runDone":"Run completed",
+    "custom.runFail":"Run failed","custom.edit":"Edit","custom.delete":"Delete",
+    "custom.reports":"Reports","custom.noReports":"No reports yet","custom.viewReport":"View",
+    "custom.step1":"Edit Template","custom.step2":"Define Parameters","custom.step3":"App Info",
+    "custom.next":"Next","custom.prev":"Back","custom.cancel":"Cancel",
+    "custom.source":"Source conversation","custom.toolsUsed":"Tools used",
+    "custom.badge":"Custom",
+    "custom.confirm":"Confirm & Enhance","custom.confirming":"Analyzing…",
+    "custom.enhanced":"Enhanced","custom.notEnhanced":"Not enhanced",
+    "custom.enhancedPrompt":"Execution Constraints","custom.enhancedHelp":"Auto-generated from a confirmed successful run, appended to every subsequent execution",
+    "custom.clearEnhanced":"Clear Enhancement","custom.refRun":"Reference run","custom.confirmedAt":"Confirmed at",
   },
 };
 
@@ -554,6 +648,7 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
       <button class="feedback-btn${likeClass}" data-rating="like" onclick="handleFeedback(this)">👍</button>
       <button class="feedback-btn${dislikeClass}" data-rating="dislike" onclick="handleFeedback(this)">👎</button>
       <button class="feedback-btn regenerate-btn" onclick="regenerateMessage(${msgIndex})" title="${t("chat.regenerate")}">🔄</button>
+      <button class="feedback-btn save-app-btn" onclick="saveAsCustomApp(${msgIndex})" title="${t("custom.createFromChat")}">💾</button>
       ${commentText}
     </div>`;
   }
@@ -1483,19 +1578,34 @@ function renderApps(apps) {
     return;
   }
 
-  grid.innerHTML = apps.map(a => {
+  // "Create Custom App" card always first
+  let html = `<div class="app-card app-card-create" onclick="openCustomAppWizard()">
+    <div class="app-card-header"><div class="app-card-icon">➕</div></div>
+    <div class="app-card-body">
+      <h3 class="app-card-name">${t("custom.create")}</h3>
+      <p class="app-card-desc">${t("custom.templateHelp")}</p>
+    </div>
+  </div>`;
+
+  html += apps.map(a => {
     const name = escapeHtml(_appName(a));
     const desc = escapeHtml(_appDesc(a));
     const ver = escapeHtml(a.version || "1.0.0");
     const icon = a.icon || "📦";
     const isInstalled = a.installed;
     const isEnabled = a.enabled;
+    const isCustom = a.type === "custom";
     const comingSoon = a.coming_soon;
 
     let statusBadge = "";
     let actions = "";
 
-    if (comingSoon) {
+    if (isCustom) {
+      statusBadge = `<span class="app-badge app-badge-custom">${t("custom.badge")}</span>`;
+      actions = `
+        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">${t("apps.configure")}</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteCustomApp('${a.id}')">${t("custom.delete")}</button>`;
+    } else if (comingSoon) {
       statusBadge = `<span class="app-badge app-badge-soon">${t("apps.comingSoon")}</span>`;
     } else if (isInstalled) {
       statusBadge = isEnabled
@@ -1509,7 +1619,7 @@ function renderApps(apps) {
       actions = `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();installApp('${a.id}')">${t("apps.install")}</button>`;
     }
 
-    return `<div class="app-card${isInstalled ? ' installed' : ''}${comingSoon ? ' coming-soon' : ''}" onclick="${isInstalled && !comingSoon ? `openAppDetail('${a.id}')` : ''}">
+    return `<div class="app-card${isInstalled || isCustom ? ' installed' : ''}${comingSoon ? ' coming-soon' : ''}" onclick="${(isInstalled || isCustom) && !comingSoon ? `openAppDetail('${a.id}')` : ''}">
       <div class="app-card-header">
         <div class="app-card-icon">${icon}</div>
         ${statusBadge}
@@ -1518,12 +1628,14 @@ function renderApps(apps) {
         <h3 class="app-card-name">${name}</h3>
         <p class="app-card-desc">${desc}</p>
         <div class="app-card-meta">
-          <span>${t("apps.version")} ${ver}</span>
+          <span>${isCustom ? t("custom.badge") : t("apps.version") + " " + ver}</span>
         </div>
       </div>
       <div class="app-card-actions">${actions}</div>
     </div>`;
   }).join("");
+
+  grid.innerHTML = html;
 }
 
 async function installApp(appId) {
@@ -1554,10 +1666,11 @@ async function uninstallApp(appId) {
 // ── App Detail (Daily Digest) ─────────────────────────────────────────
 
 async function openAppDetail(appId) {
-  if (appId === "daily_digest") {
-    await openDigestDetail();
-    return;
-  }
+  if (appId === "daily_digest") { await openDigestDetail(); return; }
+  if (appId === "web_monitor") { await openMonitorDetail(); return; }
+  if (appId === "email_summary") { await openEmailDetail(); return; }
+  if (appId === "focus_timer") { await openFocusDetail(); return; }
+  if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
 }
 
@@ -1790,6 +1903,786 @@ async function _refreshDigestReports() {
   } catch (_) {}
 }
 
+// ── Web Monitor Detail ─────────────────────────────────────────────────
+
+async function openMonitorDetail() {
+  document.getElementById("app-detail-title").textContent = `🔍 ${t("monitor.title")}`;
+  switchPage("app-detail");
+  const container = document.getElementById("app-detail-content");
+  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+
+  let appData = _appsCache.find(a => a.id === "web_monitor");
+  if (!appData) { await loadApps(); appData = _appsCache.find(a => a.id === "web_monitor"); }
+  if (!appData || !appData.installed) {
+    container.innerHTML = `<div class="app-detail-loading">${t("apps.notInstalled")}</div>`;
+    return;
+  }
+
+  const config = appData.config || {};
+  const isEnabled = appData.enabled;
+  const interval = config.check_interval_minutes || 30;
+  const defaultMode = config.default_mode || "hash";
+  const schedEnabled = config.schedule_enabled !== false;
+
+  let sitesHtml = await _renderMonitorSites();
+
+  container.innerHTML = `
+    <div class="app-detail-section">
+      <div class="digest-status-bar">
+        <div class="digest-status-left">
+          <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
+          <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="monitor-enabled" ${isEnabled ? "checked" : ""} onchange="toggleAppEnabled('web_monitor',this)" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("digest.config")}</h3>
+      <div class="digest-config-grid">
+        <div class="form-group">
+          <label>${t("monitor.interval")}</label>
+          <input type="number" id="monitor-interval" value="${interval}" min="5" max="1440" />
+        </div>
+        <div class="form-group">
+          <label>${t("monitor.defaultMode")}</label>
+          <select id="monitor-default-mode" class="digest-select">
+            <option value="hash" ${defaultMode === "hash" ? "selected" : ""}>${t("monitor.modeHash")}</option>
+            <option value="llm" ${defaultMode === "llm" ? "selected" : ""}>${t("monitor.modeLlm")}</option>
+          </select>
+        </div>
+        <div class="form-group form-group-checkbox">
+          <label><input type="checkbox" id="monitor-sched-enabled" ${schedEnabled ? "checked" : ""} /><span>${t("monitor.scheduleEnabled")}</span></label>
+        </div>
+      </div>
+      <div class="digest-actions">
+        <button class="btn btn-primary" onclick="saveMonitorConfig()">${t("digest.saveConfig")}</button>
+        <button class="btn btn-primary" id="monitor-check-btn" onclick="monitorCheckAll()">🔍 ${t("monitor.checkAll")}</button>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("monitor.addSite")}</h3>
+      <div class="monitor-add-form">
+        <input type="text" id="monitor-add-url" placeholder="${t("monitor.url")}" class="monitor-input" />
+        <input type="text" id="monitor-add-name" placeholder="${t("monitor.name")}" class="monitor-input monitor-input-sm" />
+        <select id="monitor-add-mode" class="digest-select monitor-input-sm">
+          <option value="hash">${t("monitor.modeHash")}</option>
+          <option value="llm">${t("monitor.modeLlm")}</option>
+        </select>
+        <button class="btn btn-primary" onclick="monitorAddSite()">+ ${t("monitor.add")}</button>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("monitor.sites")}</h3>
+      <div id="monitor-sites-list">${sitesHtml}</div>
+    </div>
+
+    <div class="app-detail-section" id="monitor-history-view" style="display:none;">
+      <h3 id="monitor-history-title">${t("monitor.history")}</h3>
+      <div id="monitor-history-content"></div>
+    </div>
+  `;
+}
+
+async function _renderMonitorSites() {
+  try {
+    const sites = await api("/api/apps/web_monitor/sites");
+    if (!sites.length) return `<div class="digest-empty">${t("monitor.noSites")}</div>`;
+    return sites.map(s => {
+      const statusCls = s.status === "changed" ? "monitor-changed" : s.status === "ok" ? "monitor-ok" : s.status === "error" ? "monitor-error" : "monitor-pending";
+      const statusText = s.status === "changed" ? t("monitor.changed") : s.status === "ok" ? t("monitor.unchanged") : s.status === "error" ? t("monitor.error") : t("monitor.pending");
+      const lastCheck = s.last_checked ? s.last_checked.replace("T"," ").slice(0,19) : "—";
+      const modeBadge = s.mode === "llm" ? "LLM" : "Hash";
+      return `<div class="monitor-site-item ${statusCls}">
+        <div class="monitor-site-info">
+          <div class="monitor-site-name">${escapeHtml(s.name)}</div>
+          <div class="monitor-site-url">${escapeHtml(s.url)}</div>
+          <div class="monitor-site-meta">
+            <span class="monitor-mode-badge">${modeBadge}</span>
+            <span class="monitor-status-badge ${statusCls}">${statusText}</span>
+            <span class="monitor-last-check">${t("monitor.lastCheck")}: ${lastCheck}</span>
+          </div>
+        </div>
+        <div class="monitor-site-actions">
+          <button class="btn btn-sm" onclick="monitorCheckOne('${s.id}')">${t("monitor.checkOne")}</button>
+          <button class="btn btn-sm" onclick="monitorViewHistory('${s.id}','${escapeAttr(s.name)}')">${t("monitor.history")}</button>
+          <button class="btn btn-sm btn-danger" onclick="monitorDeleteSite('${s.id}')">${t("monitor.delete")}</button>
+        </div>
+      </div>`;
+    }).join("");
+  } catch (_) {
+    return `<div class="digest-empty">${t("monitor.noSites")}</div>`;
+  }
+}
+
+async function monitorAddSite() {
+  const url = document.getElementById("monitor-add-url").value.trim();
+  if (!url) return;
+  const name = document.getElementById("monitor-add-name").value.trim();
+  const mode = document.getElementById("monitor-add-mode").value;
+  try {
+    const res = await api("/api/apps/web_monitor/sites", "POST", { url, name, mode });
+    if (res.error) { toast(res.error, "error"); return; }
+    document.getElementById("monitor-add-url").value = "";
+    document.getElementById("monitor-add-name").value = "";
+    document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function monitorDeleteSite(siteId) {
+  if (!confirm(_lang === "zh" ? "确定删除此站点？" : "Delete this site?")) return;
+  try {
+    await api(`/api/apps/web_monitor/sites/${siteId}`, "DELETE");
+    document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function monitorCheckOne(siteId) {
+  try {
+    const res = await api(`/api/apps/web_monitor/check/${siteId}`, "POST");
+    if (res.error) { toast(res.error, "error"); } else {
+      toast(res.summary || t("monitor.unchanged"), res.changed ? "success" : "info");
+    }
+    document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function monitorCheckAll() {
+  const btn = document.getElementById("monitor-check-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ " + t("monitor.checking");
+  try {
+    await api("/api/apps/web_monitor/check", "POST");
+    const poll = setInterval(async () => {
+      const st = await api("/api/apps/web_monitor/status");
+      if (st.status === "done" || st.status === "error" || st.status === "idle") {
+        clearInterval(poll);
+        btn.disabled = false;
+        btn.textContent = "🔍 " + t("monitor.checkAll");
+        document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
+        if (st.status === "done") toast(t("monitor.unchanged"), "success");
+      } else {
+        btn.textContent = "⏳ " + (st.progress || t("monitor.checking"));
+      }
+    }, 2000);
+    setTimeout(() => clearInterval(poll), 120000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "🔍 " + t("monitor.checkAll");
+    toast(e.message, "error");
+  }
+}
+
+async function monitorViewHistory(siteId, siteName) {
+  const section = document.getElementById("monitor-history-view");
+  const titleEl = document.getElementById("monitor-history-title");
+  const content = document.getElementById("monitor-history-content");
+  titleEl.textContent = `📋 ${siteName} — ${t("monitor.history")}`;
+  try {
+    const history = await api(`/api/apps/web_monitor/history/${siteId}`);
+    if (!history.length) { content.innerHTML = `<div class="digest-empty">—</div>`; }
+    else {
+      content.innerHTML = history.map(h => `
+        <div class="monitor-history-item ${h.changed ? 'changed' : ''}">
+          <span class="monitor-history-time">${h.timestamp ? h.timestamp.replace("T"," ").slice(0,19) : ""}</span>
+          <span class="monitor-history-summary">${escapeHtml(h.summary || "")}</span>
+        </div>`).join("");
+    }
+    section.style.display = "block";
+    section.scrollIntoView({ behavior: "smooth" });
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function saveMonitorConfig() {
+  const config = {
+    check_interval_minutes: parseInt(document.getElementById("monitor-interval").value) || 30,
+    default_mode: document.getElementById("monitor-default-mode").value,
+    schedule_enabled: document.getElementById("monitor-sched-enabled").checked,
+  };
+  try {
+    const res = await api("/api/apps/web_monitor/config", "POST", config);
+    if (res.success) toast(t("digest.configSaved"), "success");
+    else toast(res.error || t("digest.configFail"), "error");
+  } catch (e) { toast(e.message, "error"); }
+}
+
+// ── Email Summary Detail ──────────────────────────────────────────────
+
+async function openEmailDetail() {
+  document.getElementById("app-detail-title").textContent = `📧 ${t("email.title")}`;
+  switchPage("app-detail");
+  const container = document.getElementById("app-detail-content");
+  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+
+  let appData = _appsCache.find(a => a.id === "email_summary");
+  if (!appData) { await loadApps(); appData = _appsCache.find(a => a.id === "email_summary"); }
+  if (!appData || !appData.installed) {
+    container.innerHTML = `<div class="app-detail-loading">${t("apps.notInstalled")}</div>`;
+    return;
+  }
+
+  const config = appData.config || {};
+  const isEnabled = appData.enabled;
+
+  let presetsHtml = "";
+  try {
+    const presets = await api("/api/apps/email_summary/presets");
+    presetsHtml = Object.entries(presets).map(([key, p]) =>
+      `<button class="btn btn-sm email-preset-btn" onclick="applyEmailPreset('${key}','${p.host}',${p.port})">${key.toUpperCase()}</button>`
+    ).join("");
+  } catch (_) {}
+
+  let reportsHtml = "";
+  try {
+    const reports = await api("/api/apps/email_summary/reports");
+    if (reports.length) {
+      reportsHtml = reports.map(r =>
+        `<div class="digest-report-item" onclick="viewEmailReport('${escapeAttr(r.date)}')">
+          <span class="digest-report-date">📄 ${escapeHtml(r.date)} (${r.email_count} 封)</span>
+          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T"," ").slice(0,19) : "")}</span>
+          <button class="btn btn-sm">${t("email.viewReport")}</button>
+        </div>`
+      ).join("");
+    } else {
+      reportsHtml = `<div class="digest-empty">${t("email.noReports")}</div>`;
+    }
+  } catch (_) {
+    reportsHtml = `<div class="digest-empty">${t("email.noReports")}</div>`;
+  }
+
+  container.innerHTML = `
+    <div class="app-detail-section">
+      <div class="digest-status-bar">
+        <div class="digest-status-left">
+          <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
+          <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="email-enabled" ${isEnabled ? "checked" : ""} onchange="toggleAppEnabled('email_summary',this)" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("email.imapConfig")}</h3>
+      ${presetsHtml ? `<div class="email-presets"><span>${t("email.presets")}:</span> ${presetsHtml}</div>` : ""}
+      <div class="digest-config-grid">
+        <div class="form-group"><label>${t("email.host")}</label><input type="text" id="email-host" value="${escapeAttr(config.imap_host || "")}" placeholder="imap.qq.com" /></div>
+        <div class="form-group"><label>${t("email.port")}</label><input type="number" id="email-port" value="${config.imap_port || 993}" /></div>
+        <div class="form-group"><label>${t("email.user")}</label><input type="text" id="email-user" value="${escapeAttr(config.imap_user || "")}" /></div>
+        <div class="form-group"><label>${t("email.password")}</label><input type="password" id="email-password" value="${escapeAttr(config.imap_password || "")}" /></div>
+        <div class="form-group form-group-checkbox"><label><input type="checkbox" id="email-ssl" ${config.imap_ssl !== false ? "checked" : ""} /><span>${t("email.ssl")}</span></label></div>
+        <div class="form-group"><label>${t("email.folder")}</label><input type="text" id="email-folder" value="${escapeAttr(config.imap_folder || "INBOX")}" /></div>
+        <div class="form-group"><label>${t("email.hours")}</label><input type="number" id="email-hours" value="${config.hours || 24}" min="1" max="168" /></div>
+        <div class="form-group"><label>${t("email.maxEmails")}</label><input type="number" id="email-max" value="${config.max_emails || 50}" min="1" max="200" /></div>
+        <div class="form-group"><label>${t("email.scheduleTime")}</label><input type="time" id="email-schedule" value="${escapeAttr(config.schedule_time || "08:00")}" /></div>
+      </div>
+      <div class="digest-actions">
+        <button class="btn" id="email-test-btn" onclick="testEmailConn()">🔌 ${t("email.testConn")}</button>
+        <button class="btn btn-primary" onclick="saveEmailConfig()">${t("email.saveConfig")}</button>
+        <button class="btn btn-primary" id="email-run-btn" onclick="runEmailNow()">🚀 ${t("email.runNow")}</button>
+      </div>
+      <div id="email-test-result" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("email.reports")}</h3>
+      <div class="digest-report-list" id="email-report-list">${reportsHtml}</div>
+    </div>
+
+    <div class="app-detail-section" id="email-report-view" style="display:none;">
+      <h3 id="email-report-view-title">${t("digest.latestReport")}</h3>
+      <div class="digest-report-content" id="email-report-content"></div>
+    </div>
+  `;
+}
+
+function applyEmailPreset(key, host, port) {
+  document.getElementById("email-host").value = host;
+  document.getElementById("email-port").value = port;
+  document.getElementById("email-ssl").checked = true;
+}
+
+async function saveEmailConfig() {
+  const config = {
+    imap_host: document.getElementById("email-host").value.trim(),
+    imap_port: parseInt(document.getElementById("email-port").value) || 993,
+    imap_user: document.getElementById("email-user").value.trim(),
+    imap_password: document.getElementById("email-password").value,
+    imap_ssl: document.getElementById("email-ssl").checked,
+    imap_folder: document.getElementById("email-folder").value.trim() || "INBOX",
+    hours: parseInt(document.getElementById("email-hours").value) || 24,
+    max_emails: parseInt(document.getElementById("email-max").value) || 50,
+    schedule_time: document.getElementById("email-schedule").value || "08:00",
+  };
+  try {
+    const res = await api("/api/apps/email_summary/config", "POST", config);
+    if (res.success) toast(t("email.configSaved"), "success");
+    else toast(res.error || t("digest.configFail"), "error");
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function testEmailConn() {
+  const btn = document.getElementById("email-test-btn");
+  const box = document.getElementById("email-test-result");
+  btn.disabled = true;
+  btn.textContent = "⏳ " + t("email.testing");
+  // Save config first so the backend can test
+  await saveEmailConfig();
+  try {
+    const res = await api("/api/apps/email_summary/test", "POST");
+    if (res.success) {
+      box.innerHTML = `<span style="color:var(--green)">✅ ${t("email.testOk")}</span>`;
+    } else {
+      box.innerHTML = `<span style="color:var(--red)">❌ ${t("email.testFail")}: ${escapeHtml(res.message || "")}</span>`;
+    }
+  } catch (e) {
+    box.innerHTML = `<span style="color:var(--red)">❌ ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "🔌 " + t("email.testConn");
+  }
+}
+
+async function runEmailNow() {
+  const btn = document.getElementById("email-run-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ " + t("email.running");
+  try {
+    const res = await api("/api/apps/email_summary/run", "POST");
+    if (res.error) { toast(res.error, "error"); btn.disabled = false; btn.textContent = "🚀 " + t("email.runNow"); return; }
+    const poll = setInterval(async () => {
+      const st = await api("/api/apps/email_summary/status");
+      if (!st.running) {
+        clearInterval(poll);
+        btn.disabled = false;
+        btn.textContent = "🚀 " + t("email.runNow");
+        if (st.error) toast(st.error, "error");
+        else toast(t("email.configSaved"), "success");
+        _refreshEmailReports();
+      } else {
+        btn.textContent = "⏳ " + (st.progress || t("email.running"));
+      }
+    }, 2000);
+    setTimeout(() => clearInterval(poll), 120000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "🚀 " + t("email.runNow");
+    toast(e.message, "error");
+  }
+}
+
+async function viewEmailReport(dateStr) {
+  try {
+    const report = await api(`/api/apps/email_summary/report/${encodeURIComponent(dateStr)}`);
+    if (report.error) { toast(report.error, "error"); return; }
+    const section = document.getElementById("email-report-view");
+    const content = document.getElementById("email-report-content");
+    const title = document.getElementById("email-report-view-title");
+    title.textContent = `📅 ${report.date || dateStr}`;
+    const raw = report.content || "";
+    content.innerHTML = raw.trimStart().startsWith("<") ? raw : renderMarkdown(raw);
+    section.style.display = "block";
+    section.scrollIntoView({ behavior: "smooth" });
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function _refreshEmailReports() {
+  try {
+    const reports = await api("/api/apps/email_summary/reports");
+    const list = document.getElementById("email-report-list");
+    if (!list) return;
+    if (reports.length) {
+      list.innerHTML = reports.map(r =>
+        `<div class="digest-report-item" onclick="viewEmailReport('${escapeAttr(r.date)}')">
+          <span class="digest-report-date">📄 ${escapeHtml(r.date)} (${r.email_count} 封)</span>
+          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T"," ").slice(0,19) : "")}</span>
+          <button class="btn btn-sm">${t("email.viewReport")}</button>
+        </div>`
+      ).join("");
+    } else {
+      list.innerHTML = `<div class="digest-empty">${t("email.noReports")}</div>`;
+    }
+  } catch (_) {}
+}
+
+// ── Focus Timer Detail ────────────────────────────────────────────────
+
+let _focusState = {
+  running: false, paused: false, mode: "focus",
+  remaining: 0, total: 0, interval: null,
+  round: 1, tag: "", startedAt: null,
+};
+
+async function openFocusDetail() {
+  document.getElementById("app-detail-title").textContent = `⏱️ ${t("focus.title")}`;
+  switchPage("app-detail");
+  const container = document.getElementById("app-detail-content");
+  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+
+  let appData = _appsCache.find(a => a.id === "focus_timer");
+  if (!appData) { await loadApps(); appData = _appsCache.find(a => a.id === "focus_timer"); }
+  if (!appData || !appData.installed) {
+    container.innerHTML = `<div class="app-detail-loading">${t("apps.notInstalled")}</div>`;
+    return;
+  }
+
+  const config = appData.config || {};
+  const isEnabled = appData.enabled;
+  const focusMin = config.focus_minutes || 25;
+  const breakMin = config.break_minutes || 5;
+  const longBreakMin = config.long_break_minutes || 15;
+  const longBreakInterval = config.long_break_interval || 4;
+
+  let tagsOptions = "";
+  try {
+    const tags = await api("/api/apps/focus_timer/tags");
+    tagsOptions = tags.map(t_ => `<option value="${escapeAttr(t_)}">${escapeHtml(t_)}</option>`).join("");
+  } catch (_) {}
+
+  let statsHtml = await _renderFocusStats(7);
+  let historyHtml = await _renderFocusHistory(7);
+
+  _focusState.total = focusMin * 60;
+  _focusState.remaining = focusMin * 60;
+  _focusState.mode = "focus";
+
+  container.innerHTML = `
+    <div class="app-detail-section">
+      <div class="digest-status-bar">
+        <div class="digest-status-left">
+          <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
+          <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="focus-enabled" ${isEnabled ? "checked" : ""} onchange="toggleAppEnabled('focus_timer',this)" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="app-detail-section focus-timer-section">
+      <div class="focus-timer-ring" id="focus-timer-ring">
+        <svg viewBox="0 0 200 200" class="focus-ring-svg">
+          <circle cx="100" cy="100" r="90" class="focus-ring-bg" />
+          <circle cx="100" cy="100" r="90" class="focus-ring-progress" id="focus-ring-progress"
+            stroke-dasharray="565.49" stroke-dashoffset="0" />
+        </svg>
+        <div class="focus-timer-display">
+          <div class="focus-timer-time" id="focus-timer-time">${_fmtTime(focusMin * 60)}</div>
+          <div class="focus-timer-label" id="focus-timer-label">${t("focus.working")}</div>
+        </div>
+      </div>
+      <div class="focus-timer-tag-row">
+        <label>${t("focus.tag")}:</label>
+        <select id="focus-tag" class="digest-select focus-tag-select">
+          <option value="">—</option>
+          ${tagsOptions}
+        </select>
+        <input type="text" id="focus-new-tag" placeholder="${t("focus.newTag")}" class="monitor-input monitor-input-sm" onchange="focusAddNewTag()" />
+      </div>
+      <div class="focus-timer-controls">
+        <button class="btn btn-primary btn-lg" id="focus-start-btn" onclick="focusToggle()">${t("focus.start")}</button>
+        <button class="btn btn-lg" id="focus-reset-btn" onclick="focusReset()" style="display:none;">${t("focus.reset")}</button>
+        <button class="btn btn-lg" id="focus-skip-btn" onclick="focusSkip()" style="display:none;">${t("focus.skip")}</button>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("digest.config")}</h3>
+      <div class="digest-config-grid">
+        <div class="form-group"><label>${t("focus.focusMin")}</label><input type="number" id="focus-focus-min" value="${focusMin}" min="1" max="120" /></div>
+        <div class="form-group"><label>${t("focus.breakMin")}</label><input type="number" id="focus-break-min" value="${breakMin}" min="1" max="30" /></div>
+        <div class="form-group"><label>${t("focus.longBreakMin")}</label><input type="number" id="focus-long-break-min" value="${longBreakMin}" min="1" max="60" /></div>
+        <div class="form-group"><label>${t("focus.longBreakInterval")}</label><input type="number" id="focus-long-break-interval" value="${longBreakInterval}" min="2" max="10" /></div>
+      </div>
+      <div class="digest-actions">
+        <button class="btn btn-primary" onclick="saveFocusConfig()">${t("focus.saveConfig")}</button>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("focus.stats")}</h3>
+      <div id="focus-stats-content">${statsHtml}</div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("focus.history")}</h3>
+      <div id="focus-history-content">${historyHtml}</div>
+    </div>
+  `;
+}
+
+function _fmtTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+}
+
+function _updateFocusRing() {
+  const prog = document.getElementById("focus-ring-progress");
+  const timeEl = document.getElementById("focus-timer-time");
+  const labelEl = document.getElementById("focus-timer-label");
+  if (!prog) return;
+  const ratio = _focusState.total > 0 ? (_focusState.total - _focusState.remaining) / _focusState.total : 0;
+  const circumference = 565.49;
+  prog.style.strokeDashoffset = circumference * (1 - ratio);
+  if (timeEl) timeEl.textContent = _fmtTime(_focusState.remaining);
+
+  const modeColors = { focus: "var(--blue)", break: "var(--green)", longbreak: "var(--mauve)" };
+  prog.style.stroke = modeColors[_focusState.mode] || "var(--blue)";
+
+  if (labelEl) {
+    const labels = { focus: t("focus.working"), break: t("focus.breaking"), longbreak: t("focus.longBreaking") };
+    labelEl.textContent = labels[_focusState.mode] || "";
+  }
+}
+
+function focusToggle() {
+  const btn = document.getElementById("focus-start-btn");
+  const resetBtn = document.getElementById("focus-reset-btn");
+  const skipBtn = document.getElementById("focus-skip-btn");
+
+  if (!_focusState.running) {
+    // Start
+    _focusState.running = true;
+    _focusState.paused = false;
+    if (!_focusState.startedAt) _focusState.startedAt = new Date().toISOString();
+    btn.textContent = t("focus.pause");
+    resetBtn.style.display = "";
+    skipBtn.style.display = "";
+    _focusState.interval = setInterval(() => {
+      if (_focusState.remaining > 0) {
+        _focusState.remaining--;
+        _updateFocusRing();
+      } else {
+        _focusTimerComplete();
+      }
+    }, 1000);
+  } else if (!_focusState.paused) {
+    // Pause
+    _focusState.paused = true;
+    clearInterval(_focusState.interval);
+    btn.textContent = t("focus.resume");
+  } else {
+    // Resume
+    _focusState.paused = false;
+    btn.textContent = t("focus.pause");
+    _focusState.interval = setInterval(() => {
+      if (_focusState.remaining > 0) {
+        _focusState.remaining--;
+        _updateFocusRing();
+      } else {
+        _focusTimerComplete();
+      }
+    }, 1000);
+  }
+}
+
+async function _focusTimerComplete() {
+  clearInterval(_focusState.interval);
+
+  if (_focusState.mode === "focus") {
+    const tag = document.getElementById("focus-tag")?.value || "";
+    const duration = Math.round(_focusState.total / 60);
+    try {
+      await api("/api/apps/focus_timer/sessions", "POST", {
+        tag: tag,
+        duration_minutes: duration,
+        started_at: _focusState.startedAt,
+        completed_at: new Date().toISOString(),
+      });
+    } catch (_) {}
+    toast(t("focus.completed"), "success");
+    speakText(t("focus.completed"));
+
+    // Switch to break
+    const cfg = (_appsCache.find(a => a.id === "focus_timer") || {}).config || {};
+    const longInterval = cfg.long_break_interval || 4;
+    if (_focusState.round % longInterval === 0) {
+      _focusState.mode = "longbreak";
+      _focusState.total = (cfg.long_break_minutes || 15) * 60;
+    } else {
+      _focusState.mode = "break";
+      _focusState.total = (cfg.break_minutes || 5) * 60;
+    }
+    _focusState.remaining = _focusState.total;
+    _focusState.startedAt = null;
+    _focusState.running = false;
+    _focusState.paused = false;
+    document.getElementById("focus-start-btn").textContent = t("focus.start");
+    _updateFocusRing();
+    // Refresh stats
+    document.getElementById("focus-stats-content").innerHTML = await _renderFocusStats(7);
+    document.getElementById("focus-history-content").innerHTML = await _renderFocusHistory(7);
+  } else {
+    // Break done, go back to focus
+    toast(t("focus.breakTime"), "info");
+    speakText(t("focus.breakTime"));
+    _focusState.round++;
+    const cfg = (_appsCache.find(a => a.id === "focus_timer") || {}).config || {};
+    _focusState.mode = "focus";
+    _focusState.total = (cfg.focus_minutes || 25) * 60;
+    _focusState.remaining = _focusState.total;
+    _focusState.startedAt = null;
+    _focusState.running = false;
+    _focusState.paused = false;
+    document.getElementById("focus-start-btn").textContent = t("focus.start");
+    _updateFocusRing();
+  }
+}
+
+function focusReset() {
+  clearInterval(_focusState.interval);
+  const cfg = (_appsCache.find(a => a.id === "focus_timer") || {}).config || {};
+  _focusState.running = false;
+  _focusState.paused = false;
+  _focusState.mode = "focus";
+  _focusState.total = (cfg.focus_minutes || 25) * 60;
+  _focusState.remaining = _focusState.total;
+  _focusState.startedAt = null;
+  document.getElementById("focus-start-btn").textContent = t("focus.start");
+  document.getElementById("focus-reset-btn").style.display = "none";
+  document.getElementById("focus-skip-btn").style.display = "none";
+  _updateFocusRing();
+}
+
+function focusSkip() {
+  _focusState.remaining = 0;
+  _focusTimerComplete();
+}
+
+function focusAddNewTag() {
+  const input = document.getElementById("focus-new-tag");
+  const select = document.getElementById("focus-tag");
+  const val = input.value.trim();
+  if (!val) return;
+  const exists = [...select.options].some(o => o.value === val);
+  if (!exists) {
+    const opt = document.createElement("option");
+    opt.value = val;
+    opt.textContent = val;
+    select.appendChild(opt);
+  }
+  select.value = val;
+  input.value = "";
+}
+
+async function saveFocusConfig() {
+  const config = {
+    focus_minutes: parseInt(document.getElementById("focus-focus-min").value) || 25,
+    break_minutes: parseInt(document.getElementById("focus-break-min").value) || 5,
+    long_break_minutes: parseInt(document.getElementById("focus-long-break-min").value) || 15,
+    long_break_interval: parseInt(document.getElementById("focus-long-break-interval").value) || 4,
+    push_notification: true,
+  };
+  try {
+    const res = await api("/api/apps/focus_timer/config", "POST", config);
+    if (res.success) {
+      toast(t("focus.configSaved"), "success");
+      const app = _appsCache.find(a => a.id === "focus_timer");
+      if (app) app.config = config;
+      // Update timer if not running
+      if (!_focusState.running) {
+        _focusState.total = config.focus_minutes * 60;
+        _focusState.remaining = _focusState.total;
+        _updateFocusRing();
+      }
+    } else toast(res.error || t("digest.configFail"), "error");
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function _renderFocusStats(days) {
+  try {
+    const stats = await api(`/api/apps/focus_timer/stats?days=${days}`);
+    let html = `<div class="focus-stats-grid">
+      <div class="focus-stat-card">
+        <div class="focus-stat-num">${stats.today_sessions}</div>
+        <div class="focus-stat-label">${t("focus.today")} ${t("focus.sessions")}</div>
+        <div class="focus-stat-sub">${stats.today_minutes} ${t("focus.totalMin")}</div>
+      </div>
+      <div class="focus-stat-card">
+        <div class="focus-stat-num">${stats.total_sessions}</div>
+        <div class="focus-stat-label">${days}${_lang === "zh" ? "天" : "d"} ${t("focus.sessions")}</div>
+        <div class="focus-stat-sub">${stats.total_minutes} ${t("focus.totalMin")}</div>
+      </div>
+      <div class="focus-stat-card">
+        <div class="focus-stat-num">${stats.daily_average}</div>
+        <div class="focus-stat-label">${t("focus.dailyAvg")} (${t("focus.totalMin")})</div>
+      </div>
+    </div>`;
+
+    // Daily trend chart (simple CSS bars)
+    if (stats.trend && stats.trend.length) {
+      const maxMin = Math.max(...stats.trend.map(d => d.minutes), 1);
+      html += `<h4 style="margin-top:16px;">${t("focus.trend")}</h4>`;
+      html += `<div class="focus-trend-chart">`;
+      for (const d of stats.trend) {
+        const pct = Math.round((d.minutes / maxMin) * 100);
+        const label = d.date.slice(5);
+        html += `<div class="focus-trend-bar-wrap" title="${d.date}: ${d.minutes}min, ${d.count} sessions">
+          <div class="focus-trend-bar" style="height:${Math.max(pct, 2)}%"></div>
+          <div class="focus-trend-label">${label}</div>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    // By tag
+    if (stats.by_tag && Object.keys(stats.by_tag).length) {
+      const totalTagMin = Object.values(stats.by_tag).reduce((a,b) => a + b, 0) || 1;
+      html += `<h4 style="margin-top:16px;">${t("focus.byTag")}</h4>`;
+      html += `<div class="focus-tag-bars">`;
+      for (const [tag, min] of Object.entries(stats.by_tag)) {
+        const pct = Math.round((min / totalTagMin) * 100);
+        html += `<div class="focus-tag-bar-row">
+          <span class="focus-tag-bar-label">${escapeHtml(tag)}</span>
+          <div class="focus-tag-bar-track"><div class="focus-tag-bar-fill" style="width:${pct}%"></div></div>
+          <span class="focus-tag-bar-value">${min} min</span>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    return html;
+  } catch (_) {
+    return `<div class="digest-empty">${t("focus.noSessions")}</div>`;
+  }
+}
+
+async function _renderFocusHistory(days) {
+  try {
+    const sessions = await api(`/api/apps/focus_timer/sessions?days=${days}`);
+    if (!sessions.length) return `<div class="digest-empty">${t("focus.noSessions")}</div>`;
+    return sessions.slice(0, 20).map(s => `
+      <div class="focus-history-item">
+        <span class="focus-history-tag">${escapeHtml(s.tag || "—")}</span>
+        <span class="focus-history-dur">${s.duration_minutes} min</span>
+        <span class="focus-history-time">${s.completed_at ? s.completed_at.replace("T"," ").slice(0,16) : ""}</span>
+      </div>`).join("");
+  } catch (_) {
+    return `<div class="digest-empty">${t("focus.noSessions")}</div>`;
+  }
+}
+
+// ── Common app helpers ────────────────────────────────────────────────
+
+async function toggleAppEnabled(appId, checkbox) {
+  const enabled = checkbox.checked;
+  const endpoint = enabled ? "enable" : "disable";
+  try {
+    await api(`/api/apps/${appId}/${endpoint}`, "POST");
+    const app = _appsCache.find(a => a.id === appId);
+    if (app) app.enabled = enabled;
+  } catch (_) { checkbox.checked = !enabled; }
+}
+
 async function previewDigest() {
   const btn = document.getElementById("digest-preview-btn");
   const box = document.getElementById("digest-preview-result");
@@ -1802,9 +2695,12 @@ async function previewDigest() {
     if (data.error) { box.innerHTML = `<div class="digest-preview-error">${escapeHtml(data.error)}</div>`; return; }
 
     const methodLabel = data.method === "llm" ? "AI" : t("digest.previewRuleBased");
+    const chatSessions = data.chat_sessions || 0;
+    const chatMessages = data.chat_messages || 0;
     let html = `<div class="digest-preview-stats">
       <div class="digest-stat"><span class="digest-stat-num">${data.raw_count}</span><span class="digest-stat-label">${t("digest.rawCount")}</span></div>
       <div class="digest-stat"><span class="digest-stat-num">${data.filtered_count}</span><span class="digest-stat-label">${t("digest.filteredCount")}</span></div>
+      <div class="digest-stat"><span class="digest-stat-num">${chatSessions}/${chatMessages}</span><span class="digest-stat-label">${t("digest.chatCount")}</span></div>
       <div class="digest-stat"><span class="digest-stat-num">${data.keyword_count}</span><span class="digest-stat-label">${t("digest.keywordCount")}</span></div>
       <div class="digest-stat"><span class="digest-stat-num">${methodLabel}</span><span class="digest-stat-label">${t("digest.previewMethod")}</span></div>
     </div>`;
@@ -1848,4 +2744,476 @@ async function previewDigest() {
     btn.disabled = false;
     btn.textContent = "🔍 " + t("digest.previewBtn");
   }
+}
+
+// ── Custom Apps ───────────────────────────────────────────────────────
+
+function saveAsCustomApp(botMsgIndex) {
+  let userPrompt = "";
+  for (let i = botMsgIndex - 1; i >= 0; i--) {
+    if (chatMessages[i].role === "user") { userPrompt = chatMessages[i].content; break; }
+  }
+  if (!userPrompt) { toast("No user prompt found", "error"); return; }
+  openCustomAppWizard(userPrompt, sessionId);
+}
+
+function openCustomAppWizard(sourcePrompt, sourceSessionId) {
+  const existing = document.getElementById("custom-app-wizard");
+  if (existing) existing.remove();
+
+  const tpl = sourcePrompt || "";
+  const overlay = document.createElement("div");
+  overlay.id = "custom-app-wizard";
+  overlay.className = "wizard-overlay";
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+    <div class="wizard-panel">
+      <div class="wizard-steps">
+        <span class="wizard-step active" data-step="1">1. ${t("custom.step1")}</span>
+        <span class="wizard-step" data-step="2">2. ${t("custom.step2")}</span>
+        <span class="wizard-step" data-step="3">3. ${t("custom.step3")}</span>
+      </div>
+      <div class="wizard-body">
+        <!-- Step 1: Template -->
+        <div class="wizard-page" id="wizard-page-1">
+          <label>${t("custom.template")}</label>
+          <p class="wizard-help">${t("custom.templateHelp")}</p>
+          <textarea id="wizard-template" class="wizard-textarea" rows="8">${escapeHtml(tpl)}</textarea>
+        </div>
+        <!-- Step 2: Parameters -->
+        <div class="wizard-page" id="wizard-page-2" style="display:none;">
+          <label>${t("custom.params")}</label>
+          <div id="wizard-params-list"></div>
+        </div>
+        <!-- Step 3: Info -->
+        <div class="wizard-page" id="wizard-page-3" style="display:none;">
+          <div class="form-group"><label>${t("custom.name")}</label><input type="text" id="wizard-name" placeholder="${_lang === "zh" ? "例：每日AI新闻" : "e.g. Daily AI News"}" /></div>
+          <div class="form-group"><label>${t("custom.icon")}</label><input type="text" id="wizard-icon" value="🤖" maxlength="4" style="width:60px;font-size:24px;text-align:center;" /></div>
+          <div class="form-group"><label>${t("custom.scheduleTime")}</label><input type="time" id="wizard-schedule-time" value="" /></div>
+          <div class="form-group form-group-checkbox"><label><input type="checkbox" id="wizard-schedule-enabled" /><span>${t("custom.scheduleEnabled")}</span></label></div>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <button class="btn" id="wizard-prev-btn" onclick="_wizardPrev()" style="display:none;">${t("custom.prev")}</button>
+        <button class="btn" onclick="document.getElementById('custom-app-wizard').remove()">${t("custom.cancel")}</button>
+        <button class="btn btn-primary" id="wizard-next-btn" onclick="_wizardNext()">${t("custom.next")}</button>
+      </div>
+    </div>
+  `;
+  overlay._step = 1;
+  overlay._sourceSessionId = sourceSessionId || "";
+  overlay._sourcePrompt = sourcePrompt || "";
+  document.body.appendChild(overlay);
+}
+
+function _wizardGoTo(step) {
+  const overlay = document.getElementById("custom-app-wizard");
+  if (!overlay) return;
+  overlay._step = step;
+  for (let i = 1; i <= 3; i++) {
+    document.getElementById(`wizard-page-${i}`).style.display = i === step ? "" : "none";
+    const stepEl = overlay.querySelector(`.wizard-step[data-step="${i}"]`);
+    stepEl.classList.toggle("active", i === step);
+    stepEl.classList.toggle("done", i < step);
+  }
+  document.getElementById("wizard-prev-btn").style.display = step > 1 ? "" : "none";
+  document.getElementById("wizard-next-btn").textContent = step < 3 ? t("custom.next") : t("custom.save");
+
+  if (step === 2) _wizardParseParams();
+}
+
+function _wizardNext() {
+  const overlay = document.getElementById("custom-app-wizard");
+  if (!overlay) return;
+  if (overlay._step < 3) {
+    _wizardGoTo(overlay._step + 1);
+  } else {
+    _wizardSave();
+  }
+}
+
+function _wizardPrev() {
+  const overlay = document.getElementById("custom-app-wizard");
+  if (!overlay) return;
+  if (overlay._step > 1) _wizardGoTo(overlay._step - 1);
+}
+
+function _wizardParseParams() {
+  const template = document.getElementById("wizard-template").value;
+  const regex = /\{\{(\w+)\}\}/g;
+  const seen = new Set();
+  const params = [];
+  let m;
+  while ((m = regex.exec(template)) !== null) {
+    if (seen.has(m[1])) continue;
+    seen.add(m[1]);
+    params.push(m[1]);
+  }
+  const container = document.getElementById("wizard-params-list");
+  if (!params.length) {
+    container.innerHTML = `<div class="digest-empty">${_lang === "zh" ? "模板中未检测到 {{变量}}" : "No {{variables}} found in template"}</div>`;
+    return;
+  }
+  container.innerHTML = params.map(name => `
+    <div class="wizard-param-row" data-param="${escapeAttr(name)}">
+      <span class="wizard-param-name">{{${escapeHtml(name)}}}</span>
+      <input type="text" class="wizard-param-label" placeholder="${t("custom.paramLabel")}" value="${escapeAttr(name)}" />
+      <select class="wizard-param-type digest-select">
+        <option value="text">text</option>
+        <option value="number">number</option>
+        <option value="time">time</option>
+      </select>
+      <input type="text" class="wizard-param-default" placeholder="${t("custom.paramDefault")}" />
+    </div>
+  `).join("");
+}
+
+async function _wizardSave() {
+  const overlay = document.getElementById("custom-app-wizard");
+  if (!overlay) return;
+  const template = document.getElementById("wizard-template").value.trim();
+  const name = document.getElementById("wizard-name").value.trim();
+  const icon = document.getElementById("wizard-icon").value.trim() || "🤖";
+  if (!template) { toast(_lang === "zh" ? "Prompt 模板不能为空" : "Template required", "error"); return; }
+  if (!name) { toast(_lang === "zh" ? "请输入应用名称" : "Name required", "error"); _wizardGoTo(3); return; }
+
+  const paramRows = document.querySelectorAll(".wizard-param-row");
+  const parameters = [];
+  paramRows.forEach(row => {
+    parameters.push({
+      name: row.dataset.param,
+      label: row.querySelector(".wizard-param-label").value || row.dataset.param,
+      type: row.querySelector(".wizard-param-type").value || "text",
+      default: row.querySelector(".wizard-param-default").value || "",
+    });
+  });
+
+  const scheduleTime = document.getElementById("wizard-schedule-time").value;
+  const scheduleEnabled = document.getElementById("wizard-schedule-enabled").checked;
+  const source = overlay._sourcePrompt ? {
+    session_id: overlay._sourceSessionId,
+    original_prompt: overlay._sourcePrompt,
+  } : {};
+
+  const btn = document.getElementById("wizard-next-btn");
+  btn.disabled = true;
+  btn.textContent = t("custom.saving");
+
+  try {
+    const res = await api("/api/apps/custom", "POST", {
+      name, icon,
+      prompt_template: template,
+      parameters,
+      schedule: { time: scheduleTime, enabled: scheduleEnabled },
+      source,
+    });
+    if (res.error) { toast(res.error, "error"); btn.disabled = false; btn.textContent = t("custom.save"); return; }
+    toast(t("custom.saved"), "success");
+    overlay.remove();
+    await loadApps();
+    switchPage("apps");
+  } catch (e) {
+    toast(e.message, "error");
+    btn.disabled = false;
+    btn.textContent = t("custom.save");
+  }
+}
+
+async function deleteCustomApp(appId) {
+  if (!confirm(_lang === "zh" ? "确定删除此自定义应用？" : "Delete this custom app?")) return;
+  try {
+    const res = await api(`/api/apps/custom/${appId}`, "DELETE");
+    if (res.success) { toast(t("apps.uninstallOk"), "info"); await loadApps(); }
+    else toast(res.error || "Delete failed", "error");
+  } catch (e) { toast(e.message, "error"); }
+}
+
+// ── Custom App Detail Page ────────────────────────────────────────────
+
+async function openCustomAppDetail(appId) {
+  const container = document.getElementById("app-detail-content");
+  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+
+  let capp;
+  try { capp = await api(`/api/apps/custom/${appId}`); } catch (_) {}
+  if (!capp || capp.error) {
+    container.innerHTML = `<div class="app-detail-loading">${t("apps.notInstalled")}</div>`;
+    return;
+  }
+
+  document.getElementById("app-detail-title").textContent = `${capp.icon || "🤖"} ${capp.name}`;
+  switchPage("app-detail");
+
+  const schedEnabled = capp.schedule?.enabled || false;
+  const schedTime = capp.schedule?.time || "";
+
+  // Build dynamic parameter form
+  let paramsHtml = "";
+  for (const p of (capp.parameters || [])) {
+    let inputHtml = "";
+    if (p.type === "number") {
+      inputHtml = `<input type="number" id="capp-param-${p.name}" value="${escapeAttr(p.default || "")}" />`;
+    } else if (p.type === "time") {
+      inputHtml = `<input type="time" id="capp-param-${p.name}" value="${escapeAttr(p.default || "")}" />`;
+    } else {
+      inputHtml = `<input type="text" id="capp-param-${p.name}" value="${escapeAttr(p.default || "")}" />`;
+    }
+    paramsHtml += `<div class="form-group"><label>${escapeHtml(p.label || p.name)}</label>${inputHtml}</div>`;
+  }
+
+  let reportsHtml = "";
+  try {
+    const reports = await api(`/api/apps/custom/${appId}/reports`);
+    if (reports.length) {
+      reportsHtml = reports.map(r => {
+        const tools = r.tools_used?.length ? ` (${r.tools_used.join(", ")})` : "";
+        return `<div class="digest-report-item" onclick="viewCustomReport('${escapeAttr(appId)}','${escapeAttr(r.date)}')">
+          <span class="digest-report-date">📄 ${escapeHtml(r.date)}${tools}</span>
+          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T"," ").slice(0,19) : "")}</span>
+          <button class="btn btn-sm">${t("custom.viewReport")}</button>
+        </div>`;
+      }).join("");
+    } else {
+      reportsHtml = `<div class="digest-empty">${t("custom.noReports")}</div>`;
+    }
+  } catch (_) {
+    reportsHtml = `<div class="digest-empty">${t("custom.noReports")}</div>`;
+  }
+
+  const hasEnhanced = !!capp.enhanced_prompt;
+  const refRun = capp.reference_run || {};
+
+  let enhancedHtml = "";
+  if (hasEnhanced) {
+    enhancedHtml = `
+    <div class="app-detail-section" id="capp-enhanced-section">
+      <h3>${t("custom.enhancedPrompt")} <span class="app-badge app-badge-on" id="capp-enhanced-badge">${t("custom.enhanced")}</span></h3>
+      <p class="wizard-help">${t("custom.enhancedHelp")}${refRun.date ? ` · ${t("custom.refRun")}: ${escapeHtml(refRun.date)}` : ""}${refRun.confirmed_at ? ` · ${t("custom.confirmedAt")}: ${escapeHtml(refRun.confirmed_at.replace("T"," ").slice(0,19))}` : ""}</p>
+      <div class="custom-template-preview capp-enhanced-preview" id="capp-enhanced-content">${escapeHtml(capp.enhanced_prompt)}</div>
+      <div style="margin-top:8px;"><button class="btn btn-sm" onclick="clearEnhancedPrompt('${appId}')">${t("custom.clearEnhanced")}</button></div>
+    </div>`;
+  } else {
+    enhancedHtml = `
+    <div class="app-detail-section" id="capp-enhanced-section" style="display:block;">
+      <h3>${t("custom.enhancedPrompt")} <span class="app-badge app-badge-off" id="capp-enhanced-badge">${t("custom.notEnhanced")}</span></h3>
+      <p class="wizard-help">${t("custom.enhancedHelp")}</p>
+    </div>`;
+  }
+
+  container.innerHTML = `
+    <div class="app-detail-section">
+      <div class="digest-status-bar">
+        <div class="digest-status-left">
+          <span class="digest-status-dot ${schedEnabled ? 'on' : 'off'}"></span>
+          <span>${t("custom.schedule")}: <strong>${schedEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
+        </div>
+        <div>
+          <button class="btn btn-sm" onclick="openCustomAppWizardEdit('${appId}')">${t("custom.edit")}</button>
+          <button class="btn btn-sm btn-danger" onclick="deleteCustomApp('${appId}')">${t("custom.delete")}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("custom.template")}</h3>
+      <div class="custom-template-preview">${escapeHtml(capp.prompt_template)}</div>
+    </div>
+
+    ${enhancedHtml}
+
+    ${paramsHtml ? `<div class="app-detail-section">
+      <h3>${t("custom.params")}</h3>
+      <div class="digest-config-grid">${paramsHtml}</div>
+    </div>` : ""}
+
+    <div class="app-detail-section">
+      <div class="digest-config-grid">
+        <div class="form-group"><label>${t("custom.scheduleTime")}</label><input type="time" id="capp-schedule-time" value="${escapeAttr(schedTime)}" /></div>
+        <div class="form-group form-group-checkbox"><label><input type="checkbox" id="capp-schedule-enabled" ${schedEnabled ? "checked" : ""} /><span>${t("custom.scheduleEnabled")}</span></label></div>
+      </div>
+      <div class="digest-actions">
+        <button class="btn btn-primary" onclick="saveCustomAppSchedule('${appId}')">${t("focus.saveConfig")}</button>
+        <button class="btn btn-primary" id="capp-run-btn" onclick="runCustomApp('${appId}')">🚀 ${t("custom.run")}</button>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <h3>${t("custom.reports")}</h3>
+      <div class="digest-report-list" id="capp-report-list">${reportsHtml}</div>
+    </div>
+
+    <div class="app-detail-section" id="capp-report-view" style="display:none;">
+      <h3 id="capp-report-view-title">${t("digest.latestReport")}</h3>
+      <div class="digest-report-content" id="capp-report-content"></div>
+    </div>
+  `;
+}
+
+async function runCustomApp(appId) {
+  const btn = document.getElementById("capp-run-btn");
+  btn.disabled = true;
+  btn.textContent = "⏳ " + t("custom.running");
+
+  // Collect parameter values
+  const capp = await api(`/api/apps/custom/${appId}`);
+  const params = {};
+  for (const p of (capp.parameters || [])) {
+    const el = document.getElementById(`capp-param-${p.name}`);
+    params[p.name] = el ? el.value : (p.default || "");
+  }
+
+  try {
+    const res = await api(`/api/apps/custom/${appId}/run`, "POST", { params });
+    if (res.error) { toast(res.error, "error"); btn.disabled = false; btn.textContent = "🚀 " + t("custom.run"); return; }
+
+    const poll = setInterval(async () => {
+      try {
+        const st = await api(`/api/apps/custom/${appId}/status`);
+        if (st.status === "done") {
+          clearInterval(poll);
+          btn.disabled = false;
+          btn.textContent = "🚀 " + t("custom.run");
+          toast(t("custom.runDone"), "success");
+          if (st.report) _showCustomReport(st.report, appId);
+          _refreshCustomReports(appId);
+        } else if (st.status === "error") {
+          clearInterval(poll);
+          btn.disabled = false;
+          btn.textContent = "🚀 " + t("custom.run");
+          toast(st.error || t("custom.runFail"), "error");
+        } else {
+          btn.textContent = "⏳ " + (st.progress || t("custom.running"));
+        }
+      } catch (_) {}
+    }, 3000);
+    setTimeout(() => clearInterval(poll), 600000);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = "🚀 " + t("custom.run");
+    toast(e.message, "error");
+  }
+}
+
+function _showCustomReport(report, appId) {
+  const section = document.getElementById("capp-report-view");
+  const content = document.getElementById("capp-report-content");
+  const title = document.getElementById("capp-report-view-title");
+  if (!section || !content) return;
+  title.textContent = `📅 ${report.date || ""}`;
+  const raw = report.content || "";
+  const rendered = raw.trimStart().startsWith("<") ? raw : renderMarkdown(raw);
+
+  let confirmHtml = "";
+  if (appId && report.date) {
+    confirmHtml = `<div class="capp-confirm-bar" id="capp-confirm-bar">
+      <button class="btn btn-primary" id="capp-confirm-btn" onclick="confirmCustomRun('${escapeAttr(appId)}','${escapeAttr(report.date)}')">
+        ✅ ${t("custom.confirm")}
+      </button>
+      <span class="wizard-help">${t("custom.enhancedHelp")}</span>
+    </div>`;
+  }
+
+  content.innerHTML = confirmHtml + rendered;
+  if (!raw.trimStart().startsWith("<")) highlightCode(content);
+  section.style.display = "block";
+  section.scrollIntoView({ behavior: "smooth" });
+}
+
+async function viewCustomReport(appId, dateStr) {
+  try {
+    const report = await api(`/api/apps/custom/${appId}/report/${encodeURIComponent(dateStr)}`);
+    if (report.error) { toast(report.error, "error"); return; }
+    _showCustomReport(report, appId);
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function _refreshCustomReports(appId) {
+  try {
+    const reports = await api(`/api/apps/custom/${appId}/reports`);
+    const list = document.getElementById("capp-report-list");
+    if (!list) return;
+    if (reports.length) {
+      list.innerHTML = reports.map(r => {
+        const tools = r.tools_used?.length ? ` (${r.tools_used.join(", ")})` : "";
+        return `<div class="digest-report-item" onclick="viewCustomReport('${escapeAttr(appId)}','${escapeAttr(r.date)}')">
+          <span class="digest-report-date">📄 ${escapeHtml(r.date)}${tools}</span>
+          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T"," ").slice(0,19) : "")}</span>
+          <button class="btn btn-sm">${t("custom.viewReport")}</button>
+        </div>`;
+      }).join("");
+    } else {
+      list.innerHTML = `<div class="digest-empty">${t("custom.noReports")}</div>`;
+    }
+  } catch (_) {}
+}
+
+async function saveCustomAppSchedule(appId) {
+  const scheduleTime = document.getElementById("capp-schedule-time").value;
+  const scheduleEnabled = document.getElementById("capp-schedule-enabled").checked;
+  try {
+    const res = await api(`/api/apps/custom/${appId}`, "PUT", {
+      schedule: { time: scheduleTime, enabled: scheduleEnabled },
+    });
+    if (res.error) toast(res.error, "error");
+    else toast(t("focus.configSaved"), "success");
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function confirmCustomRun(appId, dateStr) {
+  const btn = document.getElementById("capp-confirm-btn");
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = "⏳ " + t("custom.confirming");
+
+  try {
+    const res = await api(`/api/apps/custom/${appId}/confirm`, "POST", { date: dateStr });
+    if (res.error) {
+      toast(res.error, "error");
+      btn.disabled = false;
+      btn.textContent = "✅ " + t("custom.confirm");
+      return;
+    }
+    toast(t("custom.saved"), "success");
+    // Update the enhanced prompt display
+    const epSection = document.getElementById("capp-enhanced-section");
+    if (epSection) {
+      epSection.style.display = "block";
+      const epContent = document.getElementById("capp-enhanced-content");
+      if (epContent) epContent.textContent = res.enhanced_prompt || "";
+      const badge = document.getElementById("capp-enhanced-badge");
+      if (badge) { badge.textContent = t("custom.enhanced"); badge.className = "app-badge app-badge-on"; }
+    }
+    // Replace confirm bar with success message
+    const bar = document.getElementById("capp-confirm-bar");
+    if (bar) bar.innerHTML = `<span class="app-badge app-badge-on">✅ ${t("custom.enhanced")}</span>`;
+  } catch (e) {
+    toast(e.message, "error");
+    btn.disabled = false;
+    btn.textContent = "✅ " + t("custom.confirm");
+  }
+}
+
+async function clearEnhancedPrompt(appId) {
+  if (!confirm(_lang === "zh" ? "确定清除增强指令？后续执行将使用原始模板。" : "Clear enhancement? Subsequent runs will use the original template.")) return;
+  try {
+    const res = await api(`/api/apps/custom/${appId}`, "PUT", { enhanced_prompt: "", reference_run: null });
+    if (res.error) { toast(res.error, "error"); return; }
+    toast(_lang === "zh" ? "已清除" : "Cleared", "info");
+    openCustomAppDetail(appId);
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function openCustomAppWizardEdit(appId) {
+  let capp;
+  try { capp = await api(`/api/apps/custom/${appId}`); } catch (_) {}
+  if (!capp || capp.error) { toast("App not found", "error"); return; }
+  openCustomAppWizard(capp.prompt_template);
+  // Pre-fill the wizard with existing data after it renders
+  setTimeout(() => {
+    document.getElementById("wizard-name").value = capp.name || "";
+    document.getElementById("wizard-icon").value = capp.icon || "🤖";
+    document.getElementById("wizard-schedule-time").value = capp.schedule?.time || "";
+    document.getElementById("wizard-schedule-enabled").checked = capp.schedule?.enabled || false;
+  }, 100);
 }

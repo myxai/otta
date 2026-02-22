@@ -1,14 +1,18 @@
-"""Daily Digest App — browser-history-based interest recommendation engine.
+"""Today's Reading App — personal interest recommendation engine.
+
+Data sources:
+  - Chrome / Edge browser history
+  - nanobot conversation history (chat messages)
 
 Pipeline:
-  1. Read Chrome / Edge history
+  1. Read browser history + recent chat conversations
   2. Filter noise
   3. **LLM interest analysis** — extract interests, classify (work/study/life),
      and generate high-quality search queries in one step.
      Falls back to rule-based extraction + classification when LLM unavailable.
   4. **Web search** (Brave → Bing → DuckDuckGo auto-fallback) using
      LLM-generated (or rule-built) queries
-  5. **LLM report generation** — curate a personalised daily digest from
+  5. **LLM report generation** — curate a personalised daily reading from
      real search results with explanations and action items
 """
 
@@ -300,6 +304,83 @@ def filter_history(records: list[dict]) -> list[dict]:
 
 
 # ---------------------------------------------------------------------------
+# Step 2b — Read nanobot conversation history
+# ---------------------------------------------------------------------------
+
+_CHAT_HISTORY_FILE = Path.home() / ".nanobot" / "desktop_history" / "sessions.json"
+
+
+def read_chat_history(hours: int = 72) -> list[dict]:
+    """Read recent nanobot chat conversations.
+
+    Returns a list of ``{"session_title": ..., "messages": [...]}`` dicts,
+    one per session that was updated within the last *hours*.
+    """
+    if not _CHAT_HISTORY_FILE.exists():
+        return []
+    try:
+        data = json.loads(_CHAT_HISTORY_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
+    sessions = []
+    for sid, sess in data.items():
+        updated = sess.get("updated_at", "")
+        if not updated:
+            continue
+        try:
+            ts = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+        except Exception:
+            continue
+        if ts < cutoff:
+            continue
+        msgs = sess.get("messages", [])
+        if not msgs:
+            continue
+        sessions.append({
+            "session_title": sess.get("title", sid),
+            "updated_at": updated,
+            "messages": msgs,
+        })
+
+    sessions.sort(key=lambda s: s["updated_at"], reverse=True)
+    return sessions
+
+
+def _build_chat_block(sessions: list[dict], limit: int = 60) -> str:
+    """Build a concise conversation summary block for the LLM prompt."""
+    if not sessions:
+        return ""
+
+    lines: list[str] = []
+    for sess in sessions:
+        title = sess.get("session_title", "").strip()
+        if title:
+            lines.append(f"\n### 对话: {title}")
+
+        msgs = sess.get("messages", [])
+        for m in msgs:
+            role = m.get("role", "")
+            content = (m.get("content") or "").strip()
+            if not content or role not in ("user", "assistant"):
+                continue
+            # Truncate long messages
+            preview = content[:200].replace("\n", " ")
+            if len(content) > 200:
+                preview += "…"
+            prefix = "👤 用户" if role == "user" else "🤖 助手"
+            lines.append(f"- {prefix}: {preview}")
+
+            if len(lines) >= limit:
+                break
+        if len(lines) >= limit:
+            break
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Step 3 — Extract interest keywords
 # ---------------------------------------------------------------------------
 
@@ -480,15 +561,18 @@ def _llm_call(
 # ===================================================================
 
 _INTEREST_ANALYSIS_PROMPT = """\
-你是一个浏览行为分析专家。下面是用户最近的浏览器历史摘要（页面标题 + 域名）。
+你是一个个人兴趣分析专家。下面是用户最近的两个数据来源：
+1. 浏览器历史摘要（页面标题 + 域名）
+2. 与 AI 助手的对话记录（用户提问和讨论的主题）
 
-请你：
+请你综合这两个来源：
 1. 推断出用户真正的**兴趣主题**（忽略工具/平台本身的名字，比如 github、chatgpt、bing 等不是兴趣）
 2. 将兴趣归入适用的类别：work（工作/职业相关）、study（学习/研究相关）、life（生活/娱乐相关）
 3. 为每个**有内容的**类别生成 2-4 个高质量搜索词
 
 关键规则：
-- **只输出确实有兴趣的类别**。如果浏览历史完全没有某类内容，该类别留空数组即可，不要凑数
+- **综合分析两个来源**。对话中讨论的主题往往比浏览历史更能反映深层兴趣和当前关注
+- **只输出确实有兴趣的类别**。如果数据中完全没有某类内容，该类别留空数组即可，不要凑数
 - 搜索词必须是**语义完整的自然语言短句**，可以直接粘贴到搜索引擎使用
   - 好的搜索词："Python FastAPI 异步性能优化最佳实践"、"2026年最佳降噪耳机评测对比"
   - 差的搜索词："python"、"耳机"、"FastAPI OR performance"（太短 / 不完整 / 拼凑）
@@ -498,6 +582,9 @@ _INTEREST_ANALYSIS_PROMPT = """\
 
 ═══ 用户浏览历史 ═══
 {history_block}
+
+═══ 用户 AI 对话记录 ═══
+{chat_block}
 
 ═══ 请严格以 JSON 格式输出，不要输出其他内容 ═══
 ```json
@@ -547,18 +634,22 @@ def llm_analyze_interests(
     model: str,
     api_key: str,
     api_base: str | None = None,
+    chat_sessions: list[dict] | None = None,
 ) -> dict | None:
     """Use LLM to extract interests, classify, and generate search queries.
 
+    Analyses both browser history *records* and nanobot *chat_sessions*.
     Returns dict like ``{"work": {"interests": [...], "queries": [...]}, ...}``
     or *None* on failure.
     """
-    if not records:
+    if not records and not chat_sessions:
         return None
 
-    history_block = _build_history_block(records)
+    history_block = _build_history_block(records) if records else "（无浏览记录）"
+    chat_block = _build_chat_block(chat_sessions or []) or "（无对话记录）"
     prompt = _INTEREST_ANALYSIS_PROMPT.format(
         history_block=history_block,
+        chat_block=chat_block,
         json_schema=_INTEREST_JSON_SCHEMA,
     )
 
@@ -938,7 +1029,7 @@ def build_report_prompt(categories: dict[str, list],
         )
     sections_hint = "\n".join(cat_section_hints)
 
-    return f"""你是一个高质量个人日报策展人。根据用户浏览兴趣和全网搜索结果，精选最有价值的推荐。
+    return f"""你是一个高质量个人阅读策展人。根据用户浏览兴趣、AI 对话主题和全网搜索结果，精选最有价值的推荐。
 
 今日日期：{date_str}
 
@@ -962,7 +1053,7 @@ def build_report_prompt(categories: dict[str, list],
 
 HTML 结构要求（严格使用以下 CSS class）：
 
-<h1>📅 {date_str} 个人兴趣推荐日报</h1>
+<h1>📅 {date_str} 今日私读</h1>
 
 {sections_hint}
 
@@ -1012,7 +1103,7 @@ def generate_report_fallback(categories: dict[str, list],
                              search_results: dict[str, list[dict]],
                              date_str: str) -> str:
     """HTML report when LLM is unavailable — still uses real search links."""
-    parts: list[str] = [f'<h1>📅 {date_str} 个人兴趣推荐日报</h1>']
+    parts: list[str] = [f'<h1>📅 {date_str} 今日私读</h1>']
 
     for cat in ("work", "study", "life"):
         meta = _CAT_META[cat]
@@ -1135,13 +1226,19 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
 
     # ── 1. Collect ──────────────────────────────────────────────────
     if progress_cb:
-        progress_cb("正在读取浏览器历史…")
+        progress_cb("正在读取浏览器历史和对话记录…")
     raw = read_browser_history(hours=hours, browser=browser)
     print(f"[daily_digest] raw history: {len(raw)} records")
-    if not raw:
+
+    chat_hours = config.get("chat_hours", 72)
+    chat_sessions = read_chat_history(hours=chat_hours)
+    chat_msg_count = sum(len(s.get("messages", [])) for s in chat_sessions)
+    print(f"[daily_digest] chat sessions: {len(chat_sessions)}, messages: {chat_msg_count}")
+
+    if not raw and not chat_sessions:
         return {
             "status": "error",
-            "message": "未找到浏览器历史记录。请确认 Chrome 或 Edge 浏览器已安装并有浏览记录。",
+            "message": "未找到浏览器历史记录或对话记录。请确认浏览器已安装或有过对话。",
         }
 
     # ── 2. Filter ───────────────────────────────────────────────────
@@ -1159,7 +1256,10 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
     if has_llm:
         if progress_cb:
             progress_cb("正在通过 AI 分析兴趣…")
-        llm_analysis = llm_analyze_interests(filtered, model, api_key, api_base)
+        llm_analysis = llm_analyze_interests(
+            filtered, model, api_key, api_base,
+            chat_sessions=chat_sessions,
+        )
 
     if llm_analysis:
         # LLM path — use its queries & interests directly
@@ -1212,7 +1312,7 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
 
     # ── 6. Generate report ──────────────────────────────────────────
     if progress_cb:
-        progress_cb("正在生成推荐日报…")
+        progress_cb("正在生成今日私读…")
 
     if has_llm:
         try:
@@ -1240,6 +1340,8 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
         "stats": {
             "raw_count": len(raw),
             "filtered_count": len(filtered),
+            "chat_sessions": len(chat_sessions),
+            "chat_messages": chat_msg_count,
             "keyword_count": sum(len(v) for v in interests_summary.values()),
             "search_queries": search_stats["total_queries"],
             "search_results": search_stats["total_results"],

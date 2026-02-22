@@ -1,4 +1,4 @@
-"""nanobot Desktop — Windows 桌面可视化客户端."""
+"""MyxAI Desk — 桌面可视化客户端."""
 
 import os
 
@@ -59,6 +59,9 @@ _mcp_log_lock = threading.Lock()
 
 _notifications: list[dict] = []
 _notifications_lock = threading.Lock()
+
+_last_tools_used: dict[str, list[str]] = {}
+_last_tools_lock = threading.Lock()
 
 
 def _mcp_record(server: str, level: str, message: str):
@@ -399,6 +402,9 @@ def _patch_agent_tool_history(agent):
 
         self.sessions.save(session)
 
+        with _last_tools_lock:
+            _last_tools_used[key] = list(tools_used)
+
         return OutboundMessage(
             channel=msg.channel, chat_id=msg.chat_id,
             content=final_content,
@@ -588,6 +594,65 @@ async def _connect_mcp_safe(agent, progress_cb=None):
         _mcp_record("*", "ok", f"Total MCP tools registered: {total_registered}")
     else:
         _mcp_record("*", "warn", "No MCP tools were registered")
+
+
+# ---------------------------------------------------------------------------
+# Agent execution helper (for custom apps, scheduled tasks, etc.)
+# ---------------------------------------------------------------------------
+
+def _run_agent_with_prompt(
+    prompt: str,
+    session_key: str,
+    progress_cb=None,
+    timeout: int = 300,
+) -> dict:
+    """Run the nanobot agent with a prompt and return {content, tools_used}.
+
+    This is the universal entry point for programmatically invoking the agent
+    from background threads (custom apps, scheduled tasks, etc.).
+    """
+    if not NANOBOT_AVAILABLE:
+        return {"content": "nanobot 未安装", "tools_used": []}
+
+    result_holder: dict = {"content": "", "tools_used": []}
+    error_holder: list = []
+
+    async def _execute():
+        try:
+            agent = _get_or_create_agent()
+            need_mcp = bool(agent._mcp_servers)
+            has_mcp = any(n.startswith("mcp_") for n in agent.tools._tools)
+            if need_mcp and not has_mcp:
+                await _connect_mcp_safe(agent)
+
+            async def _progress(content):
+                if progress_cb:
+                    progress_cb(content)
+
+            response = await agent.process_direct(
+                prompt, session_key=session_key, on_progress=_progress,
+            )
+            result_holder["content"] = response or ""
+            with _last_tools_lock:
+                result_holder["tools_used"] = list(
+                    _last_tools_used.pop(session_key, [])
+                )
+        except Exception as exc:
+            error_holder.append(exc)
+
+    _ensure_loop()
+    future = asyncio.run_coroutine_threadsafe(_execute(), _async_loop)
+    try:
+        future.result(timeout=timeout)
+    except Exception as exc:
+        error_holder.append(exc)
+
+    if error_holder:
+        return {
+            "content": f"执行出错: {error_holder[0]}",
+            "tools_used": result_holder.get("tools_used", []),
+        }
+    return result_holder
 
 
 # ---------------------------------------------------------------------------
@@ -1120,8 +1185,8 @@ _digest_task_status: dict = {}  # {"status": "idle"|"running"|"done"|"error", ..
 _APP_CATALOG = {
     "daily_digest": {
         "id": "daily_digest",
-        "name": "推荐日报",
-        "name_en": "Daily Digest",
+        "name": "今日私读",
+        "name_en": "Today's Reading",
         "icon": "📰",
         "description": "基于浏览器历史，自动分析个人兴趣，每日推荐工作、学习、生活相关内容",
         "description_en": "Analyze browser history to discover interests, generate daily recommendations for work, study and life",
@@ -1136,10 +1201,9 @@ _APP_CATALOG = {
         "icon": "🔍",
         "description": "监控指定网页变化，有更新时自动提醒",
         "description_en": "Monitor web pages for changes, notify on updates",
-        "version": "0.1.0",
+        "version": "1.0.0",
         "author": "nanobot",
         "category": "tools",
-        "coming_soon": True,
     },
     "email_summary": {
         "id": "email_summary",
@@ -1148,10 +1212,9 @@ _APP_CATALOG = {
         "icon": "📧",
         "description": "自动汇总未读邮件，生成每日邮件摘要",
         "description_en": "Auto-summarize unread emails into a daily digest",
-        "version": "0.1.0",
+        "version": "1.0.0",
         "author": "nanobot",
         "category": "productivity",
-        "coming_soon": True,
     },
     "focus_timer": {
         "id": "focus_timer",
@@ -1160,10 +1223,9 @@ _APP_CATALOG = {
         "icon": "⏱️",
         "description": "番茄钟工作法，自动记录专注时间并统计",
         "description_en": "Pomodoro timer with automatic focus time tracking",
-        "version": "0.1.0",
+        "version": "1.0.0",
         "author": "nanobot",
         "category": "productivity",
-        "coming_soon": True,
     },
 }
 
@@ -1173,6 +1235,32 @@ _DEFAULT_DIGEST_CONFIG = {
     "schedule_time": "22:00",
     "push_notification": True,
     "push_email": "",
+}
+
+_DEFAULT_MONITOR_CONFIG = {
+    "check_interval_minutes": 30,
+    "default_mode": "hash",
+    "schedule_enabled": True,
+}
+
+_DEFAULT_EMAIL_CONFIG = {
+    "imap_host": "",
+    "imap_port": 993,
+    "imap_user": "",
+    "imap_password": "",
+    "imap_ssl": True,
+    "imap_folder": "INBOX",
+    "hours": 24,
+    "max_emails": 50,
+    "schedule_time": "08:00",
+}
+
+_DEFAULT_FOCUS_CONFIG = {
+    "focus_minutes": 25,
+    "break_minutes": 5,
+    "long_break_minutes": 15,
+    "long_break_interval": 4,
+    "push_notification": True,
 }
 
 
@@ -1215,17 +1303,36 @@ def _get_model_config() -> dict:
 
 @flask_app.route("/api/apps")
 def api_apps_list():
-    """Return all apps: catalog + installation status."""
+    """Return all apps: catalog + installation status + custom apps."""
     registry = _load_apps_registry()
     result = []
     for app_id, catalog in _APP_CATALOG.items():
         entry = {**catalog}
+        entry["type"] = "builtin"
         installed = registry.get(app_id)
         entry["installed"] = installed is not None
         entry["enabled"] = installed.get("enabled", False) if installed else False
         entry["config"] = installed.get("config", {}) if installed else {}
         entry["last_run"] = installed.get("last_run") if installed else None
         result.append(entry)
+    from apps.custom_app import list_apps as _list_custom
+    for capp in _list_custom():
+        result.append({
+            "id": capp["id"],
+            "name": capp["name"],
+            "name_en": capp["name"],
+            "icon": capp.get("icon", "🤖"),
+            "description": capp.get("prompt_template", "")[:60] + "…",
+            "description_en": capp.get("prompt_template", "")[:60] + "…",
+            "version": "1.0.0",
+            "author": "custom",
+            "category": "custom",
+            "type": "custom",
+            "installed": True,
+            "enabled": capp.get("schedule", {}).get("enabled", False),
+            "config": {},
+            "last_run": capp.get("last_run"),
+        })
     return jsonify(result)
 
 
@@ -1233,12 +1340,15 @@ def api_apps_list():
 def api_app_install(app_id):
     if app_id not in _APP_CATALOG:
         return jsonify({"error": "应用不存在"}), 404
-    if _APP_CATALOG[app_id].get("coming_soon"):
-        return jsonify({"error": "该应用即将推出，暂不可安装"}), 400
     registry = _load_apps_registry()
     if app_id in registry:
         return jsonify({"error": "应用已安装"}), 400
-    default_configs = {"daily_digest": _DEFAULT_DIGEST_CONFIG}
+    default_configs = {
+        "daily_digest": _DEFAULT_DIGEST_CONFIG,
+        "web_monitor": _DEFAULT_MONITOR_CONFIG,
+        "email_summary": _DEFAULT_EMAIL_CONFIG,
+        "focus_timer": _DEFAULT_FOCUS_CONFIG,
+    }
     registry[app_id] = {
         "installed_at": datetime.now(timezone.utc).isoformat(),
         "enabled": True,
@@ -1302,7 +1412,7 @@ def api_digest_run():
     """Start a daily digest run in the background."""
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "推荐日报应用未安装"}), 400
+        return jsonify({"error": "今日私读应用未安装"}), 400
 
     with _digest_task_lock:
         if _digest_task_status.get("status") == "running":
@@ -1330,7 +1440,7 @@ def api_digest_run():
 
                 stats = result.get("stats", {})
                 _push_notification(
-                    title="📰 推荐日报已生成",
+                    title="📰 今日私读已生成",
                     content=(
                         f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
                         f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
@@ -1387,12 +1497,12 @@ def api_digest_preview():
     """
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "推荐日报应用未安装"}), 400
+        return jsonify({"error": "今日私读应用未安装"}), 400
 
     from apps.daily_digest import (
         read_browser_history, filter_history,
         extract_keywords, classify_interests,
-        llm_analyze_interests,
+        llm_analyze_interests, read_chat_history,
     )
     app_config = registry["daily_digest"].get("config", {})
     browser = app_config.get("browser", "auto")
@@ -1401,6 +1511,10 @@ def api_digest_preview():
     raw = read_browser_history(hours=hours, browser=browser)
     filtered = filter_history(raw)
 
+    chat_hours = app_config.get("chat_hours", 72)
+    chat_sessions = read_chat_history(hours=chat_hours)
+    chat_msg_count = sum(len(s.get("messages", [])) for s in chat_sessions)
+
     model_cfg = _get_model_config()
     model = model_cfg.get("model")
     api_key = model_cfg.get("api_key")
@@ -1408,7 +1522,10 @@ def api_digest_preview():
     analysis_method = "rule"
 
     if model and api_key:
-        llm_result = llm_analyze_interests(filtered, model, api_key, api_base)
+        llm_result = llm_analyze_interests(
+            filtered, model, api_key, api_base,
+            chat_sessions=chat_sessions,
+        )
         if llm_result:
             analysis_method = "llm"
             interests = {
@@ -1422,6 +1539,8 @@ def api_digest_preview():
             return jsonify({
                 "raw_count": len(raw),
                 "filtered_count": len(filtered),
+                "chat_sessions": len(chat_sessions),
+                "chat_messages": chat_msg_count,
                 "keyword_count": sum(len(v) for v in interests.values()),
                 "interests": interests,
                 "queries": queries,
@@ -1437,10 +1556,407 @@ def api_digest_preview():
     return jsonify({
         "raw_count": len(raw),
         "filtered_count": len(filtered),
+        "chat_sessions": len(chat_sessions),
+        "chat_messages": chat_msg_count,
         "keyword_count": len(keywords),
         "interests": interests,
         "method": analysis_method,
     })
+
+
+# ---------------------------------------------------------------------------
+# Routes — Web Monitor
+# ---------------------------------------------------------------------------
+
+_monitor_task_lock = threading.Lock()
+_monitor_task_status: dict = {}
+
+
+@flask_app.route("/api/apps/web_monitor/sites")
+def api_monitor_sites():
+    from apps.web_monitor import list_sites
+    return jsonify(list_sites())
+
+
+@flask_app.route("/api/apps/web_monitor/sites", methods=["POST"])
+def api_monitor_add_site():
+    body = request.json or {}
+    url = body.get("url", "").strip()
+    if not url:
+        return jsonify({"error": "URL 不能为空"}), 400
+    from apps.web_monitor import add_site
+    site = add_site(url, name=body.get("name", ""), mode=body.get("mode", "hash"))
+    return jsonify(site)
+
+
+@flask_app.route("/api/apps/web_monitor/sites/<site_id>", methods=["DELETE"])
+def api_monitor_remove_site(site_id):
+    from apps.web_monitor import remove_site
+    if remove_site(site_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "站点不存在"}), 404
+
+
+@flask_app.route("/api/apps/web_monitor/check", methods=["POST"])
+def api_monitor_check_all():
+    """Trigger a check on all enabled sites (background)."""
+    with _monitor_task_lock:
+        if _monitor_task_status.get("status") == "running":
+            return jsonify({"error": "正在检查中"}), 409
+        _monitor_task_status.update({"status": "running", "progress": ""})
+
+    def _run():
+        try:
+            from apps.web_monitor import check_all_sites
+            model_cfg = _get_model_config()
+
+            def _progress(msg):
+                with _monitor_task_lock:
+                    _monitor_task_status["progress"] = msg
+
+            results = check_all_sites(
+                model=model_cfg.get("model"),
+                api_key=model_cfg.get("api_key"),
+                api_base=model_cfg.get("api_base"),
+                progress_cb=_progress,
+            )
+            changed = [r for r in results if r.get("changed")]
+            if changed:
+                _push_notification(
+                    title="🔍 网页变化通知",
+                    content=f"检测到 {len(changed)} 个网页有更新",
+                    level="info",
+                )
+            reg = _load_apps_registry()
+            if "web_monitor" in reg:
+                reg["web_monitor"]["last_run"] = datetime.now(timezone.utc).isoformat()
+                _save_apps_registry(reg)
+            with _monitor_task_lock:
+                _monitor_task_status.update({"status": "done", "results": results})
+        except Exception as exc:
+            print(f"[web_monitor] check error: {exc}")
+            with _monitor_task_lock:
+                _monitor_task_status.update({"status": "error", "error": str(exc)})
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "running"})
+
+
+@flask_app.route("/api/apps/web_monitor/check/<site_id>", methods=["POST"])
+def api_monitor_check_one(site_id):
+    from apps.web_monitor import check_site
+    model_cfg = _get_model_config()
+    result = check_site(
+        site_id,
+        model=model_cfg.get("model"),
+        api_key=model_cfg.get("api_key"),
+        api_base=model_cfg.get("api_base"),
+    )
+    return jsonify(result)
+
+
+@flask_app.route("/api/apps/web_monitor/status")
+def api_monitor_status():
+    with _monitor_task_lock:
+        return jsonify(dict(_monitor_task_status) if _monitor_task_status else {"status": "idle"})
+
+
+@flask_app.route("/api/apps/web_monitor/history/<site_id>")
+def api_monitor_history(site_id):
+    from apps.web_monitor import get_history
+    return jsonify(get_history(site_id))
+
+
+# ---------------------------------------------------------------------------
+# Routes — Email Summary
+# ---------------------------------------------------------------------------
+
+@flask_app.route("/api/apps/email_summary/run", methods=["POST"])
+def api_email_run():
+    registry = _load_apps_registry()
+    if "email_summary" not in registry:
+        return jsonify({"error": "邮件摘要应用未安装"}), 400
+    from apps.email_summary import run_email_summary
+    app_config = registry["email_summary"].get("config", {})
+    if not app_config.get("imap_host") or not app_config.get("imap_user"):
+        return jsonify({"error": "请先配置 IMAP 邮箱信息"}), 400
+    model_cfg = _get_model_config()
+
+    def _run():
+        result = run_email_summary(app_config, model_config=model_cfg)
+        if result.get("success"):
+            reg = _load_apps_registry()
+            if "email_summary" in reg:
+                reg["email_summary"]["last_run"] = datetime.now(timezone.utc).isoformat()
+                _save_apps_registry(reg)
+            _push_notification(
+                title="📧 邮件摘要已生成",
+                content=f"汇总了 {result.get('email_count', 0)} 封邮件",
+                level="info",
+            )
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "running"})
+
+
+@flask_app.route("/api/apps/email_summary/status")
+def api_email_status():
+    from apps.email_summary import get_status
+    return jsonify(get_status())
+
+
+@flask_app.route("/api/apps/email_summary/reports")
+def api_email_reports():
+    from apps.email_summary import list_reports
+    return jsonify(list_reports())
+
+
+@flask_app.route("/api/apps/email_summary/report/<date_str>")
+def api_email_report(date_str):
+    from apps.email_summary import get_report
+    report = get_report(date_str)
+    if not report:
+        return jsonify({"error": "报告不存在"}), 404
+    return jsonify(report)
+
+
+@flask_app.route("/api/apps/email_summary/test", methods=["POST"])
+def api_email_test():
+    registry = _load_apps_registry()
+    if "email_summary" not in registry:
+        return jsonify({"error": "邮件摘要应用未安装"}), 400
+    from apps.email_summary import test_connection
+    app_config = registry["email_summary"].get("config", {})
+    return jsonify(test_connection(app_config))
+
+
+@flask_app.route("/api/apps/email_summary/presets")
+def api_email_presets():
+    from apps.email_summary import IMAP_PRESETS
+    return jsonify(IMAP_PRESETS)
+
+
+# ---------------------------------------------------------------------------
+# Routes — Focus Timer
+# ---------------------------------------------------------------------------
+
+@flask_app.route("/api/apps/focus_timer/sessions", methods=["POST"])
+def api_focus_save():
+    body = request.json or {}
+    from apps.focus_timer import save_session
+    entry = save_session(body)
+    return jsonify(entry)
+
+
+@flask_app.route("/api/apps/focus_timer/sessions")
+def api_focus_sessions():
+    days = request.args.get("days", 7, type=int)
+    tag = request.args.get("tag", "")
+    from apps.focus_timer import list_sessions
+    return jsonify(list_sessions(days=days, tag=tag))
+
+
+@flask_app.route("/api/apps/focus_timer/sessions/<session_id>", methods=["DELETE"])
+def api_focus_delete(session_id):
+    from apps.focus_timer import delete_session
+    if delete_session(session_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "会话不存在"}), 404
+
+
+@flask_app.route("/api/apps/focus_timer/stats")
+def api_focus_stats():
+    days = request.args.get("days", 30, type=int)
+    from apps.focus_timer import get_stats
+    return jsonify(get_stats(days=days))
+
+
+@flask_app.route("/api/apps/focus_timer/tags")
+def api_focus_tags():
+    from apps.focus_timer import get_tags
+    return jsonify(get_tags())
+
+
+# ---------------------------------------------------------------------------
+# Routes — Custom Apps
+# ---------------------------------------------------------------------------
+
+_custom_run_status: dict[str, dict] = {}
+_custom_run_lock = threading.Lock()
+
+
+@flask_app.route("/api/apps/custom", methods=["GET"])
+def api_custom_list():
+    from apps.custom_app import list_apps
+    return jsonify(list_apps())
+
+
+@flask_app.route("/api/apps/custom", methods=["POST"])
+def api_custom_create():
+    body = request.json or {}
+    name = body.get("name", "").strip()
+    prompt_template = body.get("prompt_template", "").strip()
+    if not name or not prompt_template:
+        return jsonify({"error": "名称和 Prompt 模板不能为空"}), 400
+    from apps.custom_app import create_app
+    app = create_app(
+        name=name,
+        prompt_template=prompt_template,
+        parameters=body.get("parameters"),
+        icon=body.get("icon", "🤖"),
+        schedule=body.get("schedule"),
+        source=body.get("source"),
+    )
+    return jsonify(app)
+
+
+@flask_app.route("/api/apps/custom/<app_id>", methods=["GET"])
+def api_custom_get(app_id):
+    from apps.custom_app import get_app
+    app = get_app(app_id)
+    if not app:
+        return jsonify({"error": "应用不存在"}), 404
+    return jsonify(app)
+
+
+@flask_app.route("/api/apps/custom/<app_id>", methods=["PUT"])
+def api_custom_update(app_id):
+    body = request.json or {}
+    from apps.custom_app import update_app
+    app = update_app(app_id, **body)
+    if not app:
+        return jsonify({"error": "应用不存在"}), 404
+    return jsonify(app)
+
+
+@flask_app.route("/api/apps/custom/<app_id>", methods=["DELETE"])
+def api_custom_delete(app_id):
+    from apps.custom_app import delete_app
+    if delete_app(app_id):
+        return jsonify({"success": True})
+    return jsonify({"error": "应用不存在"}), 404
+
+
+@flask_app.route("/api/apps/custom/<app_id>/run", methods=["POST"])
+def api_custom_run(app_id):
+    """Run a custom app with given parameter values."""
+    from apps.custom_app import get_app, build_effective_prompt, save_report, set_last_run
+    app = get_app(app_id)
+    if not app:
+        return jsonify({"error": "应用不存在"}), 404
+
+    with _custom_run_lock:
+        st = _custom_run_status.get(app_id, {})
+        if st.get("status") == "running":
+            return jsonify({"error": "正在运行中"}), 409
+        _custom_run_status[app_id] = {"status": "running", "progress": "准备执行…"}
+
+    body = request.json or {}
+    param_values = body.get("params", {})
+    for p in app.get("parameters", []):
+        if p["name"] not in param_values:
+            param_values[p["name"]] = p.get("default", "")
+
+    prompt = build_effective_prompt(app, param_values)
+
+    def _run():
+        try:
+            def _progress(msg):
+                with _custom_run_lock:
+                    _custom_run_status[app_id]["progress"] = msg
+
+            session_key = f"custom_app:{app_id}:{int(time.time())}"
+            result = _run_agent_with_prompt(
+                prompt, session_key=session_key, progress_cb=_progress,
+            )
+            report = save_report(
+                app_id,
+                content=result["content"],
+                params_used=param_values,
+                tools_used=result.get("tools_used"),
+            )
+            set_last_run(app_id)
+            _push_notification(
+                title=f"{app.get('icon', '🤖')} {app['name']}",
+                content="执行完成",
+                level="info",
+            )
+            with _custom_run_lock:
+                _custom_run_status[app_id] = {
+                    "status": "done",
+                    "report": report,
+                }
+        except Exception as exc:
+            print(f"[custom_app] run error: {exc}")
+            with _custom_run_lock:
+                _custom_run_status[app_id] = {
+                    "status": "error",
+                    "error": str(exc),
+                }
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"status": "running"})
+
+
+@flask_app.route("/api/apps/custom/<app_id>/status")
+def api_custom_status(app_id):
+    with _custom_run_lock:
+        st = _custom_run_status.get(app_id, {"status": "idle"})
+        return jsonify(dict(st))
+
+
+@flask_app.route("/api/apps/custom/<app_id>/confirm", methods=["POST"])
+def api_custom_confirm(app_id):
+    """Confirm a successful run and auto-generate enhanced prompt constraints."""
+    from apps.custom_app import get_app, get_report, generate_enhanced_prompt, update_app
+    app = get_app(app_id)
+    if not app:
+        return jsonify({"error": "应用不存在"}), 404
+
+    body = request.json or {}
+    date_str = body.get("date")
+    if not date_str:
+        return jsonify({"error": "缺少报告日期"}), 400
+
+    report = get_report(app_id, date_str)
+    if not report:
+        return jsonify({"error": "报告不存在"}), 404
+
+    mc = _get_model_config()
+    if not mc.get("api_key"):
+        return jsonify({"error": "未配置 LLM，无法生成增强指令"}), 400
+
+    try:
+        enhanced = generate_enhanced_prompt(
+            original_template=app["prompt_template"],
+            successful_output=report.get("content", ""),
+            tools_used=report.get("tools_used", []),
+            model=mc["model"],
+            api_key=mc["api_key"],
+            api_base=mc.get("api_base"),
+        )
+        update_app(app_id,
+                    enhanced_prompt=enhanced,
+                    reference_run={"date": date_str, "confirmed_at": datetime.now(timezone.utc).isoformat()})
+        return jsonify({"success": True, "enhanced_prompt": enhanced})
+    except Exception as exc:
+        print(f"[custom_app] enhance error: {exc}")
+        return jsonify({"error": f"生成增强指令失败: {exc}"}), 500
+
+
+@flask_app.route("/api/apps/custom/<app_id>/reports")
+def api_custom_reports(app_id):
+    from apps.custom_app import list_reports
+    return jsonify(list_reports(app_id))
+
+
+@flask_app.route("/api/apps/custom/<app_id>/report/<date_str>")
+def api_custom_report(app_id, date_str):
+    from apps.custom_app import get_report
+    report = get_report(app_id, date_str)
+    if not report:
+        return jsonify({"error": "报告不存在"}), 404
+    return jsonify(report)
 
 
 # ---------------------------------------------------------------------------
@@ -1473,37 +1989,38 @@ def _start_app_scheduler():
 def _check_scheduled_apps():
     now = datetime.now()
     current_time = now.strftime("%H:%M")
+    current_minute = now.minute
     today = now.strftime("%Y-%m-%d")
 
     registry = _load_apps_registry()
     for app_id, app in registry.items():
         if not app.get("enabled"):
             continue
-        schedule_time = app.get("config", {}).get("schedule_time")
-        if not schedule_time or current_time != schedule_time:
-            continue
-        last_run = app.get("last_run", "")
-        if last_run and last_run.startswith(today):
-            continue
+        config = app.get("config", {})
 
+        # --- Daily Digest: schedule_time based ---
         if app_id == "daily_digest":
+            schedule_time = config.get("schedule_time")
+            if not schedule_time or current_time != schedule_time:
+                continue
+            last_run = app.get("last_run", "")
+            if last_run and last_run.startswith(today):
+                continue
             with _digest_task_lock:
                 if _digest_task_status.get("status") == "running":
                     continue
             print(f"[app_scheduler] triggering daily_digest at {current_time}")
-            # Trigger via the API endpoint logic
             try:
                 from apps.daily_digest import run_daily_digest
-                app_config = app.get("config", {})
                 model_cfg = _get_model_config()
-                merged = {**app_config, **model_cfg}
+                merged = {**config, **model_cfg}
                 result = run_daily_digest(merged)
                 if result["status"] == "ok":
                     registry[app_id]["last_run"] = datetime.now(timezone.utc).isoformat()
                     _save_apps_registry(registry)
                     stats = result.get("stats", {})
                     _push_notification(
-                        title="📰 推荐日报已生成",
+                        title="📰 今日私读已生成",
                         content=(
                             f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
                             f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
@@ -1512,6 +2029,97 @@ def _check_scheduled_apps():
                     )
             except Exception as exc:
                 print(f"[app_scheduler] daily_digest error: {exc}")
+
+        # --- Web Monitor: interval based ---
+        elif app_id == "web_monitor":
+            if not config.get("schedule_enabled", True):
+                continue
+            interval = config.get("check_interval_minutes", 30)
+            if current_minute % interval != 0:
+                continue
+            with _monitor_task_lock:
+                if _monitor_task_status.get("status") == "running":
+                    continue
+            print(f"[app_scheduler] triggering web_monitor check")
+            try:
+                from apps.web_monitor import check_all_sites
+                model_cfg = _get_model_config()
+                results = check_all_sites(
+                    model=model_cfg.get("model"),
+                    api_key=model_cfg.get("api_key"),
+                    api_base=model_cfg.get("api_base"),
+                )
+                changed = [r for r in results if r.get("changed")]
+                if changed:
+                    _push_notification(
+                        title="🔍 网页变化通知",
+                        content=f"检测到 {len(changed)} 个网页有更新",
+                        level="info",
+                    )
+                registry[app_id]["last_run"] = datetime.now(timezone.utc).isoformat()
+                _save_apps_registry(registry)
+            except Exception as exc:
+                print(f"[app_scheduler] web_monitor error: {exc}")
+
+        # --- Email Summary: schedule_time based ---
+        elif app_id == "email_summary":
+            schedule_time = config.get("schedule_time")
+            if not schedule_time or current_time != schedule_time:
+                continue
+            last_run = app.get("last_run", "")
+            if last_run and last_run.startswith(today):
+                continue
+            if not config.get("imap_host") or not config.get("imap_user"):
+                continue
+            print(f"[app_scheduler] triggering email_summary at {current_time}")
+            try:
+                from apps.email_summary import run_email_summary
+                model_cfg = _get_model_config()
+                result = run_email_summary(config, model_config=model_cfg)
+                if result.get("success"):
+                    registry[app_id]["last_run"] = datetime.now(timezone.utc).isoformat()
+                    _save_apps_registry(registry)
+                    _push_notification(
+                        title="📧 邮件摘要已生成",
+                        content=f"汇总了 {result.get('email_count', 0)} 封邮件",
+                        level="info",
+                    )
+            except Exception as exc:
+                print(f"[app_scheduler] email_summary error: {exc}")
+
+    # --- Custom apps: schedule_time based ---
+    from apps.custom_app import list_apps as _list_custom, build_effective_prompt, save_report, set_last_run
+    for capp in _list_custom():
+        sched = capp.get("schedule", {})
+        if not sched.get("enabled"):
+            continue
+        sched_time = sched.get("time")
+        if not sched_time or current_time != sched_time:
+            continue
+        last_run = capp.get("last_run", "")
+        if last_run and last_run[:10] >= today:
+            continue
+        capp_id = capp["id"]
+        with _custom_run_lock:
+            st = _custom_run_status.get(capp_id, {})
+            if st.get("status") == "running":
+                continue
+        print(f"[app_scheduler] triggering custom app '{capp['name']}' at {current_time}")
+        try:
+            param_values = {p["name"]: p.get("default", "") for p in capp.get("parameters", [])}
+            prompt = build_effective_prompt(capp, param_values)
+            session_key = f"custom_app:{capp_id}:{int(time.time())}"
+            result = _run_agent_with_prompt(prompt, session_key=session_key)
+            save_report(capp_id, content=result["content"],
+                        params_used=param_values, tools_used=result.get("tools_used"))
+            set_last_run(capp_id)
+            _push_notification(
+                title=f"{capp.get('icon', '🤖')} {capp['name']}",
+                content="定时执行完成",
+                level="info",
+            )
+        except Exception as exc:
+            print(f"[app_scheduler] custom app '{capp['name']}' error: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -1738,7 +2346,7 @@ def _shutdown():
         _async_loop.call_soon_threadsafe(_async_loop.stop)
     _async_loop = None
 
-    print("[nanobot Desktop] Shutdown complete.", flush=True)
+    print("[MyxAI Desk] Shutdown complete.", flush=True)
 
 
 import atexit
@@ -1788,7 +2396,7 @@ def main():
             time.sleep(0.05)
 
     window = webview.create_window(
-        "nanobot Desktop",
+        "MyxAI Desk",
         f"http://127.0.0.1:{port}",
         width=1280,
         height=860,
