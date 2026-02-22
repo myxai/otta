@@ -11,7 +11,7 @@ const I18N = {
     "setup.install.title":"安装 nanobot","setup.install.desc":"在终端运行以下命令：",
     "setup.onboard.title":"初始化配置","setup.onboard.desc":"点击下方按钮自动初始化。","setup.onboard.btn":"初始化 nanobot",
     "setup.apikey.title":"配置 API Key","setup.apikey.desc":"前往「设置」页面填写您的 API Key。","setup.apikey.btn":"前往设置",
-    "chat.ready":"nanobot 已就绪","chat.readyDesc":"输入消息开始对话，我可以帮你搜索信息、编写代码、管理文件等。",
+    "chat.ready":"MyxAI Desk 已就绪","chat.readyDesc":"输入消息开始对话，我可以帮你搜索信息、编写代码、管理文件等。",
     "chat.placeholder":"输入消息… (Enter 发送, Shift+Enter 换行)",
     "chat.you":"你","chat.noHistory":"暂无历史对话","chat.newChat":"新对话",
     "chat.rename":"重命名","chat.renameTitle":"修改对话标题","chat.renamePlaceholder":"输入新标题",
@@ -519,7 +519,7 @@ function renderChatFromHistory() {
   if (!chatMessages.length) {
     container.innerHTML = `
       <div class="welcome-message">
-        <div class="welcome-icon">🐈</div>
+        <div class="welcome-icon">🌀</div>
         <h2>${t("chat.ready")}</h2>
         <p>${t("chat.readyDesc")}</p>
       </div>`;
@@ -635,7 +635,7 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
   div.className = className;
   div.id = id;
 
-  const avatar = isUser ? "👤" : "🐈";
+  const avatar = isUser ? "👤" : "🌀";
   const sender = isUser ? t("chat.you") : "nanobot";
   const rendered = renderMd ? renderMarkdown(content) : escapeHtml(content);
 
@@ -771,7 +771,7 @@ function appendThinking() {
   const id = "thinking-" + Date.now();
   const div = document.createElement("div");
   div.className = "message bot"; div.id = id;
-  div.innerHTML = `<div class="message-avatar">🐈</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div></div></div>`;
+  div.innerHTML = `<div class="message-avatar">🌀</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div></div></div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return id;
