@@ -778,6 +778,31 @@ a:hover { text-decoration: underline; }
 .form-group input:focus { border-color: var(--blue); }
 .form-group input::placeholder { color: var(--text-dim); }
 
+.search-usage-bar {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-usage-bar .usage-meter {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-surface1);
+  border-radius: 3px;
+  overflow: hidden;
+  max-width: 200px;
+}
+.search-usage-bar .usage-meter-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--green);
+  transition: width 0.3s;
+}
+.search-usage-bar .usage-meter-fill.warn { background: var(--orange, #f59e0b); }
+.search-usage-bar .usage-meter-fill.danger { background: var(--red); }
+
 .form-group input[type="range"] {
   -webkit-appearance: none;
   height: 6px;
@@ -1284,6 +1309,27 @@ a:hover { text-decoration: underline; }
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+}
+.app-card-actions-left {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.app-card-actions-right {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.btn-danger-subtle {
+  color: var(--red, #e74c3c);
+  border-color: var(--red, #e74c3c);
+  background: transparent;
+}
+.btn-danger-subtle:hover {
+  background: var(--red, #e74c3c);
+  color: #fff;
 }
 
 /* ── App Detail page ──────────────────────────────────────────────── */
@@ -1991,6 +2037,36 @@ a:hover { text-decoration: underline; }
   color: var(--text-dim);
   margin-bottom: 8px;
 }
+.wizard-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.wizard-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  border: 2px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  background: var(--bg-crust);
+  cursor: pointer;
+  font-size: 13px;
+  transition: border-color .15s, background .15s;
+}
+.wizard-type-card:hover {
+  border-color: var(--accent);
+  background: var(--bg-surface0);
+}
+.wizard-type-card.active {
+  border-color: var(--accent);
+  background: var(--accent-bg, rgba(137,180,250,.12));
+}
+.wizard-type-icon {
+  font-size: 22px;
+}
 .wizard-textarea {
   width: 100%;
   padding: 10px 12px;
@@ -2078,27 +2154,103 @@ a:hover { text-decoration: underline; }
   opacity: 1;
 }
 
-/* Confirm bar on report view */
-.capp-confirm-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  background: var(--bg-surface0);
+/* Run log */
+.capp-run-log {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg-crust);
   border: 1px solid var(--bg-surface1);
   border-radius: var(--radius);
+  max-height: 180px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.6;
 }
-.capp-confirm-bar .wizard-help {
-  margin: 0;
-  flex: 1;
+.capp-log-line {
+  color: var(--text-dim);
+}
+.capp-log-ts {
+  color: var(--subtext0);
+  margin-right: 8px;
+}
+.capp-log-ts::before { content: "["; }
+.capp-log-ts::after { content: "]"; }
+.capp-log-error { color: var(--red); }
+.capp-log-done { color: var(--green); font-weight: 600; }
+
+/* ── Param groups ────────────────────────────────────────────────── */
+.capp-param-group {
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  padding: 10px 12px 6px;
+  margin-bottom: 10px;
+  position: relative;
+}
+.capp-param-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.capp-param-group-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+.capp-report-params {
+  font-size: 11px;
+  color: var(--blue, #3b82f6);
+  background: var(--bg-surface0);
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin: 0 4px;
 }
 
-/* Enhanced prompt preview */
-.capp-enhanced-preview {
-  border-left: 3px solid var(--green);
-  max-height: 200px;
-  overflow-y: auto;
+/* ── Unread badges ────────────────────────────────────────────────── */
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  line-height: 1;
+}
+.app-card-icon {
+  position: relative;
+}
+.app-card-unread {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--red);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.capp-report-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--red);
+  margin-right: 6px;
+  flex-shrink: 0;
 }
 
 /* ── Scrollbar global ──────────────────────────────────────────────── */

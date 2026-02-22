@@ -46,7 +46,7 @@ def save_session(data: dict) -> dict:
         "tag": data.get("tag", ""),
         "duration_minutes": data.get("duration_minutes", 25),
         "started_at": data.get("started_at", ""),
-        "completed_at": data.get("completed_at", datetime.now(timezone.utc).isoformat()),
+        "completed_at": data.get("completed_at", datetime.now().astimezone().isoformat()),
         "completed": True,
     }
     sessions.insert(0, entry)
@@ -57,7 +57,7 @@ def save_session(data: dict) -> dict:
 def list_sessions(days: int = 7, tag: str = "") -> list[dict]:
     """List sessions within the given day range, optionally filtered by tag."""
     sessions = _load_sessions()
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    cutoff = (datetime.now().astimezone() - timedelta(days=days)).isoformat()
     result = []
     for s in sessions:
         if s.get("completed_at", "") < cutoff:

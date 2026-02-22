@@ -1,4 +1,4 @@
-# MyxAI Desk
+# 🌀 MyxAI Desk 
 
 A desktop GUI client for [nanobot](https://github.com/HKUDS/nanobot) — the ultra-lightweight personal AI assistant.
 
@@ -27,7 +27,7 @@ An automated daily recommendation engine that analyzes your browser history **an
 
 1. **Collect** — Reads Chrome / Edge browsing history (titles & URLs only) **plus recent nanobot chat conversations** (topics discussed with the AI)
 2. **Analyse** — LLM identifies your real interests from both sources and classifies them (work / study / life)
-3. **Search** — Generates semantic search queries and searches the web (Brave → Bing → DuckDuckGo auto-fallback)
+3. **Search** — Generates semantic search queries and searches the web (Baidu API / Brave API with daily quota tracking)
 4. **Curate** — LLM selects the best content from search results, generates an HTML report with real links
 
 **Key design:**
@@ -35,7 +35,7 @@ An automated daily recommendation engine that analyzes your browser history **an
 - No browser plugins required; works with local history database
 - Analyses both browsing behaviour and AI conversation topics for deeper interest understanding
 - AI-powered interest extraction (falls back to rule-based when LLM unavailable)
-- Multi-engine web search with automatic failover
+- API-only web search (Baidu / Brave) with daily quota tracking and free-tier enforcement
 - Structured HTML report with card layout
 - Scheduled auto-generation or manual trigger
 - Interest preview for quick analysis without full report
@@ -129,7 +129,7 @@ A native desktop window will open. If `pywebview` is not installed, it will fall
 | Code highlighting | highlight.js |
 | AI engine | nanobot-ai |
 | LLM routing | litellm (auto provider detection) |
-| Web search | Brave API / Bing / DuckDuckGo (auto-fallback) |
+| Web search | Baidu qianfan API / Brave Search API (with daily quota management) |
 
 ## Project Structure
 
@@ -146,7 +146,8 @@ myai/
 │   ├── web_monitor.py  # Web Monitor app: page change detection
 │   ├── email_summary.py# Email Summary app: IMAP + LLM summary
 │   ├── focus_timer.py  # Focus Timer app: session persistence + stats
-│   └── custom_app.py   # Custom App framework: CRUD, templates, reports
+│   ├── custom_app.py   # Custom App framework: CRUD, templates, reports
+│   └── web_search.py   # API-only web search: Baidu / Brave with quota tracking
 └── frontend/
     ├── index.html      # Frontend page
     ├── style.css       # Styles (Catppuccin Mocha dark theme)

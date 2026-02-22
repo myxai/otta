@@ -692,171 +692,32 @@ def llm_analyze_interests(
 
 
 # ===================================================================
-# Step 5 — Web search  (the crucial new step)
+# Step 5 — Web search  (delegates to shared apps.web_search module)
 # ===================================================================
 
-# -- 5a. Brave Search API -------------------------------------------------
-
-def _brave_search(query: str, api_key: str, count: int = 8) -> list[dict]:
-    """Call Brave Web Search API."""
-    params = urllib.parse.urlencode({
-        "q": query, "count": count, "freshness": "pw",
-    })
-    url = f"https://api.search.brave.com/res/v1/web/search?{params}"
-    req = urllib.request.Request(url, headers={
-        "X-Subscription-Token": api_key,
-        "Accept": "application/json",
-        "Accept-Encoding": "identity",
-    })
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        data = json.loads(resp.read().decode())
-    return [
-        {
-            "title": r.get("title", ""),
-            "url": r.get("url", ""),
-            "description": re.sub(r"<[^>]+>", "", r.get("description", "")),
-            "age": r.get("age", ""),
-        }
-        for r in data.get("web", {}).get("results", [])
-    ]
-
-
-def _bing_search(query: str, count: int = 8) -> list[dict]:
-    """Free fallback search via Bing HTML (cn.bing.com, works in China)."""
-    params = urllib.parse.urlencode({"q": query, "count": str(count)})
-    url = f"https://cn.bing.com/search?{params}"
-    req = urllib.request.Request(url, headers={
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/126.0.0.0 Safari/537.36"
-        ),
-        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-    })
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        html = resp.read().decode("utf-8", errors="replace")
-
-    # Split by result blocks — Bing uses <li class="b_algo" data-id ...>
-    parts = re.split(r'<li\s+class="b_algo"[^>]*>', html)
-    results: list[dict] = []
-    for part in parts[1:]:                       # skip content before first result
-        if len(results) >= count:
-            break
-        end = part.find("</li>")
-        block = part[:end] if end > 0 else part[:2000]
-        # Title link inside <h2>
-        link_m = re.search(
-            r'<h2[^>]*>.*?<a[^>]+href="(https?://[^"]+)"[^>]*>(.*?)</a>',
-            block, re.DOTALL,
-        )
-        if not link_m:
-            continue
-        href = link_m.group(1)
-        title = _html.unescape(re.sub(r"<[^>]+>", "", link_m.group(2))).strip()
-        if not title:
-            continue
-        desc_m = re.search(r'<p[^>]*>(.*?)</p>', block, re.DOTALL)
-        desc = ""
-        if desc_m:
-            desc = _html.unescape(re.sub(r"<[^>]+>", "", desc_m.group(1))).strip()
-        results.append({
-            "title": title,
-            "url": href,
-            "description": desc[:300],
-            "age": "",
-        })
-    return results
-
-
-def _ddg_search(query: str, count: int = 8) -> list[dict]:
-    """Free fallback search via DuckDuckGo HTML (may not work in China)."""
-    form_data = urllib.parse.urlencode({"q": query, "b": ""}).encode()
-    req = urllib.request.Request(
-        "https://html.duckduckgo.com/html/",
-        data=form_data,
-        headers={
-            "User-Agent": (
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/126.0.0.0 Safari/537.36"
-            ),
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        html = resp.read().decode("utf-8", errors="replace")
-
-    links = re.findall(
-        r'class="result__a"[^>]*href="([^"]*)"[^>]*>(.*?)</a>',
-        html, re.DOTALL,
-    )
-    snippets = re.findall(
-        r'class="result__snippet"[^>]*>(.*?)</a>',
-        html, re.DOTALL,
-    )
-
-    results: list[dict] = []
-    for i, (raw_href, raw_title) in enumerate(links):
-        if len(results) >= count:
-            break
-        uddg = re.search(r'uddg=([^&]+)', raw_href)
-        actual_url = urllib.parse.unquote(uddg.group(1)) if uddg else raw_href
-        if not actual_url or actual_url.startswith("//"):
-            continue
-        title = re.sub(r"<[^>]+>", "", raw_title).strip()
-        desc = re.sub(r"<[^>]+>", "", snippets[i]).strip() if i < len(snippets) else ""
-        if not title:
-            continue
-        results.append({
-            "title": title,
-            "url": actual_url,
-            "description": desc[:300],
-            "age": "",
-        })
-    return results
-
-
-# Ordered list of (name, function) — tried top to bottom after Brave
-_FREE_ENGINES: list[tuple[str, callable]] = [
-    ("Bing", _bing_search),
-    ("DuckDuckGo", _ddg_search),
-]
+from apps.web_search import multi_engine_search as _multi_engine_search
 
 
 def _web_search(query: str, brave_api_key: str | None = None,
+                baidu_api_key: str | None = None,
                 count: int = 8,
                 _session_state: dict | None = None) -> list[dict]:
-    """Unified search with automatic fallback: Brave → Bing → DuckDuckGo.
+    """Search via available APIs (Baidu / Brave).
 
-    *_session_state* is a mutable dict shared across calls within one search
-    session.  After a Brave timeout/error the key ``"skip_brave"`` is set so
-    subsequent queries in the same batch skip the 30-second timeout.
-
+    Delegates to the shared multi-engine search in apps.web_search.
     Always returns a list (possibly empty), never raises.
     """
-    import time as _time
-    if _session_state is None:
-        _session_state = {}
-
-    if brave_api_key and not _session_state.get("skip_brave"):
-        try:
-            results = _brave_search(query, brave_api_key, count)
-            if results:
-                return results
-        except Exception as exc:
-            print(f"[daily_digest] brave failed — disabling for this session: {exc}")
-            _session_state["skip_brave"] = True
-
-    for engine_name, engine_fn in _FREE_ENGINES:
-        try:
-            results = engine_fn(query, count)
-            if results:
-                return results
-        except Exception as exc:
-            print(f"[daily_digest] {engine_name} failed: {exc}")
-            _time.sleep(0.5)
-
-    return []
+    try:
+        results, engine = _multi_engine_search(
+            query, brave_api_key=brave_api_key,
+            baidu_api_key=baidu_api_key, count=count,
+        )
+        if results:
+            print(f"[daily_digest] search OK via {engine}: {len(results)} results")
+        return results
+    except Exception as exc:
+        print(f"[daily_digest] search failed for '{query[:60]}': {exc}")
+        return []
 
 
 # -- 5b. Smart query building strategy ------------------------------------
@@ -915,6 +776,7 @@ def build_search_queries(categories: dict[str, list],
 def search_for_recommendations(
     queries: dict[str, list[str]],
     brave_api_key: str | None = None,
+    baidu_api_key: str | None = None,
     results_per_query: int = 8,
     progress_cb=None,
 ) -> dict[str, list[dict]]:
@@ -941,6 +803,7 @@ def search_for_recommendations(
 
             hits = _web_search(
                 q, brave_api_key=brave_api_key,
+                baidu_api_key=baidu_api_key,
                 count=results_per_query, _session_state=session,
             )
             for h in hits:
@@ -1167,7 +1030,7 @@ def save_report(content: str, date_str: str | None = None,
         "content": content,
         "interests": interests,
         "search_stats": search_stats,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now().astimezone().isoformat(),
     }
     (_REPORTS_DIR / f"{date_str}.json").write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
@@ -1220,6 +1083,7 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
     api_key = config.get("api_key")
     api_base = config.get("api_base")
     brave_api_key = config.get("brave_api_key") or None
+    baidu_api_key = config.get("baidu_api_key") or None
     has_llm = bool(model and api_key)
 
     print(f"[daily_digest] starting — browser={browser}, hours={hours}, llm={has_llm}")
@@ -1301,8 +1165,10 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
     search_results = search_for_recommendations(
         search_queries,
         brave_api_key=brave_api_key,
+        baidu_api_key=baidu_api_key,
         progress_cb=progress_cb,
     )
+
     total_r = sum(len(v) for v in search_results.values())
     search_stats = {
         "total_queries": sum(len(v) for v in search_queries.values()),

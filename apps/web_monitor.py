@@ -67,7 +67,7 @@ def _save_snapshot(site_id: str, text_hash: str, text: str):
         json.dumps({
             "hash": text_hash,
             "text": text[:50000],
-            "saved_at": datetime.now(timezone.utc).isoformat(),
+            "saved_at": datetime.now().astimezone().isoformat(),
         }, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -120,7 +120,7 @@ def add_site(url: str, name: str = "", mode: str = "hash") -> dict:
         "name": name,
         "mode": mode if mode in ("hash", "llm") else "hash",
         "enabled": True,
-        "added_at": datetime.now(timezone.utc).isoformat(),
+        "added_at": datetime.now().astimezone().isoformat(),
         "last_checked": None,
         "last_changed": None,
         "status": "pending",
@@ -178,7 +178,7 @@ def check_site(
 
     url = site["url"]
     mode = site.get("mode", "hash")
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now().astimezone().isoformat()
 
     try:
         text = _fetch_page(url)

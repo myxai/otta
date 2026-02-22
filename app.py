@@ -452,6 +452,36 @@ def _get_or_create_agent():
         )
 
         _patch_agent_tool_history(_agent)
+
+        try:
+            from apps.web_search import EnhancedWebSearchTool, quota as _quota
+            from nanobot.config.loader import get_config_path as _gcp
+            _raw_cfg = {}
+            try:
+                _raw_cfg = json.loads(_gcp().read_text(encoding="utf-8"))
+            except Exception:
+                pass
+            _search_cfg = _raw_cfg.get("tools", {}).get("web", {}).get("search", {})
+            _baidu_key = _search_cfg.get("baiduApiKey") or None
+            _brave_key = config.tools.web.search.api_key or None
+            _agent.tools.register(EnhancedWebSearchTool(
+                brave_api_key=_brave_key,
+                baidu_api_key=_baidu_key,
+            ))
+            _quota.set_quota_only(_search_cfg.get("quotaOnly", True))
+            limits = {}
+            if _search_cfg.get("baiduDailyLimit"):
+                limits["baidu"] = int(_search_cfg["baiduDailyLimit"])
+            if _search_cfg.get("braveDailyLimit"):
+                limits["brave"] = int(_search_cfg["braveDailyLimit"])
+            if limits:
+                _quota.set_limits(limits)
+            _active = [n for n in ["Baidu" if _baidu_key else None,
+                                   "Brave" if _brave_key else None] if n]
+            print(f"[agent] web_search: API engines = {_active or ['none (no keys)']}")
+        except Exception as _ws_err:
+            print(f"[agent] failed to replace web_search: {_ws_err}")
+
         agent_ref = _agent
 
         async def _on_cron_job(job):
@@ -741,6 +771,16 @@ def api_save_config():
             json.dump(data, f, indent=2, ensure_ascii=False)
         _reset_agent()
         return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/search/usage")
+def api_search_usage():
+    """Return today's search API usage stats."""
+    try:
+        from apps.web_search import quota
+        return jsonify(quota.get_usage())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1282,20 +1322,28 @@ def _save_apps_registry(data: dict):
 
 
 def _get_model_config() -> dict:
-    """Read model/api_key/api_base/brave_api_key from nanobot config."""
+    """Read model/api_key/api_base/brave_api_key/baidu_api_key from nanobot config."""
     if not NANOBOT_AVAILABLE:
         return {}
     try:
-        from nanobot.config.loader import load_config
+        from nanobot.config.loader import load_config, get_config_path
         config = load_config()
         model = config.agents.defaults.model
         p = config.get_provider(model)
         brave_key = config.tools.web.search.api_key if config.tools.web.search else None
+        baidu_key = None
+        try:
+            raw = json.loads(get_config_path().read_text(encoding="utf-8"))
+            baidu_key = (raw.get("tools", {}).get("web", {})
+                         .get("search", {}).get("baiduApiKey") or None)
+        except Exception:
+            pass
         return {
             "model": model,
             "api_key": p.api_key if p else None,
             "api_base": config.get_api_base(model) or None,
             "brave_api_key": brave_key or None,
+            "baidu_api_key": baidu_key or None,
         }
     except Exception:
         return {}
@@ -1316,14 +1364,26 @@ def api_apps_list():
         entry["last_run"] = installed.get("last_run") if installed else None
         result.append(entry)
     from apps.custom_app import list_apps as _list_custom
+    import re as _re
     for capp in _list_custom():
+        _tpl = capp.get("prompt_template", "")
+        _pg = capp.get("param_groups") or []
+        _pv = _pg[0] if _pg else capp.get("param_values", {})
+        _desc = _re.sub(
+            r"\{\{(.+?)\}\}",
+            lambda m: _pv.get(m.group(1).strip(), m.group(0)),
+            _tpl,
+        )[:60]
+        if len(_pg) > 1:
+            _desc += f" (+{len(_pg)-1})"
+        _desc += "…"
         result.append({
             "id": capp["id"],
             "name": capp["name"],
             "name_en": capp["name"],
             "icon": capp.get("icon", "🤖"),
-            "description": capp.get("prompt_template", "")[:60] + "…",
-            "description_en": capp.get("prompt_template", "")[:60] + "…",
+            "description": _desc,
+            "description_en": _desc,
             "version": "1.0.0",
             "author": "custom",
             "category": "custom",
@@ -1781,10 +1841,6 @@ def api_focus_tags():
 # Routes — Custom Apps
 # ---------------------------------------------------------------------------
 
-_custom_run_status: dict[str, dict] = {}
-_custom_run_lock = threading.Lock()
-
-
 @flask_app.route("/api/apps/custom", methods=["GET"])
 def api_custom_list():
     from apps.custom_app import list_apps
@@ -1797,17 +1853,32 @@ def api_custom_create():
     name = body.get("name", "").strip()
     prompt_template = body.get("prompt_template", "").strip()
     if not name or not prompt_template:
-        return jsonify({"error": "名称和 Prompt 模板不能为空"}), 400
+        return jsonify({"error": "名称和任务描述不能为空"}), 400
     from apps.custom_app import create_app
     app = create_app(
         name=name,
         prompt_template=prompt_template,
-        parameters=body.get("parameters"),
         icon=body.get("icon", "🤖"),
+        output_format=body.get("output_format", "text"),
         schedule=body.get("schedule"),
-        source=body.get("source"),
+        summary=body.get("summary"),
     )
     return jsonify(app)
+
+
+@flask_app.route("/api/apps/custom/meta", methods=["GET"])
+def api_custom_meta():
+    from apps.custom_app import OUTPUT_FORMATS, SCHEDULE_MODES
+    return jsonify({
+        "output_formats": OUTPUT_FORMATS,
+        "schedule_modes": SCHEDULE_MODES,
+    })
+
+
+@flask_app.route("/api/apps/custom/unread")
+def api_custom_unread():
+    from apps.custom_app import all_unread_counts
+    return jsonify(all_unread_counts())
 
 
 @flask_app.route("/api/apps/custom/<app_id>", methods=["GET"])
@@ -1839,109 +1910,92 @@ def api_custom_delete(app_id):
 
 @flask_app.route("/api/apps/custom/<app_id>/run", methods=["POST"])
 def api_custom_run(app_id):
-    """Run a custom app with given parameter values."""
-    from apps.custom_app import get_app, build_effective_prompt, save_report, set_last_run
+    """Run a custom app — SSE stream. Supports multiple param groups."""
+    from apps.custom_app import get_app, build_message, save_report, set_last_run
+
+    if not NANOBOT_AVAILABLE:
+        return jsonify({"error": "nanobot 未安装"}), 400
+
     app = get_app(app_id)
     if not app:
         return jsonify({"error": "应用不存在"}), 404
 
-    with _custom_run_lock:
-        st = _custom_run_status.get(app_id, {})
-        if st.get("status") == "running":
-            return jsonify({"error": "正在运行中"}), 409
-        _custom_run_status[app_id] = {"status": "running", "progress": "准备执行…"}
-
     body = request.json or {}
-    param_values = body.get("params", {})
-    for p in app.get("parameters", []):
-        if p["name"] not in param_values:
-            param_values[p["name"]] = p.get("default", "")
+    param_groups = body.get("param_groups", None)
+    if param_groups is None:
+        single = body.get("params", {})
+        for p in app.get("parameters", []):
+            if p["name"] not in single:
+                single[p["name"]] = p.get("default", "")
+        param_groups = [single]
 
-    prompt = build_effective_prompt(app, param_values)
+    q: queue.Queue[str] = queue.Queue()
 
-    def _run():
+    import uuid as _uuid
+
+    async def _process():
         try:
-            def _progress(msg):
-                with _custom_run_lock:
-                    _custom_run_status[app_id]["progress"] = msg
+            agent = _get_or_create_agent()
 
-            session_key = f"custom_app:{app_id}:{int(time.time())}"
-            result = _run_agent_with_prompt(
-                prompt, session_key=session_key, progress_cb=_progress,
-            )
-            report = save_report(
-                app_id,
-                content=result["content"],
-                params_used=param_values,
-                tools_used=result.get("tools_used"),
-            )
+            async def on_progress(content):
+                q.put(json.dumps({"type": "progress", "content": content},
+                                 ensure_ascii=False))
+
+            need_mcp = bool(agent._mcp_servers)
+            has_mcp = any(n.startswith("mcp_") for n in agent.tools._tools)
+            if need_mcp and not has_mcp:
+                await _connect_mcp_safe(agent, progress_cb=on_progress)
+
+            total = len(param_groups)
+            for idx, pv in enumerate(param_groups):
+                label = ", ".join(str(v) for v in pv.values()) if pv else ""
+                if total > 1:
+                    q.put(json.dumps({"type": "progress",
+                                      "content": f"[{idx+1}/{total}] {label}"},
+                                     ensure_ascii=False))
+
+                message = build_message(app, pv)
+                session_key = f"capp_{_uuid.uuid4().hex[:12]}"
+
+                response = await agent.process_direct(
+                    message, session_key=session_key, on_progress=on_progress,
+                )
+
+                save_report(app_id, content=response or "", params_used=pv)
+
+                if total > 1:
+                    q.put(json.dumps({"type": "progress",
+                                      "content": f"✅ [{idx+1}/{total}] {label}"},
+                                     ensure_ascii=False))
+
             set_last_run(app_id)
-            _push_notification(
-                title=f"{app.get('icon', '🤖')} {app['name']}",
-                content="执行完成",
-                level="info",
-            )
-            with _custom_run_lock:
-                _custom_run_status[app_id] = {
-                    "status": "done",
-                    "report": report,
-                }
+            last_resp = ""
+            q.put(json.dumps({"type": "done", "content": last_resp},
+                             ensure_ascii=False))
         except Exception as exc:
-            print(f"[custom_app] run error: {exc}")
-            with _custom_run_lock:
-                _custom_run_status[app_id] = {
-                    "status": "error",
-                    "error": str(exc),
-                }
+            q.put(json.dumps({"type": "error", "content": str(exc)},
+                             ensure_ascii=False))
 
-    threading.Thread(target=_run, daemon=True).start()
-    return jsonify({"status": "running"})
+    _ensure_loop()
+    asyncio.run_coroutine_threadsafe(_process(), _async_loop)
 
+    def generate():
+        while True:
+            try:
+                data = q.get(timeout=300)
+                yield f"data: {data}\n\n"
+                parsed = json.loads(data)
+                if parsed.get("type") in ("done", "error"):
+                    break
+            except queue.Empty:
+                yield f'data: {json.dumps({"type":"error","content":"请求超时"})}\n\n'
+                break
 
-@flask_app.route("/api/apps/custom/<app_id>/status")
-def api_custom_status(app_id):
-    with _custom_run_lock:
-        st = _custom_run_status.get(app_id, {"status": "idle"})
-        return jsonify(dict(st))
-
-
-@flask_app.route("/api/apps/custom/<app_id>/confirm", methods=["POST"])
-def api_custom_confirm(app_id):
-    """Confirm a successful run and auto-generate enhanced prompt constraints."""
-    from apps.custom_app import get_app, get_report, generate_enhanced_prompt, update_app
-    app = get_app(app_id)
-    if not app:
-        return jsonify({"error": "应用不存在"}), 404
-
-    body = request.json or {}
-    date_str = body.get("date")
-    if not date_str:
-        return jsonify({"error": "缺少报告日期"}), 400
-
-    report = get_report(app_id, date_str)
-    if not report:
-        return jsonify({"error": "报告不存在"}), 404
-
-    mc = _get_model_config()
-    if not mc.get("api_key"):
-        return jsonify({"error": "未配置 LLM，无法生成增强指令"}), 400
-
-    try:
-        enhanced = generate_enhanced_prompt(
-            original_template=app["prompt_template"],
-            successful_output=report.get("content", ""),
-            tools_used=report.get("tools_used", []),
-            model=mc["model"],
-            api_key=mc["api_key"],
-            api_base=mc.get("api_base"),
-        )
-        update_app(app_id,
-                    enhanced_prompt=enhanced,
-                    reference_run={"date": date_str, "confirmed_at": datetime.now(timezone.utc).isoformat()})
-        return jsonify({"success": True, "enhanced_prompt": enhanced})
-    except Exception as exc:
-        print(f"[custom_app] enhance error: {exc}")
-        return jsonify({"error": f"生成增强指令失败: {exc}"}), 500
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @flask_app.route("/api/apps/custom/<app_id>/reports")
@@ -1950,13 +2004,97 @@ def api_custom_reports(app_id):
     return jsonify(list_reports(app_id))
 
 
-@flask_app.route("/api/apps/custom/<app_id>/report/<date_str>")
-def api_custom_report(app_id, date_str):
-    from apps.custom_app import get_report
-    report = get_report(app_id, date_str)
+@flask_app.route("/api/apps/custom/<app_id>/report/<path:key>")
+def api_custom_report(app_id, key):
+    from apps.custom_app import get_report, mark_report_read
+    report = get_report(app_id, key)
     if not report:
         return jsonify({"error": "报告不存在"}), 404
+    mark_report_read(app_id, key)
     return jsonify(report)
+
+
+@flask_app.route("/api/apps/custom/<app_id>/report/<path:key>", methods=["DELETE"])
+def api_custom_report_delete(app_id, key):
+    from apps.custom_app import delete_report
+    if delete_report(app_id, key):
+        return jsonify({"success": True})
+    return jsonify({"error": "报告不存在"}), 404
+
+
+@flask_app.route("/api/apps/custom/<app_id>/summary", methods=["POST"])
+def api_custom_summary(app_id):
+    """Generate a summary from historical reports — direct LLM call, SSE stream."""
+    from apps.custom_app import get_app, build_summary_prompt, save_report, mark_triggered
+
+    app = get_app(app_id)
+    if not app:
+        return jsonify({"error": "应用不存在"}), 404
+
+    prompt = build_summary_prompt(app)
+    if not prompt:
+        return jsonify({"error": "无历史报告可用于总结"}), 400
+
+    mcfg = _get_model_config()
+    if not mcfg.get("model") or not mcfg.get("api_key"):
+        return jsonify({"error": "未配置 LLM（请先在设置中填写 API Key）"}), 400
+
+    q: queue.Queue[str] = queue.Queue()
+
+    def _run():
+        try:
+            q.put(json.dumps({"type": "progress",
+                              "content": "正在调用 LLM 生成总结…"},
+                             ensure_ascii=False))
+            import os, litellm
+            os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+
+            _KNOWN = ("openai/", "azure/", "anthropic/", "cohere/",
+                      "huggingface/", "ollama/", "deepseek/", "groq/",
+                      "together_ai/", "openrouter/", "gemini/", "mistral/")
+            model = mcfg["model"]
+            if not any(model.startswith(p) for p in _KNOWN) and mcfg.get("api_base"):
+                model = f"openai/{model}"
+
+            resp = litellm.completion(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                api_key=mcfg["api_key"],
+                api_base=mcfg.get("api_base"),
+                temperature=0.5,
+                max_tokens=4096,
+            )
+            content = resp.choices[0].message.content or ""
+
+            save_report(app_id, content=content, params_used={},
+                        report_type="summary")
+            mark_triggered(app_id, "summary")
+
+            q.put(json.dumps({"type": "done", "content": content},
+                             ensure_ascii=False))
+        except Exception as exc:
+            q.put(json.dumps({"type": "error", "content": str(exc)},
+                             ensure_ascii=False))
+
+    threading.Thread(target=_run, daemon=True).start()
+
+    def generate():
+        while True:
+            try:
+                data = q.get(timeout=300)
+                yield f"data: {data}\n\n"
+                parsed = json.loads(data)
+                if parsed.get("type") in ("done", "error"):
+                    break
+            except queue.Empty:
+                yield f'data: {json.dumps({"type":"error","content":"请求超时"})}\n\n'
+                break
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -2087,39 +2225,75 @@ def _check_scheduled_apps():
             except Exception as exc:
                 print(f"[app_scheduler] email_summary error: {exc}")
 
-    # --- Custom apps: schedule_time based ---
-    from apps.custom_app import list_apps as _list_custom, build_effective_prompt, save_report, set_last_run
+    # --- Custom apps ---
+    from apps.custom_app import (
+        list_apps as _list_custom, build_message, build_summary_prompt,
+        save_report, set_last_run, should_trigger, mark_triggered,
+    )
     for capp in _list_custom():
-        sched = capp.get("schedule", {})
-        if not sched.get("enabled"):
-            continue
-        sched_time = sched.get("time")
-        if not sched_time or current_time != sched_time:
-            continue
-        last_run = capp.get("last_run", "")
-        if last_run and last_run[:10] >= today:
-            continue
         capp_id = capp["id"]
-        with _custom_run_lock:
-            st = _custom_run_status.get(capp_id, {})
-            if st.get("status") == "running":
-                continue
-        print(f"[app_scheduler] triggering custom app '{capp['name']}' at {current_time}")
-        try:
-            param_values = {p["name"]: p.get("default", "") for p in capp.get("parameters", [])}
-            prompt = build_effective_prompt(capp, param_values)
-            session_key = f"custom_app:{capp_id}:{int(time.time())}"
-            result = _run_agent_with_prompt(prompt, session_key=session_key)
-            save_report(capp_id, content=result["content"],
-                        params_used=param_values, tools_used=result.get("tools_used"))
-            set_last_run(capp_id)
-            _push_notification(
-                title=f"{capp.get('icon', '🤖')} {capp['name']}",
-                content="定时执行完成",
-                level="info",
-            )
-        except Exception as exc:
-            print(f"[app_scheduler] custom app '{capp['name']}' error: {exc}")
+
+        # Main task schedule
+        sched = capp.get("schedule", {})
+        if should_trigger(sched, now):
+            print(f"[app_scheduler] triggering custom app '{capp['name']}' at {current_time}")
+            try:
+                defaults = {p["name"]: p.get("default", "") for p in capp.get("parameters", [])}
+                groups = capp.get("param_groups")
+                if not groups or not isinstance(groups, list):
+                    groups = [capp.get("param_values", defaults)]
+                for pv in groups:
+                    message = build_message(capp, pv)
+                    import uuid as _uuid_sched
+                    session_key = f"capp_{_uuid_sched.uuid4().hex[:12]}"
+                    result = _run_agent_with_prompt(message, session_key=session_key)
+                    save_report(capp_id, content=result["content"], params_used=pv)
+                set_last_run(capp_id)
+                mark_triggered(capp_id, "schedule")
+                _push_notification(
+                    title=f"{capp.get('icon', '🤖')} {capp['name']}",
+                    content=f"定时执行完成（{len(groups)} 组）",
+                    level="info",
+                )
+            except Exception as exc:
+                print(f"[app_scheduler] custom app '{capp['name']}' error: {exc}")
+
+        # Summary schedule — direct LLM call (no agent)
+        summary_cfg = capp.get("summary", {})
+        summary_sched = summary_cfg.get("schedule", {})
+        if summary_cfg.get("enabled") and should_trigger(summary_sched, now):
+            print(f"[app_scheduler] triggering summary for '{capp['name']}' at {current_time}")
+            try:
+                prompt = build_summary_prompt(capp)
+                if prompt:
+                    mcfg = _get_model_config()
+                    if mcfg.get("model") and mcfg.get("api_key"):
+                        import os as _os, litellm as _lt
+                        _os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
+                        _KNOWN = ("openai/", "azure/", "anthropic/", "cohere/",
+                                  "huggingface/", "ollama/", "deepseek/", "groq/",
+                                  "together_ai/", "openrouter/", "gemini/", "mistral/")
+                        _m = mcfg["model"]
+                        if not any(_m.startswith(p) for p in _KNOWN) and mcfg.get("api_base"):
+                            _m = f"openai/{_m}"
+                        resp = _lt.completion(
+                            model=_m,
+                            messages=[{"role": "user", "content": prompt}],
+                            api_key=mcfg["api_key"],
+                            api_base=mcfg.get("api_base"),
+                            temperature=0.5, max_tokens=4096,
+                        )
+                        content = resp.choices[0].message.content or ""
+                        save_report(capp_id, content=content,
+                                    params_used={}, report_type="summary")
+                        mark_triggered(capp_id, "summary")
+                        _push_notification(
+                            title=f"📊 {capp['name']} 总结",
+                            content="总结报告已生成",
+                            level="info",
+                        )
+            except Exception as exc:
+                print(f"[app_scheduler] summary '{capp['name']}' error: {exc}")
 
 
 # ---------------------------------------------------------------------------

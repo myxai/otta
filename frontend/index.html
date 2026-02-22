@@ -206,8 +206,20 @@
             <h2 data-i18n="settings.searchTools">搜索与工具</h2>
             <div class="form-grid">
               <div class="form-group">
+                <label data-i18n="settings.baiduKey">Baidu Search API Key</label>
+                <input type="password" id="cfg-baidu-key" placeholder="bce-v3/..." />
+                <div class="search-usage-bar" id="baidu-usage-bar"></div>
+              </div>
+              <div class="form-group">
                 <label data-i18n="settings.braveKey">Brave Search API Key</label>
                 <input type="password" id="cfg-brave-key" placeholder="BSA..." />
+                <div class="search-usage-bar" id="brave-usage-bar"></div>
+              </div>
+              <div class="form-group form-group-checkbox">
+                <label>
+                  <input type="checkbox" id="cfg-quota-only" checked />
+                  <span data-i18n="settings.quotaOnly">仅使用免费额度</span>
+                </label>
               </div>
               <div class="form-group">
                 <label data-i18n="settings.shellTimeout">Shell 超时 (秒)</label>

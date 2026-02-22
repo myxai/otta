@@ -23,7 +23,8 @@ const I18N = {
     "settings.model":"模型设置","settings.modelName":"模型名称",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"最大工具迭代次数","settings.memoryWindow":"记忆窗口大小",
     "settings.apiKeys":"API 密钥",
-    "settings.searchTools":"搜索与工具","settings.braveKey":"Brave Search API Key",
+    "settings.searchTools":"搜索与工具","settings.baiduKey":"百度搜索 API Key","settings.braveKey":"Brave Search API Key",
+    "settings.quotaOnly":"仅使用免费额度","settings.usageToday":"今日已用","settings.quotaExhausted":"额度已用完",
     "settings.shellTimeout":"Shell 超时 (秒)","settings.restrictWorkspace":"限制工具在工作区内操作",
     "settings.channels":"频道",
     "settings.advancedJson":"高级 JSON 编辑","settings.toggleJson":"展开/折叠","settings.applyJson":"应用 JSON",
@@ -56,7 +57,7 @@ const I18N = {
     "nav.apps":"应用",
     "apps.title":"应用中心","apps.search":"搜索应用…","apps.back":"返回",
     "apps.installed":"已安装","apps.notInstalled":"未安装","apps.comingSoon":"即将推出",
-    "apps.install":"安装","apps.uninstall":"卸载","apps.configure":"配置",
+    "apps.install":"安装","apps.uninstall":"卸载","apps.configure":"配置","apps.viewReports":"报告",
     "apps.enabled":"已启用","apps.disabled":"已停用",
     "apps.enable":"启用","apps.disable":"停用",
     "apps.installOk":"应用安装成功","apps.uninstallOk":"应用已卸载",
@@ -109,23 +110,29 @@ const I18N = {
     "focus.byTag":"按标签","focus.trend":"每日趋势","focus.history":"历史记录",
     "focus.noSessions":"暂无记录","focus.completed":"已完成！","focus.breakTime":"休息时间到",
     "custom.title":"自定义应用","custom.create":"新建自定义应用","custom.createFromChat":"保存为应用",
-    "custom.name":"应用名称","custom.icon":"图标","custom.template":"Prompt 模板",
-    "custom.templateHelp":"用 {{变量名}} 标记可变部分，如：搜索{{keywords}}的最新资讯",
-    "custom.params":"参数定义","custom.paramName":"变量名","custom.paramLabel":"显示名称",
-    "custom.paramType":"类型","custom.paramDefault":"默认值",
-    "custom.schedule":"定时执行","custom.scheduleTime":"执行时间","custom.scheduleEnabled":"启用定时",
+    "custom.name":"应用名称","custom.icon":"图标","custom.template":"任务描述",
+    "custom.templateHelp":"用 {{变量名}} 标记可变部分，如：搜索{{关键词}}的最新资讯",
+    "custom.appType":"应用类型","custom.type.search":"网络搜索","custom.type.local":"本地处理","custom.type.reminder":"定时提醒",
+    "custom.searchEngine":"搜索引擎",
+    "custom.outputFmt":"输出格式","custom.fmt.report":"HTML报告","custom.fmt.notification":"通知","custom.fmt.text":"纯文本",
+    "custom.schedule":"定时任务","custom.scheduleTime":"执行时间","custom.scheduleEnabled":"启用定时",
+    "custom.schedMode":"频率","custom.sched.daily":"每天","custom.sched.weekly":"每周","custom.sched.monthly":"每月","custom.sched.interval":"间隔(天)",
+    "custom.schedDow":"星期","custom.schedDom":"几号","custom.schedInterval":"间隔天数",
+    "custom.weekdays":"周一,周二,周三,周四,周五,周六,周日",
+    "custom.summary":"总结功能","custom.summaryEnabled":"启用总结","custom.summaryPrompt":"总结要求",
+    "custom.summaryPromptHelp":"描述你希望如何总结历史数据，留空则使用默认总结",
+    "custom.summaryRun":"生成总结","custom.summarySchedule":"定时总结",
+    "custom.summaryFormat":"输出格式","custom.summaryRange":"分析范围",
+    "custom.summaryFmtHtml":"HTML 报告","custom.summaryFmtText":"纯文本",
+    "custom.summaryRangeDays":"天","custom.summaryRangeWeeks":"周","custom.summaryRangeMonths":"月",
     "custom.save":"保存应用","custom.saving":"保存中…","custom.saved":"应用已保存",
     "custom.run":"立即执行","custom.running":"执行中…","custom.runDone":"执行完成",
     "custom.runFail":"执行失败","custom.edit":"编辑","custom.delete":"删除",
-    "custom.reports":"执行报告","custom.noReports":"暂无报告","custom.viewReport":"查看",
-    "custom.step1":"编辑模板","custom.step2":"定义参数","custom.step3":"基本信息",
+    "custom.reports":"执行报告","custom.summaries":"总结报告","custom.noReports":"暂无报告","custom.viewReport":"查看",
+    "custom.addGroup":"添加一组","custom.removeGroup":"移除","custom.group":"第 {n} 组",
+    "custom.step1":"类型与任务","custom.step2":"定时与总结","custom.step3":"基本信息",
     "custom.next":"下一步","custom.prev":"上一步","custom.cancel":"取消",
-    "custom.source":"来源对话","custom.toolsUsed":"使用的工具",
     "custom.badge":"自定义",
-    "custom.confirm":"确认结果并生成增强","custom.confirming":"正在分析…",
-    "custom.enhanced":"已增强","custom.notEnhanced":"未增强",
-    "custom.enhancedPrompt":"执行约束指令","custom.enhancedHelp":"基于已确认的成功执行自动生成，后续运行将自动附带",
-    "custom.clearEnhanced":"清除增强","custom.refRun":"参考执行","custom.confirmedAt":"确认时间",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
@@ -145,7 +152,8 @@ const I18N = {
     "settings.model":"Model Settings","settings.modelName":"Model Name",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"Max Tool Iterations","settings.memoryWindow":"Memory Window Size",
     "settings.apiKeys":"API Keys",
-    "settings.searchTools":"Search & Tools","settings.braveKey":"Brave Search API Key",
+    "settings.searchTools":"Search & Tools","settings.baiduKey":"Baidu Search API Key","settings.braveKey":"Brave Search API Key",
+    "settings.quotaOnly":"Free quota only","settings.usageToday":"Used today","settings.quotaExhausted":"Quota exhausted",
     "settings.shellTimeout":"Shell Timeout (sec)","settings.restrictWorkspace":"Restrict tools to workspace",
     "settings.channels":"Channels",
     "settings.advancedJson":"Advanced JSON Editor","settings.toggleJson":"Toggle","settings.applyJson":"Apply JSON",
@@ -178,7 +186,7 @@ const I18N = {
     "nav.apps":"Apps",
     "apps.title":"App Center","apps.search":"Search apps…","apps.back":"Back",
     "apps.installed":"Installed","apps.notInstalled":"Not installed","apps.comingSoon":"Coming Soon",
-    "apps.install":"Install","apps.uninstall":"Uninstall","apps.configure":"Configure",
+    "apps.install":"Install","apps.uninstall":"Uninstall","apps.configure":"Configure","apps.viewReports":"Reports",
     "apps.enabled":"Enabled","apps.disabled":"Disabled",
     "apps.enable":"Enable","apps.disable":"Disable",
     "apps.installOk":"App installed successfully","apps.uninstallOk":"App uninstalled",
@@ -231,23 +239,29 @@ const I18N = {
     "focus.byTag":"By Tag","focus.trend":"Daily Trend","focus.history":"History",
     "focus.noSessions":"No records yet","focus.completed":"Completed!","focus.breakTime":"Break time!",
     "custom.title":"Custom App","custom.create":"New Custom App","custom.createFromChat":"Save as App",
-    "custom.name":"App Name","custom.icon":"Icon","custom.template":"Prompt Template",
+    "custom.name":"App Name","custom.icon":"Icon","custom.template":"Task Description",
     "custom.templateHelp":"Use {{variable}} for dynamic parts, e.g.: Search {{keywords}} for latest news",
-    "custom.params":"Parameters","custom.paramName":"Variable","custom.paramLabel":"Label",
-    "custom.paramType":"Type","custom.paramDefault":"Default",
+    "custom.appType":"App Type","custom.type.search":"Web Search","custom.type.local":"Local","custom.type.reminder":"Reminder",
+    "custom.searchEngine":"Search Engine",
+    "custom.outputFmt":"Output Format","custom.fmt.report":"HTML Report","custom.fmt.notification":"Notification","custom.fmt.text":"Plain Text",
     "custom.schedule":"Schedule","custom.scheduleTime":"Run Time","custom.scheduleEnabled":"Enable Schedule",
+    "custom.schedMode":"Frequency","custom.sched.daily":"Daily","custom.sched.weekly":"Weekly","custom.sched.monthly":"Monthly","custom.sched.interval":"Interval (days)",
+    "custom.schedDow":"Weekday","custom.schedDom":"Day of Month","custom.schedInterval":"Interval Days",
+    "custom.weekdays":"Mon,Tue,Wed,Thu,Fri,Sat,Sun",
+    "custom.summary":"Summary","custom.summaryEnabled":"Enable Summary","custom.summaryPrompt":"Summary Requirements",
+    "custom.summaryPromptHelp":"Describe how to summarize historical data. Leave empty for default.",
+    "custom.summaryRun":"Generate Summary","custom.summarySchedule":"Scheduled Summary",
+    "custom.summaryFormat":"Output Format","custom.summaryRange":"Analysis Range",
+    "custom.summaryFmtHtml":"HTML Report","custom.summaryFmtText":"Plain Text",
+    "custom.summaryRangeDays":"days","custom.summaryRangeWeeks":"weeks","custom.summaryRangeMonths":"months",
     "custom.save":"Save App","custom.saving":"Saving…","custom.saved":"App saved",
     "custom.run":"Run Now","custom.running":"Running…","custom.runDone":"Run completed",
     "custom.runFail":"Run failed","custom.edit":"Edit","custom.delete":"Delete",
-    "custom.reports":"Reports","custom.noReports":"No reports yet","custom.viewReport":"View",
-    "custom.step1":"Edit Template","custom.step2":"Define Parameters","custom.step3":"App Info",
+    "custom.reports":"Reports","custom.summaries":"Summary Reports","custom.noReports":"No reports yet","custom.viewReport":"View",
+    "custom.addGroup":"Add Group","custom.removeGroup":"Remove","custom.group":"Group {n}",
+    "custom.step1":"Type & Task","custom.step2":"Schedule & Summary","custom.step3":"App Info",
     "custom.next":"Next","custom.prev":"Back","custom.cancel":"Cancel",
-    "custom.source":"Source conversation","custom.toolsUsed":"Tools used",
     "custom.badge":"Custom",
-    "custom.confirm":"Confirm & Enhance","custom.confirming":"Analyzing…",
-    "custom.enhanced":"Enhanced","custom.notEnhanced":"Not enhanced",
-    "custom.enhancedPrompt":"Execution Constraints","custom.enhancedHelp":"Auto-generated from a confirmed successful run, appended to every subsequent execution",
-    "custom.clearEnhanced":"Clear Enhancement","custom.refRun":"Reference run","custom.confirmedAt":"Confirmed at",
   },
 };
 
@@ -309,6 +323,17 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (sel) sel.value = localStorage.getItem("nanobot_lang") || "auto";
   setupInput();
   setTimeout(hideSplash, 6000);
+
+  // Intercept all link clicks — open external URLs in system browser
+  document.body.addEventListener("click", (e) => {
+    const a = e.target.closest("a[href]");
+    if (!a) return;
+    const href = a.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("javascript:")) return;
+    e.preventDefault();
+    window.open(href, "_blank");
+  });
+
   await checkSystem();
 });
 
@@ -343,6 +368,8 @@ async function checkSystem() {
     applyLanguage();
     hideSplash();
     startNotificationPoll();
+    updateUnreadBadges();
+    _startBadgePoll();
   } catch (e) {
     hideSplash();
     applyLanguage();
@@ -841,9 +868,12 @@ function fillConfigForm(cfg) {
   document.getElementById("cfg-max-iterations").value = get(cfg, ["agents", "defaults", "maxToolIterations"]) || "";
   document.getElementById("cfg-memory-window").value = get(cfg, ["agents", "defaults", "memoryWindow"]) || "";
   PROVIDER_FIELDS.forEach(({ id, path }) => { document.getElementById(id).value = get(cfg, path) || ""; });
+  document.getElementById("cfg-baidu-key").value = get(cfg, ["tools", "web", "search", "baiduApiKey"]) || "";
   document.getElementById("cfg-brave-key").value = get(cfg, ["tools", "web", "search", "apiKey"]) || "";
+  document.getElementById("cfg-quota-only").checked = get(cfg, ["tools", "web", "search", "quotaOnly"]) !== false;
   document.getElementById("cfg-exec-timeout").value = get(cfg, ["tools", "exec", "timeout"]) || "";
   document.getElementById("cfg-restrict-workspace").checked = !!get(cfg, ["tools", "restrictToWorkspace"]);
+  refreshSearchUsage();
 
   const grid = document.getElementById("channels-grid");
   grid.innerHTML = "";
@@ -857,6 +887,31 @@ function fillConfigForm(cfg) {
 
   renderMcpServers(cfg);
   document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
+}
+
+// ── Search API Usage ────────────────────────────────────────────────────
+
+function _renderUsageBar(barId, used, limit) {
+  const bar = document.getElementById(barId);
+  if (!bar) return;
+  const pct = limit > 0 ? Math.min(used / limit * 100, 100) : 0;
+  const cls = pct >= 100 ? "danger" : pct >= 80 ? "warn" : "";
+  const label = pct >= 100
+    ? `⚠️ ${t("settings.quotaExhausted")} (${used}/${limit})`
+    : `${t("settings.usageToday")}: ${used} / ${limit}`;
+  bar.innerHTML = `<span>${label}</span><div class="usage-meter"><div class="usage-meter-fill ${cls}" style="width:${pct}%"></div></div>`;
+}
+
+async function refreshSearchUsage() {
+  try {
+    const data = await api("/api/search/usage");
+    if (data && data.engines) {
+      const b = data.engines.baidu;
+      const v = data.engines.brave;
+      if (b) _renderUsageBar("baidu-usage-bar", b.used, b.limit);
+      if (v) _renderUsageBar("brave-usage-bar", v.used, v.limit);
+    }
+  } catch (_) {}
 }
 
 // ── MCP Servers ────────────────────────────────────────────────────────
@@ -997,8 +1052,11 @@ function collectConfigForm() {
   const memWin = parseInt(document.getElementById("cfg-memory-window").value);
   if (memWin) set(cfg, ["agents", "defaults", "memoryWindow"], memWin);
   PROVIDER_FIELDS.forEach(({ id, path }) => { const val = document.getElementById(id).value; if (val) set(cfg, path, val); });
+  const baiduKey = document.getElementById("cfg-baidu-key").value;
+  if (baiduKey) set(cfg, ["tools", "web", "search", "baiduApiKey"], baiduKey);
   const braveKey = document.getElementById("cfg-brave-key").value;
   if (braveKey) set(cfg, ["tools", "web", "search", "apiKey"], braveKey);
+  set(cfg, ["tools", "web", "search", "quotaOnly"], document.getElementById("cfg-quota-only").checked);
   const execTimeout = parseInt(document.getElementById("cfg-exec-timeout").value);
   if (execTimeout) set(cfg, ["tools", "exec", "timeout"], execTimeout);
   set(cfg, ["tools", "restrictToWorkspace"], document.getElementById("cfg-restrict-workspace").checked);
@@ -1553,6 +1611,7 @@ async function loadApps() {
   } catch (_) {
     _appsCache = [];
   }
+  await updateUnreadBadges();
   renderApps(_appsCache);
 }
 
@@ -1603,8 +1662,13 @@ function renderApps(apps) {
     if (isCustom) {
       statusBadge = `<span class="app-badge app-badge-custom">${t("custom.badge")}</span>`;
       actions = `
-        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">${t("apps.configure")}</button>
-        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteCustomApp('${a.id}')">${t("custom.delete")}</button>`;
+        <div class="app-card-actions-left">
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">⚙️ ${t("apps.configure")}</button>
+          <button class="btn btn-sm" onclick="event.stopPropagation();openAppReports('${a.id}')">📋 ${t("apps.viewReports")}</button>
+        </div>
+        <div class="app-card-actions-right">
+          <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteCustomApp('${a.id}')">🗑 ${t("custom.delete")}</button>
+        </div>`;
     } else if (comingSoon) {
       statusBadge = `<span class="app-badge app-badge-soon">${t("apps.comingSoon")}</span>`;
     } else if (isInstalled) {
@@ -1612,16 +1676,23 @@ function renderApps(apps) {
         ? `<span class="app-badge app-badge-on">${t("apps.enabled")}</span>`
         : `<span class="app-badge app-badge-off">${t("apps.disabled")}</span>`;
       actions = `
-        <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">${t("apps.configure")}</button>
-        <button class="btn btn-sm" onclick="event.stopPropagation();uninstallApp('${a.id}')">${t("apps.uninstall")}</button>`;
+        <div class="app-card-actions-left">
+          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">⚙️ ${t("apps.configure")}</button>
+          <button class="btn btn-sm" onclick="event.stopPropagation();openAppReports('${a.id}')">📋 ${t("apps.viewReports")}</button>
+        </div>
+        <div class="app-card-actions-right">
+          <button class="btn btn-sm btn-danger-subtle" onclick="event.stopPropagation();uninstallApp('${a.id}')">📦 ${t("apps.uninstall")}</button>
+        </div>`;
     } else {
       statusBadge = `<span class="app-badge app-badge-new">${t("apps.notInstalled")}</span>`;
-      actions = `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();installApp('${a.id}')">${t("apps.install")}</button>`;
+      actions = `<button class="btn btn-sm btn-primary" onclick="event.stopPropagation();installApp('${a.id}')">📥 ${t("apps.install")}</button>`;
     }
+
+    const unreadBadge = isCustom ? _appCardBadge(a.id) : "";
 
     return `<div class="app-card${isInstalled || isCustom ? ' installed' : ''}${comingSoon ? ' coming-soon' : ''}" onclick="${(isInstalled || isCustom) && !comingSoon ? `openAppDetail('${a.id}')` : ''}">
       <div class="app-card-header">
-        <div class="app-card-icon">${icon}</div>
+        <div class="app-card-icon">${icon}${unreadBadge}</div>
         ${statusBadge}
       </div>
       <div class="app-card-body">
@@ -1672,6 +1743,18 @@ async function openAppDetail(appId) {
   if (appId === "focus_timer") { await openFocusDetail(); return; }
   if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
+}
+
+async function openAppReports(appId) {
+  await openAppDetail(appId);
+  setTimeout(() => {
+    const targets = ["digest-report-list", "email-report-list", "capp-report-list",
+                     "monitor-sites-list", "focus-stats-content"];
+    for (const id of targets) {
+      const el = document.getElementById(id);
+      if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    }
+  }, 200);
 }
 
 async function openDigestDetail() {
@@ -2757,11 +2840,20 @@ function saveAsCustomApp(botMsgIndex) {
   openCustomAppWizard(userPrompt, sessionId);
 }
 
-function openCustomAppWizard(sourcePrompt, sourceSessionId) {
+function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
   const existing = document.getElementById("custom-app-wizard");
   if (existing) existing.remove();
 
-  const tpl = sourcePrompt || "";
+  const tpl = sourcePrompt || (editData && editData.prompt_template) || "";
+  const ed = editData || {};
+  const curFmt = ed.output_format || "text";
+  const sched = ed.schedule || {};
+  const summ = ed.summary || {};
+  const summSched = summ.schedule || {};
+
+  const weekdays = t("custom.weekdays").split(",");
+  const dowOptions = weekdays.map((d,i) => `<option value="${i}" ${(sched.day_of_week||0)===i?'selected':''}>${d}</option>`).join("");
+
   const overlay = document.createElement("div");
   overlay.id = "custom-app-wizard";
   overlay.className = "wizard-overlay";
@@ -2775,23 +2867,97 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId) {
         <span class="wizard-step" data-step="3">3. ${t("custom.step3")}</span>
       </div>
       <div class="wizard-body">
-        <!-- Step 1: Template -->
+        <!-- Step 1: Task -->
         <div class="wizard-page" id="wizard-page-1">
           <label>${t("custom.template")}</label>
           <p class="wizard-help">${t("custom.templateHelp")}</p>
-          <textarea id="wizard-template" class="wizard-textarea" rows="8">${escapeHtml(tpl)}</textarea>
+          <textarea id="wizard-template" class="wizard-textarea" rows="5">${escapeHtml(tpl)}</textarea>
+          <div style="margin-top:12px;">
+            <label>${t("custom.outputFmt")}</label>
+            <select id="wizard-output-format" class="digest-select">
+              <option value="report" ${curFmt==='report'?'selected':''}>${t("custom.fmt.report")}</option>
+              <option value="notification" ${curFmt==='notification'?'selected':''}>${t("custom.fmt.notification")}</option>
+              <option value="text" ${curFmt==='text'?'selected':''}>${t("custom.fmt.text")}</option>
+            </select>
+          </div>
         </div>
-        <!-- Step 2: Parameters -->
+        <!-- Step 2: Schedule & Summary -->
         <div class="wizard-page" id="wizard-page-2" style="display:none;">
-          <label>${t("custom.params")}</label>
-          <div id="wizard-params-list"></div>
+          <h4 style="margin:0 0 8px;">${t("custom.schedule")}</h4>
+          <div class="form-group form-group-checkbox"><label><input type="checkbox" id="wizard-sched-enabled" ${sched.enabled?'checked':''} onchange="_wizardToggleSchedFields()" /><span>${t("custom.scheduleEnabled")}</span></label></div>
+          <div id="wizard-sched-fields" style="${sched.enabled?'':'display:none;'}">
+            <div class="digest-config-grid">
+              <div class="form-group">
+                <label>${t("custom.schedMode")}</label>
+                <select id="wizard-sched-mode" class="digest-select" onchange="_wizardSchedModeChange()">
+                  <option value="daily" ${(sched.mode||'daily')==='daily'?'selected':''}>${t("custom.sched.daily")}</option>
+                  <option value="weekly" ${sched.mode==='weekly'?'selected':''}>${t("custom.sched.weekly")}</option>
+                  <option value="monthly" ${sched.mode==='monthly'?'selected':''}>${t("custom.sched.monthly")}</option>
+                  <option value="interval" ${sched.mode==='interval'?'selected':''}>${t("custom.sched.interval")}</option>
+                </select>
+              </div>
+              <div class="form-group"><label>${t("custom.scheduleTime")}</label><input type="time" id="wizard-sched-time" value="${escapeAttr(sched.time||'')}" /></div>
+              <div class="form-group" id="wizard-sched-dow-group" style="${sched.mode==='weekly'?'':'display:none;'}">
+                <label>${t("custom.schedDow")}</label>
+                <select id="wizard-sched-dow" class="digest-select">${dowOptions}</select>
+              </div>
+              <div class="form-group" id="wizard-sched-dom-group" style="${sched.mode==='monthly'?'':'display:none;'}">
+                <label>${t("custom.schedDom")}</label>
+                <input type="number" id="wizard-sched-dom" min="1" max="31" value="${sched.day_of_month||1}" />
+              </div>
+              <div class="form-group" id="wizard-sched-interval-group" style="${sched.mode==='interval'?'':'display:none;'}">
+                <label>${t("custom.schedInterval")}</label>
+                <input type="number" id="wizard-sched-interval" min="1" value="${sched.interval_days||1}" />
+              </div>
+            </div>
+          </div>
+          <hr style="border:0;border-top:1px solid var(--bg-surface1);margin:16px 0;" />
+          <h4 style="margin:0 0 8px;">${t("custom.summary")}</h4>
+          <div class="form-group form-group-checkbox"><label><input type="checkbox" id="wizard-summ-enabled" ${summ.enabled?'checked':''} onchange="_wizardToggleSummFields()" /><span>${t("custom.summaryEnabled")}</span></label></div>
+          <div id="wizard-summ-fields" style="${summ.enabled?'':'display:none;'}">
+            <div class="form-group">
+              <label>${t("custom.summaryPrompt")}</label>
+              <p class="wizard-help">${t("custom.summaryPromptHelp")}</p>
+              <textarea id="wizard-summ-prompt" class="wizard-textarea" rows="3">${escapeHtml(summ.prompt||'')}</textarea>
+            </div>
+            <div class="digest-config-grid">
+              <div class="form-group">
+                <label>${t("custom.summaryFormat")}</label>
+                <select id="wizard-summ-format" class="digest-select">
+                  <option value="html" ${(summ.output_format||'html')==='html'?'selected':''}>${t("custom.summaryFmtHtml")}</option>
+                  <option value="text" ${summ.output_format==='text'?'selected':''}>${t("custom.summaryFmtText")}</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>${t("custom.summaryRange")}</label>
+                <div style="display:flex;gap:6px;align-items:center;">
+                  <input type="number" id="wizard-summ-range-val" min="1" max="365" value="${summ.range_days ? _rangeToDU(summ.range_days).val : 7}" style="width:70px;" />
+                  <select id="wizard-summ-range-unit" class="digest-select" style="width:auto;">
+                    <option value="days" ${!summ.range_days || _rangeToDU(summ.range_days).unit==='days' ? 'selected' : ''}>${t("custom.summaryRangeDays")}</option>
+                    <option value="weeks" ${summ.range_days && _rangeToDU(summ.range_days).unit==='weeks' ? 'selected' : ''}>${t("custom.summaryRangeWeeks")}</option>
+                    <option value="months" ${summ.range_days && _rangeToDU(summ.range_days).unit==='months' ? 'selected' : ''}>${t("custom.summaryRangeMonths")}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="form-group form-group-checkbox"><label><input type="checkbox" id="wizard-summ-sched-enabled" ${summSched.enabled?'checked':''} /><span>${t("custom.summarySchedule")}</span></label></div>
+            <div class="digest-config-grid">
+              <div class="form-group">
+                <label>${t("custom.schedMode")}</label>
+                <select id="wizard-summ-mode" class="digest-select">
+                  <option value="daily" ${(summSched.mode||'daily')==='daily'?'selected':''}>${t("custom.sched.daily")}</option>
+                  <option value="weekly" ${summSched.mode==='weekly'?'selected':''}>${t("custom.sched.weekly")}</option>
+                  <option value="monthly" ${summSched.mode==='monthly'?'selected':''}>${t("custom.sched.monthly")}</option>
+                </select>
+              </div>
+              <div class="form-group"><label>${t("custom.scheduleTime")}</label><input type="time" id="wizard-summ-time" value="${escapeAttr(summSched.time||'')}" /></div>
+            </div>
+          </div>
         </div>
         <!-- Step 3: Info -->
         <div class="wizard-page" id="wizard-page-3" style="display:none;">
-          <div class="form-group"><label>${t("custom.name")}</label><input type="text" id="wizard-name" placeholder="${_lang === "zh" ? "例：每日AI新闻" : "e.g. Daily AI News"}" /></div>
-          <div class="form-group"><label>${t("custom.icon")}</label><input type="text" id="wizard-icon" value="🤖" maxlength="4" style="width:60px;font-size:24px;text-align:center;" /></div>
-          <div class="form-group"><label>${t("custom.scheduleTime")}</label><input type="time" id="wizard-schedule-time" value="" /></div>
-          <div class="form-group form-group-checkbox"><label><input type="checkbox" id="wizard-schedule-enabled" /><span>${t("custom.scheduleEnabled")}</span></label></div>
+          <div class="form-group"><label>${t("custom.name")}</label><input type="text" id="wizard-name" value="${escapeAttr(ed.name || '')}" placeholder="${_lang === "zh" ? "例：每日AI新闻" : "e.g. Daily AI News"}" /></div>
+          <div class="form-group"><label>${t("custom.icon")}</label><input type="text" id="wizard-icon" value="${escapeAttr(ed.icon || '🤖')}" maxlength="4" style="width:60px;font-size:24px;text-align:center;" /></div>
         </div>
       </div>
       <div class="wizard-footer">
@@ -2802,9 +2968,40 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId) {
     </div>
   `;
   overlay._step = 1;
-  overlay._sourceSessionId = sourceSessionId || "";
-  overlay._sourcePrompt = sourcePrompt || "";
+  overlay._editId = ed.id || "";
   document.body.appendChild(overlay);
+}
+
+function _rangeToDU(days) {
+  if (days >= 30 && days % 30 === 0) return { val: days / 30, unit: "months" };
+  if (days >= 7 && days % 7 === 0) return { val: days / 7, unit: "weeks" };
+  return { val: days, unit: "days" };
+}
+function _duToRangeDays(val, unit) {
+  if (unit === "months") return val * 30;
+  if (unit === "weeks") return val * 7;
+  return val;
+}
+function _rangeToDULabel(days) {
+  const d = _rangeToDU(days);
+  return `${d.val} ${t("custom.summaryRange" + d.unit.charAt(0).toUpperCase() + d.unit.slice(1))}`;
+}
+
+function _wizardToggleSchedFields() {
+  const on = document.getElementById("wizard-sched-enabled").checked;
+  document.getElementById("wizard-sched-fields").style.display = on ? "" : "none";
+}
+
+function _wizardToggleSummFields() {
+  const on = document.getElementById("wizard-summ-enabled").checked;
+  document.getElementById("wizard-summ-fields").style.display = on ? "" : "none";
+}
+
+function _wizardSchedModeChange() {
+  const mode = document.getElementById("wizard-sched-mode").value;
+  document.getElementById("wizard-sched-dow-group").style.display = mode === "weekly" ? "" : "none";
+  document.getElementById("wizard-sched-dom-group").style.display = mode === "monthly" ? "" : "none";
+  document.getElementById("wizard-sched-interval-group").style.display = mode === "interval" ? "" : "none";
 }
 
 function _wizardGoTo(step) {
@@ -2819,13 +3016,15 @@ function _wizardGoTo(step) {
   }
   document.getElementById("wizard-prev-btn").style.display = step > 1 ? "" : "none";
   document.getElementById("wizard-next-btn").textContent = step < 3 ? t("custom.next") : t("custom.save");
-
-  if (step === 2) _wizardParseParams();
 }
 
 function _wizardNext() {
   const overlay = document.getElementById("custom-app-wizard");
   if (!overlay) return;
+  if (overlay._step === 1) {
+    const tpl = document.getElementById("wizard-template").value.trim();
+    if (!tpl) { toast(_lang === "zh" ? "任务描述不能为空" : "Task description required", "error"); return; }
+  }
   if (overlay._step < 3) {
     _wizardGoTo(overlay._step + 1);
   } else {
@@ -2839,80 +3038,66 @@ function _wizardPrev() {
   if (overlay._step > 1) _wizardGoTo(overlay._step - 1);
 }
 
-function _wizardParseParams() {
-  const template = document.getElementById("wizard-template").value;
-  const regex = /\{\{(\w+)\}\}/g;
-  const seen = new Set();
-  const params = [];
-  let m;
-  while ((m = regex.exec(template)) !== null) {
-    if (seen.has(m[1])) continue;
-    seen.add(m[1]);
-    params.push(m[1]);
-  }
-  const container = document.getElementById("wizard-params-list");
-  if (!params.length) {
-    container.innerHTML = `<div class="digest-empty">${_lang === "zh" ? "模板中未检测到 {{变量}}" : "No {{variables}} found in template"}</div>`;
-    return;
-  }
-  container.innerHTML = params.map(name => `
-    <div class="wizard-param-row" data-param="${escapeAttr(name)}">
-      <span class="wizard-param-name">{{${escapeHtml(name)}}}</span>
-      <input type="text" class="wizard-param-label" placeholder="${t("custom.paramLabel")}" value="${escapeAttr(name)}" />
-      <select class="wizard-param-type digest-select">
-        <option value="text">text</option>
-        <option value="number">number</option>
-        <option value="time">time</option>
-      </select>
-      <input type="text" class="wizard-param-default" placeholder="${t("custom.paramDefault")}" />
-    </div>
-  `).join("");
-}
-
 async function _wizardSave() {
   const overlay = document.getElementById("custom-app-wizard");
   if (!overlay) return;
   const template = document.getElementById("wizard-template").value.trim();
   const name = document.getElementById("wizard-name").value.trim();
   const icon = document.getElementById("wizard-icon").value.trim() || "🤖";
-  if (!template) { toast(_lang === "zh" ? "Prompt 模板不能为空" : "Template required", "error"); return; }
-  if (!name) { toast(_lang === "zh" ? "请输入应用名称" : "Name required", "error"); _wizardGoTo(3); return; }
+  const outputFormat = document.getElementById("wizard-output-format").value;
+  if (!template) { toast(_lang === "zh" ? "任务描述不能为空" : "Task description required", "error"); return; }
+  if (!name) { toast(_lang === "zh" ? "请输入应用名称" : "Name required", "error"); return; }
 
-  const paramRows = document.querySelectorAll(".wizard-param-row");
-  const parameters = [];
-  paramRows.forEach(row => {
-    parameters.push({
-      name: row.dataset.param,
-      label: row.querySelector(".wizard-param-label").value || row.dataset.param,
-      type: row.querySelector(".wizard-param-type").value || "text",
-      default: row.querySelector(".wizard-param-default").value || "",
-    });
-  });
+  const schedule = {
+    enabled: document.getElementById("wizard-sched-enabled").checked,
+    mode: document.getElementById("wizard-sched-mode").value,
+    time: document.getElementById("wizard-sched-time").value,
+    day_of_week: parseInt(document.getElementById("wizard-sched-dow").value) || 0,
+    day_of_month: parseInt(document.getElementById("wizard-sched-dom").value) || 1,
+    interval_days: parseInt(document.getElementById("wizard-sched-interval").value) || 1,
+  };
 
-  const scheduleTime = document.getElementById("wizard-schedule-time").value;
-  const scheduleEnabled = document.getElementById("wizard-schedule-enabled").checked;
-  const source = overlay._sourcePrompt ? {
-    session_id: overlay._sourceSessionId,
-    original_prompt: overlay._sourcePrompt,
-  } : {};
+  const summRangeVal = parseInt(document.getElementById("wizard-summ-range-val")?.value) || 7;
+  const summRangeUnit = document.getElementById("wizard-summ-range-unit")?.value || "days";
+  const summary = {
+    enabled: document.getElementById("wizard-summ-enabled").checked,
+    prompt: document.getElementById("wizard-summ-prompt").value.trim(),
+    output_format: document.getElementById("wizard-summ-format")?.value || "html",
+    range_days: _duToRangeDays(summRangeVal, summRangeUnit),
+    schedule: {
+      enabled: document.getElementById("wizard-summ-sched-enabled").checked,
+      mode: document.getElementById("wizard-summ-mode").value,
+      time: document.getElementById("wizard-summ-time").value,
+    },
+  };
 
   const btn = document.getElementById("wizard-next-btn");
   btn.disabled = true;
   btn.textContent = t("custom.saving");
 
+  const payload = {
+    name, icon,
+    prompt_template: template, output_format: outputFormat,
+    schedule, summary,
+  };
+
   try {
-    const res = await api("/api/apps/custom", "POST", {
-      name, icon,
-      prompt_template: template,
-      parameters,
-      schedule: { time: scheduleTime, enabled: scheduleEnabled },
-      source,
-    });
+    let res;
+    if (overlay._editId) {
+      res = await api(`/api/apps/custom/${overlay._editId}`, "PUT", payload);
+    } else {
+      res = await api("/api/apps/custom", "POST", payload);
+    }
     if (res.error) { toast(res.error, "error"); btn.disabled = false; btn.textContent = t("custom.save"); return; }
     toast(t("custom.saved"), "success");
+    const editId = overlay._editId;
     overlay.remove();
     await loadApps();
-    switchPage("apps");
+    if (editId) {
+      openCustomAppDetail(editId);
+    } else {
+      switchPage("apps");
+    }
   } catch (e) {
     toast(e.message, "error");
     btn.disabled = false;
@@ -2931,6 +3116,18 @@ async function deleteCustomApp(appId) {
 
 // ── Custom App Detail Page ────────────────────────────────────────────
 
+function _scheduleDesc(sched) {
+  if (!sched || !sched.enabled) return t("apps.disabled");
+  const mode = sched.mode || "daily";
+  const time = sched.time || "--:--";
+  const weekdays = t("custom.weekdays").split(",");
+  if (mode === "daily") return `${t("custom.sched.daily")} ${time}`;
+  if (mode === "weekly") return `${t("custom.sched.weekly")} ${weekdays[sched.day_of_week||0]} ${time}`;
+  if (mode === "monthly") return `${t("custom.sched.monthly")} ${sched.day_of_month||1}${_lang==="zh"?"号":"th"} ${time}`;
+  if (mode === "interval") return `${_lang==="zh"?"每":"Every "}${sched.interval_days||1}${_lang==="zh"?"天":"d"} ${time}`;
+  return time;
+}
+
 async function openCustomAppDetail(appId) {
   const container = document.getElementById("app-detail-content");
   container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
@@ -2945,68 +3142,52 @@ async function openCustomAppDetail(appId) {
   document.getElementById("app-detail-title").textContent = `${capp.icon || "🤖"} ${capp.name}`;
   switchPage("app-detail");
 
-  const schedEnabled = capp.schedule?.enabled || false;
-  const schedTime = capp.schedule?.time || "";
+  const sched = capp.schedule || {};
+  const outputFmt = capp.output_format || "text";
+  const fmtLabels = {report:t("custom.fmt.report"), notification:t("custom.fmt.notification"), text:t("custom.fmt.text")};
+  const summCfg = capp.summary || {};
 
-  // Build dynamic parameter form
+  const paramDefs = capp.parameters || [];
+  _cappParamDefs = paramDefs;
+  const hasParams = paramDefs.length > 0;
+  let paramGroups = capp.param_groups || [];
+  if (hasParams && !paramGroups.length) {
+    const fallback = capp.param_values || {};
+    paramGroups = [Object.fromEntries(paramDefs.map(p => [p.name, fallback[p.name] || p.default || ""]))];
+  }
   let paramsHtml = "";
-  for (const p of (capp.parameters || [])) {
-    let inputHtml = "";
-    if (p.type === "number") {
-      inputHtml = `<input type="number" id="capp-param-${p.name}" value="${escapeAttr(p.default || "")}" />`;
-    } else if (p.type === "time") {
-      inputHtml = `<input type="time" id="capp-param-${p.name}" value="${escapeAttr(p.default || "")}" />`;
-    } else {
-      inputHtml = `<input type="text" id="capp-param-${p.name}" value="${escapeAttr(p.default || "")}" />`;
-    }
-    paramsHtml += `<div class="form-group"><label>${escapeHtml(p.label || p.name)}</label>${inputHtml}</div>`;
+  if (hasParams) {
+    paramsHtml = `<div id="capp-param-groups">${paramGroups.map((g, i) => _paramGroupHtml(paramDefs, g, i, paramGroups.length)).join("")}</div>
+      <button class="btn btn-sm" style="margin-top:8px;" onclick="_cappAddGroup()">➕ ${t("custom.addGroup")}</button>`;
   }
 
   let reportsHtml = "";
+  let summariesHtml = "";
   try {
     const reports = await api(`/api/apps/custom/${appId}/reports`);
-    if (reports.length) {
-      reportsHtml = reports.map(r => {
-        const tools = r.tools_used?.length ? ` (${r.tools_used.join(", ")})` : "";
-        return `<div class="digest-report-item" onclick="viewCustomReport('${escapeAttr(appId)}','${escapeAttr(r.date)}')">
-          <span class="digest-report-date">📄 ${escapeHtml(r.date)}${tools}</span>
-          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T"," ").slice(0,19) : "")}</span>
-          <button class="btn btn-sm">${t("custom.viewReport")}</button>
-        </div>`;
-      }).join("");
+    const runs = reports.filter(r => (r.type||"run") === "run");
+    const summs = reports.filter(r => r.type === "summary");
+    if (runs.length) {
+      reportsHtml = runs.map(r => _reportItemHtml(appId, r, "📄")).join("");
     } else {
       reportsHtml = `<div class="digest-empty">${t("custom.noReports")}</div>`;
+    }
+    if (summs.length) {
+      summariesHtml = summs.map(r => _reportItemHtml(appId, r, "📊")).join("");
     }
   } catch (_) {
     reportsHtml = `<div class="digest-empty">${t("custom.noReports")}</div>`;
   }
 
-  const hasEnhanced = !!capp.enhanced_prompt;
-  const refRun = capp.reference_run || {};
-
-  let enhancedHtml = "";
-  if (hasEnhanced) {
-    enhancedHtml = `
-    <div class="app-detail-section" id="capp-enhanced-section">
-      <h3>${t("custom.enhancedPrompt")} <span class="app-badge app-badge-on" id="capp-enhanced-badge">${t("custom.enhanced")}</span></h3>
-      <p class="wizard-help">${t("custom.enhancedHelp")}${refRun.date ? ` · ${t("custom.refRun")}: ${escapeHtml(refRun.date)}` : ""}${refRun.confirmed_at ? ` · ${t("custom.confirmedAt")}: ${escapeHtml(refRun.confirmed_at.replace("T"," ").slice(0,19))}` : ""}</p>
-      <div class="custom-template-preview capp-enhanced-preview" id="capp-enhanced-content">${escapeHtml(capp.enhanced_prompt)}</div>
-      <div style="margin-top:8px;"><button class="btn btn-sm" onclick="clearEnhancedPrompt('${appId}')">${t("custom.clearEnhanced")}</button></div>
-    </div>`;
-  } else {
-    enhancedHtml = `
-    <div class="app-detail-section" id="capp-enhanced-section" style="display:block;">
-      <h3>${t("custom.enhancedPrompt")} <span class="app-badge app-badge-off" id="capp-enhanced-badge">${t("custom.notEnhanced")}</span></h3>
-      <p class="wizard-help">${t("custom.enhancedHelp")}</p>
-    </div>`;
-  }
+  const fmtBadge = outputFmt !== "text" ? `<span class="app-badge">${fmtLabels[outputFmt]||outputFmt}</span>` : "";
 
   container.innerHTML = `
     <div class="app-detail-section">
       <div class="digest-status-bar">
         <div class="digest-status-left">
-          <span class="digest-status-dot ${schedEnabled ? 'on' : 'off'}"></span>
-          <span>${t("custom.schedule")}: <strong>${schedEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
+          ${fmtBadge}
+          <span class="digest-status-dot ${sched.enabled ? 'on' : 'off'}"></span>
+          <span>${t("custom.schedule")}: <strong>${_scheduleDesc(sched)}</strong></span>
         </div>
         <div>
           <button class="btn btn-sm" onclick="openCustomAppWizardEdit('${appId}')">${t("custom.edit")}</button>
@@ -3020,28 +3201,36 @@ async function openCustomAppDetail(appId) {
       <div class="custom-template-preview">${escapeHtml(capp.prompt_template)}</div>
     </div>
 
-    ${enhancedHtml}
-
     ${paramsHtml ? `<div class="app-detail-section">
-      <h3>${t("custom.params")}</h3>
+      <h3>${_lang === "zh" ? "参数" : "Parameters"}</h3>
       <div class="digest-config-grid">${paramsHtml}</div>
     </div>` : ""}
 
     <div class="app-detail-section">
-      <div class="digest-config-grid">
-        <div class="form-group"><label>${t("custom.scheduleTime")}</label><input type="time" id="capp-schedule-time" value="${escapeAttr(schedTime)}" /></div>
-        <div class="form-group form-group-checkbox"><label><input type="checkbox" id="capp-schedule-enabled" ${schedEnabled ? "checked" : ""} /><span>${t("custom.scheduleEnabled")}</span></label></div>
-      </div>
+      <h3>🚀 ${_lang === "zh" ? "执行" : "Run"}</h3>
       <div class="digest-actions">
-        <button class="btn btn-primary" onclick="saveCustomAppSchedule('${appId}')">${t("focus.saveConfig")}</button>
-        <button class="btn btn-primary" id="capp-run-btn" onclick="runCustomApp('${appId}')">🚀 ${t("custom.run")}</button>
+        <button class="btn btn-primary" id="capp-run-btn" data-app-id="${appId}" onclick="runCustomApp('${appId}')">🚀 ${t("custom.run")}</button>
       </div>
+      <div class="capp-run-log" id="capp-run-log" style="display:none;"></div>
     </div>
 
     <div class="app-detail-section">
-      <h3>${t("custom.reports")}</h3>
+      <h3>📄 ${t("custom.reports")}</h3>
       <div class="digest-report-list" id="capp-report-list">${reportsHtml}</div>
     </div>
+
+    ${summCfg.enabled ? `<div class="app-detail-section capp-summary-section">
+      <h3>📊 ${t("custom.summaries")}</h3>
+      <div class="digest-status-bar" style="margin-bottom:12px;">
+        <div class="digest-status-left">
+          <span class="app-badge">${(summCfg.output_format||'html')==='html' ? t("custom.summaryFmtHtml") : t("custom.summaryFmtText")}</span>
+          <span class="app-badge">${t("custom.summaryRange")}: ${_rangeToDULabel(summCfg.range_days || 7)}</span>
+        </div>
+        <button class="btn" id="capp-summ-btn" onclick="runCustomSummary('${appId}')">📊 ${t("custom.summaryRun")}</button>
+      </div>
+      <div class="capp-run-log" id="capp-summ-log" style="display:none;"></div>
+      <div class="digest-report-list" id="capp-summary-list">${summariesHtml || `<div class="digest-empty">${_lang === "zh" ? "暂无总结报告" : "No summaries yet"}</div>`}</div>
+    </div>` : ""}
 
     <div class="app-detail-section" id="capp-report-view" style="display:none;">
       <h3 id="capp-report-view-title">${t("digest.latestReport")}</h3>
@@ -3050,52 +3239,242 @@ async function openCustomAppDetail(appId) {
   `;
 }
 
-async function runCustomApp(appId) {
-  const btn = document.getElementById("capp-run-btn");
-  btn.disabled = true;
-  btn.textContent = "⏳ " + t("custom.running");
+// ── Param group helpers ────────────────────────────────────────────
+let _cappParamDefs = [];
 
-  // Collect parameter values
-  const capp = await api(`/api/apps/custom/${appId}`);
-  const params = {};
-  for (const p of (capp.parameters || [])) {
-    const el = document.getElementById(`capp-param-${p.name}`);
-    params[p.name] = el ? el.value : (p.default || "");
+function _paramGroupHtml(paramDefs, groupVals, idx, total) {
+  const label = t("custom.group").replace("{n}", idx + 1);
+  const removeBtn = total > 1
+    ? `<button class="btn btn-sm btn-danger-subtle" onclick="_cappRemoveGroup(${idx})" title="${t("custom.removeGroup")}">✕</button>`
+    : "";
+  let fields = "";
+  for (const p of paramDefs) {
+    const val = groupVals[p.name] !== undefined ? groupVals[p.name] : (p.default || "");
+    fields += `<div class="form-group"><label>${escapeHtml(p.label || p.name)}</label><input type="text" class="capp-group-input" data-group="${idx}" data-param="${escapeAttr(p.name)}" value="${escapeAttr(val)}" /></div>`;
   }
+  return `<div class="capp-param-group" data-group-idx="${idx}">
+    <div class="capp-param-group-header"><span class="capp-param-group-label">${label}</span>${removeBtn}</div>
+    <div class="digest-config-grid">${fields}</div>
+  </div>`;
+}
 
+function _cappCollectGroups() {
+  const container = document.getElementById("capp-param-groups");
+  if (!container) return [];
+  const groups = [];
+  container.querySelectorAll(".capp-param-group").forEach(el => {
+    const g = {};
+    el.querySelectorAll(".capp-group-input").forEach(inp => {
+      g[inp.dataset.param] = inp.value.trim();
+    });
+    groups.push(g);
+  });
+  return groups;
+}
+
+function _cappAddGroup() {
+  const container = document.getElementById("capp-param-groups");
+  if (!container || !_cappParamDefs.length) return;
+  const groups = _cappCollectGroups();
+  const empty = Object.fromEntries(_cappParamDefs.map(p => [p.name, ""]));
+  groups.push(empty);
+  _cappRenderGroups(groups);
+}
+
+function _cappRemoveGroup(idx) {
+  const groups = _cappCollectGroups();
+  if (groups.length <= 1) return;
+  groups.splice(idx, 1);
+  _cappRenderGroups(groups);
+}
+
+function _cappRenderGroups(groups) {
+  const container = document.getElementById("capp-param-groups");
+  if (!container) return;
+  container.innerHTML = groups.map((g, i) => _paramGroupHtml(_cappParamDefs, g, i, groups.length)).join("");
+}
+
+function _cappLog(msg, type, logId) {
+  const log = document.getElementById(logId || "capp-run-log");
+  if (!log) return;
+  log.style.display = "block";
+  const ts = new Date().toLocaleTimeString();
+  const cls = type === "error" ? "capp-log-error" : type === "done" ? "capp-log-done" : "";
+  log.innerHTML += `<div class="capp-log-line ${cls}"><span class="capp-log-ts">${ts}</span>${escapeHtml(msg)}</div>`;
+  log.scrollTop = log.scrollHeight;
+}
+
+let _cappAbort = null;
+
+async function _readSSE(resp, appId, signal, logId) {
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
   try {
-    const res = await api(`/api/apps/custom/${appId}/run`, "POST", { params });
-    if (res.error) { toast(res.error, "error"); btn.disabled = false; btn.textContent = "🚀 " + t("custom.run"); return; }
-
-    const poll = setInterval(async () => {
-      try {
-        const st = await api(`/api/apps/custom/${appId}/status`);
-        if (st.status === "done") {
-          clearInterval(poll);
-          btn.disabled = false;
-          btn.textContent = "🚀 " + t("custom.run");
-          toast(t("custom.runDone"), "success");
-          if (st.report) _showCustomReport(st.report, appId);
-          _refreshCustomReports(appId);
-        } else if (st.status === "error") {
-          clearInterval(poll);
-          btn.disabled = false;
-          btn.textContent = "🚀 " + t("custom.run");
-          toast(st.error || t("custom.runFail"), "error");
-        } else {
-          btn.textContent = "⏳ " + (st.progress || t("custom.running"));
-        }
-      } catch (_) {}
-    }, 3000);
-    setTimeout(() => clearInterval(poll), 600000);
+    while (true) {
+      if (signal && signal.aborted) break;
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() || "";
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const evt = JSON.parse(line.slice(6));
+          if (evt.type === "progress") {
+            _cappLog(evt.content, null, logId);
+          } else if (evt.type === "done") {
+            _cappLog(t("custom.runDone"), "done", logId);
+            _showCustomReport({ content: evt.content, date: new Date().toISOString().slice(0,10) });
+            if (appId) _refreshCustomReports(appId);
+          } else if (evt.type === "error") {
+            _cappLog(evt.content || t("custom.runFail"), "error", logId);
+          }
+        } catch (_) {}
+      }
+    }
   } catch (e) {
-    btn.disabled = false;
-    btn.textContent = "🚀 " + t("custom.run");
-    toast(e.message, "error");
+    if (e.name !== "AbortError") throw e;
+  } finally {
+    try { reader.cancel(); } catch (_) {}
   }
 }
 
-function _showCustomReport(report, appId) {
+function _cappSetRunning(running) {
+  const btn = document.getElementById("capp-run-btn");
+  if (!btn) return;
+  if (running) {
+    btn.textContent = `⏹ ${_lang === "zh" ? "停止" : "Stop"}`;
+    btn.onclick = () => _cappStopRun();
+    btn.disabled = false;
+    btn.classList.add("btn-danger");
+    btn.classList.remove("btn-primary");
+  } else {
+    btn.textContent = `🚀 ${t("custom.run")}`;
+    const aid = btn.dataset.appId;
+    btn.onclick = () => runCustomApp(aid);
+    btn.disabled = false;
+    btn.classList.remove("btn-danger");
+    btn.classList.add("btn-primary");
+    _cappAbort = null;
+  }
+}
+
+function _cappStopRun() {
+  if (_cappAbort) { _cappAbort.abort(); _cappAbort = null; }
+  _cappLog(_lang === "zh" ? "已终止" : "Stopped", "error");
+  _cappSetRunning(false);
+}
+
+async function runCustomApp(appId) {
+  const log = document.getElementById("capp-run-log");
+  if (log) { log.style.display = "block"; log.innerHTML = ""; }
+
+  let capp;
+  try { capp = await api(`/api/apps/custom/${appId}`); } catch (_) {}
+  if (!capp) { _cappLog("App not found", "error"); return; }
+
+  const paramDefs = capp.parameters || [];
+  let paramGroups = paramDefs.length ? _cappCollectGroups() : [{}];
+  if (paramDefs.length && !paramGroups.length) {
+    paramGroups = [Object.fromEntries(paramDefs.map(p => [p.name, p.default || ""]))];
+  }
+
+  for (let gi = 0; gi < paramGroups.length; gi++) {
+    const g = paramGroups[gi];
+    for (const p of paramDefs) {
+      if (!(g[p.name] || "").trim()) {
+        const label = `${t("custom.group").replace("{n}", gi + 1)} — ${p.label || p.name}`;
+        toast(_lang === "zh" ? `请填写 ${label}` : `Fill in ${label}`, "error");
+        const inp = document.querySelector(`.capp-group-input[data-group="${gi}"][data-param="${p.name}"]`);
+        if (inp) { inp.focus(); inp.style.borderColor = "var(--red)"; setTimeout(() => inp.style.borderColor = "", 3000); }
+        return;
+      }
+    }
+  }
+
+  try { await api(`/api/apps/custom/${appId}`, "PUT", { param_groups: paramGroups }); } catch (_) {}
+
+  _cappSetRunning(true);
+  _cappLog(paramGroups.length > 1
+    ? (_lang === "zh" ? `开始执行 ${paramGroups.length} 组参数…` : `Running ${paramGroups.length} groups…`)
+    : t("custom.running"));
+  const ac = new AbortController();
+  _cappAbort = ac;
+
+  try {
+    const resp = await fetch(`/api/apps/custom/${appId}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ param_groups: paramGroups }),
+      signal: ac.signal,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      _cappLog(err.error || `HTTP ${resp.status}`, "error");
+      _cappSetRunning(false);
+      return;
+    }
+    await _readSSE(resp, appId, ac.signal);
+  } catch (e) {
+    if (e.name !== "AbortError") _cappLog(e.message, "error");
+  } finally {
+    _cappSetRunning(false);
+    updateUnreadBadges();
+  }
+}
+
+let _summAbort = null;
+
+async function runCustomSummary(appId) {
+  const LOGID = "capp-summ-log";
+  const btn = document.getElementById("capp-summ-btn");
+  const log = document.getElementById(LOGID);
+  if (log) { log.style.display = "block"; log.innerHTML = ""; }
+
+  const ac = new AbortController();
+  _summAbort = ac;
+
+  if (btn) {
+    btn.textContent = `⏹ ${_lang === "zh" ? "停止" : "Stop"}`;
+    btn.onclick = () => { if (_summAbort) { _summAbort.abort(); _summAbort = null; } _cappLog(_lang === "zh" ? "已终止" : "Stopped", "error", LOGID); _summResetBtn(appId); };
+    btn.classList.add("btn-danger");
+  }
+
+  _cappLog(_lang === "zh" ? "正在调用 LLM 生成总结…" : "Calling LLM for summary…", null, LOGID);
+
+  try {
+    const resp = await fetch(`/api/apps/custom/${appId}/summary`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: ac.signal,
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      _cappLog(err.error || `HTTP ${resp.status}`, "error", LOGID);
+      _summResetBtn(appId);
+      return;
+    }
+    await _readSSE(resp, appId, ac.signal, LOGID);
+  } catch (e) {
+    if (e.name !== "AbortError") _cappLog(e.message, "error", LOGID);
+  } finally {
+    _summResetBtn(appId);
+    _summAbort = null;
+    updateUnreadBadges();
+  }
+}
+
+function _summResetBtn(appId) {
+  const btn = document.getElementById("capp-summ-btn");
+  if (!btn) return;
+  btn.textContent = `📊 ${t("custom.summaryRun")}`;
+  btn.onclick = () => runCustomSummary(appId);
+  btn.classList.remove("btn-danger");
+}
+
+function _showCustomReport(report) {
   const section = document.getElementById("capp-report-view");
   const content = document.getElementById("capp-report-content");
   const title = document.getElementById("capp-report-view-title");
@@ -3103,117 +3482,106 @@ function _showCustomReport(report, appId) {
   title.textContent = `📅 ${report.date || ""}`;
   const raw = report.content || "";
   const rendered = raw.trimStart().startsWith("<") ? raw : renderMarkdown(raw);
-
-  let confirmHtml = "";
-  if (appId && report.date) {
-    confirmHtml = `<div class="capp-confirm-bar" id="capp-confirm-bar">
-      <button class="btn btn-primary" id="capp-confirm-btn" onclick="confirmCustomRun('${escapeAttr(appId)}','${escapeAttr(report.date)}')">
-        ✅ ${t("custom.confirm")}
-      </button>
-      <span class="wizard-help">${t("custom.enhancedHelp")}</span>
-    </div>`;
-  }
-
-  content.innerHTML = confirmHtml + rendered;
+  content.innerHTML = rendered;
   if (!raw.trimStart().startsWith("<")) highlightCode(content);
   section.style.display = "block";
   section.scrollIntoView({ behavior: "smooth" });
 }
 
-async function viewCustomReport(appId, dateStr) {
+async function viewCustomReport(appId, key) {
   try {
-    const report = await api(`/api/apps/custom/${appId}/report/${encodeURIComponent(dateStr)}`);
+    const report = await api(`/api/apps/custom/${appId}/report/${encodeURIComponent(key)}`);
     if (report.error) { toast(report.error, "error"); return; }
-    _showCustomReport(report, appId);
+    _showCustomReport(report);
+    const dot = document.querySelector(`.capp-report-dot[data-key="${key}"]`);
+    if (dot) dot.remove();
+    updateUnreadBadges();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+function _reportItemHtml(appId, r, icon) {
+  const dot = r.read ? "" : `<span class="capp-report-dot" data-key="${escapeAttr(r.key)}"></span>`;
+  const pu = r.params_used || {};
+  const paramLabel = Object.values(pu).filter(v => v).join(", ");
+  const paramTag = paramLabel ? `<span class="capp-report-params">${escapeHtml(paramLabel)}</span>` : "";
+  return `<div class="digest-report-item" data-report-key="${escapeAttr(r.key)}" onclick="viewCustomReport('${escapeAttr(appId)}','${escapeAttr(r.key)}')">
+      ${dot}<span class="digest-report-date">${icon} ${escapeHtml(r.date)}</span>
+      ${paramTag}
+      <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T"," ").slice(0,19) : "")}</span>
+      <button class="btn btn-sm">${t("custom.viewReport")}</button>
+      <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteCustomReport('${escapeAttr(appId)}','${escapeAttr(r.key)}')" title="${_lang==="zh"?"删除":"Delete"}">🗑</button>
+    </div>`;
+}
+
+async function deleteCustomReport(appId, key) {
+  const yes = confirm(_lang === "zh" ? "确定删除此报告？" : "Delete this report?");
+  if (!yes) return;
+  try {
+    await api(`/api/apps/custom/${appId}/report/${encodeURIComponent(key)}`, "DELETE");
+    const item = document.querySelector(`.digest-report-item[data-report-key="${key}"]`);
+    if (item) item.remove();
+    updateUnreadBadges();
+    toast(_lang === "zh" ? "已删除" : "Deleted", "success");
   } catch (e) { toast(e.message, "error"); }
 }
 
 async function _refreshCustomReports(appId) {
   try {
     const reports = await api(`/api/apps/custom/${appId}/reports`);
+    const runs = reports.filter(r => (r.type||"run") === "run");
     const list = document.getElementById("capp-report-list");
-    if (!list) return;
-    if (reports.length) {
-      list.innerHTML = reports.map(r => {
-        const tools = r.tools_used?.length ? ` (${r.tools_used.join(", ")})` : "";
-        return `<div class="digest-report-item" onclick="viewCustomReport('${escapeAttr(appId)}','${escapeAttr(r.date)}')">
-          <span class="digest-report-date">📄 ${escapeHtml(r.date)}${tools}</span>
-          <span class="digest-report-time">${escapeHtml(r.generated_at ? r.generated_at.replace("T"," ").slice(0,19) : "")}</span>
-          <button class="btn btn-sm">${t("custom.viewReport")}</button>
-        </div>`;
-      }).join("");
-    } else {
-      list.innerHTML = `<div class="digest-empty">${t("custom.noReports")}</div>`;
+    if (list) {
+      list.innerHTML = runs.length
+        ? runs.map(r => _reportItemHtml(appId, r, "📄")).join("")
+        : `<div class="digest-empty">${t("custom.noReports")}</div>`;
+    }
+    const summs = reports.filter(r => r.type === "summary");
+    const summList = document.getElementById("capp-summary-list");
+    if (summList) {
+      summList.innerHTML = summs.length
+        ? summs.map(r => _reportItemHtml(appId, r, "📊")).join("")
+        : `<div class="digest-empty">${_lang === "zh" ? "暂无总结报告" : "No summaries yet"}</div>`;
     }
   } catch (_) {}
 }
 
-async function saveCustomAppSchedule(appId) {
-  const scheduleTime = document.getElementById("capp-schedule-time").value;
-  const scheduleEnabled = document.getElementById("capp-schedule-enabled").checked;
-  try {
-    const res = await api(`/api/apps/custom/${appId}`, "PUT", {
-      schedule: { time: scheduleTime, enabled: scheduleEnabled },
-    });
-    if (res.error) toast(res.error, "error");
-    else toast(t("focus.configSaved"), "success");
-  } catch (e) { toast(e.message, "error"); }
-}
+// ── Unread badges ─────────────────────────────────────────────────────
 
-async function confirmCustomRun(appId, dateStr) {
-  const btn = document.getElementById("capp-confirm-btn");
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = "⏳ " + t("custom.confirming");
+let _unreadCounts = {};
 
-  try {
-    const res = await api(`/api/apps/custom/${appId}/confirm`, "POST", { date: dateStr });
-    if (res.error) {
-      toast(res.error, "error");
-      btn.disabled = false;
-      btn.textContent = "✅ " + t("custom.confirm");
-      return;
+async function updateUnreadBadges() {
+  try { _unreadCounts = await api("/api/apps/custom/unread"); } catch (_) { _unreadCounts = {}; }
+  const total = Object.values(_unreadCounts).reduce((s, n) => s + n, 0);
+  let navBadge = document.getElementById("nav-apps-badge");
+  if (!navBadge) {
+    const navItem = document.querySelector('.nav-item[data-page="apps"]');
+    if (navItem) {
+      navBadge = document.createElement("span");
+      navBadge.id = "nav-apps-badge";
+      navBadge.className = "nav-badge";
+      navItem.appendChild(navBadge);
     }
-    toast(t("custom.saved"), "success");
-    // Update the enhanced prompt display
-    const epSection = document.getElementById("capp-enhanced-section");
-    if (epSection) {
-      epSection.style.display = "block";
-      const epContent = document.getElementById("capp-enhanced-content");
-      if (epContent) epContent.textContent = res.enhanced_prompt || "";
-      const badge = document.getElementById("capp-enhanced-badge");
-      if (badge) { badge.textContent = t("custom.enhanced"); badge.className = "app-badge app-badge-on"; }
-    }
-    // Replace confirm bar with success message
-    const bar = document.getElementById("capp-confirm-bar");
-    if (bar) bar.innerHTML = `<span class="app-badge app-badge-on">✅ ${t("custom.enhanced")}</span>`;
-  } catch (e) {
-    toast(e.message, "error");
-    btn.disabled = false;
-    btn.textContent = "✅ " + t("custom.confirm");
+  }
+  if (navBadge) {
+    navBadge.textContent = total > 0 ? total : "";
+    navBadge.style.display = total > 0 ? "" : "none";
   }
 }
 
-async function clearEnhancedPrompt(appId) {
-  if (!confirm(_lang === "zh" ? "确定清除增强指令？后续执行将使用原始模板。" : "Clear enhancement? Subsequent runs will use the original template.")) return;
-  try {
-    const res = await api(`/api/apps/custom/${appId}`, "PUT", { enhanced_prompt: "", reference_run: null });
-    if (res.error) { toast(res.error, "error"); return; }
-    toast(_lang === "zh" ? "已清除" : "Cleared", "info");
-    openCustomAppDetail(appId);
-  } catch (e) { toast(e.message, "error"); }
+function _appCardBadge(appId) {
+  const c = _unreadCounts[appId] || 0;
+  return c > 0 ? `<span class="app-card-unread">${c}</span>` : "";
+}
+
+let _badgePollTimer = null;
+function _startBadgePoll() {
+  if (_badgePollTimer) return;
+  _badgePollTimer = setInterval(updateUnreadBadges, 30000);
 }
 
 async function openCustomAppWizardEdit(appId) {
   let capp;
   try { capp = await api(`/api/apps/custom/${appId}`); } catch (_) {}
   if (!capp || capp.error) { toast("App not found", "error"); return; }
-  openCustomAppWizard(capp.prompt_template);
-  // Pre-fill the wizard with existing data after it renders
-  setTimeout(() => {
-    document.getElementById("wizard-name").value = capp.name || "";
-    document.getElementById("wizard-icon").value = capp.icon || "🤖";
-    document.getElementById("wizard-schedule-time").value = capp.schedule?.time || "";
-    document.getElementById("wizard-schedule-enabled").checked = capp.schedule?.enabled || false;
-  }, 100);
+  openCustomAppWizard(null, null, capp);
 }

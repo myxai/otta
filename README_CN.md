@@ -1,4 +1,4 @@
-# MyxAI Desk
+# 🌀 MyxAI Desk 
 
 基于 [nanobot](https://github.com/HKUDS/nanobot) 的桌面可视化客户端。
 
@@ -27,7 +27,7 @@
 
 1. **采集** — 读取 Chrome / Edge 浏览历史（仅标题和 URL）**+ 近期 nanobot 对话内容**（你和 AI 讨论过的主题）
 2. **分析** — LLM 综合两个来源识别真实兴趣并分类（工作 / 学习 / 生活）
-3. **搜索** — 生成语义完整的搜索词，全网搜索（Brave → Bing → DuckDuckGo 自动降级）
+3. **搜索** — 生成语义完整的搜索词，调用搜索 API（百度 / Brave，支持每日额度追踪）
 4. **策展** — LLM 从搜索结果中精选最优内容，生成带真实链接的 HTML 卡片报告
 
 **设计特点：**
@@ -35,7 +35,7 @@
 - 无需安装浏览器插件，直接读取本地历史数据库
 - 综合浏览行为和 AI 对话主题，更深入理解兴趣
 - AI 驱动的兴趣提取（LLM 不可用时自动降级为规则方案）
-- 多搜索引擎自动降级（Brave API → Bing → DuckDuckGo）
+- 纯 API 搜索（百度 / Brave），实时统计每日调用次数，支持免费额度限制
 - 结构化 HTML 卡片报告，美观易读
 - 支持定时自动生成或手动触发
 - 兴趣预览功能，快速查看分析结果
@@ -129,7 +129,7 @@ python app.py
 | 代码高亮 | highlight.js |
 | AI 引擎 | nanobot-ai |
 | LLM 路由 | litellm（自动识别 provider） |
-| 全网搜索 | Brave API / Bing / DuckDuckGo（自动降级） |
+| 全网搜索 | 百度千帆 API / Brave Search API（支持每日额度管理） |
 
 ## 项目结构
 
@@ -146,7 +146,8 @@ myai/
 │   ├── web_monitor.py  # 网页监控：页面变化检测
 │   ├── email_summary.py# 邮件摘要：IMAP + LLM 摘要
 │   ├── focus_timer.py  # 专注计时：会话持久化 + 统计
-│   └── custom_app.py   # 自定义应用：CRUD、模板引擎、报告存储
+│   ├── custom_app.py   # 自定义应用：CRUD、模板引擎、报告存储
+│   └── web_search.py   # 纯 API 搜索：百度 / Brave，含每日额度追踪
 └── frontend/
     ├── index.html      # 前端页面
     ├── style.css       # 样式 (Catppuccin Mocha 暗色主题)

@@ -298,7 +298,7 @@ def run_email_summary(config: dict, model_config: dict | None = None) -> dict:
             "date": date_str,
             "email_count": len(emails_data),
             "content": content,
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now().astimezone().isoformat(),
             "method": "llm" if has_llm else "fallback",
         }
         _save_report(date_str, report)
