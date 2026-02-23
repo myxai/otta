@@ -31,9 +31,11 @@ Not just another chatbot. A thinking companion that grows with you.
 
 ### 🎯 Daily Briefing — Your Private Curator
 
-Every day, MyxAI reads your browsing history and recent AI conversations,
+Every day, MyxAI locally reads your browsing history and recent AI conversations,
 figures out what you truly care about, searches the web for the best content,
 and delivers a **personalised briefing** you actually want to read.
+
+> 🔒 All data processing happens locally on your device. Browsing history is never uploaded to any server.
 
 - **Understands your context** — not just keywords, but your real interests across work, study, and life
 - **Searches the web for you** — finds fresh, relevant content you'd miss on your own
@@ -76,7 +78,18 @@ Full Pomodoro timer with task tags and beautiful stats — stay productive and t
 
 ### 🧩 Custom Apps
 
-Turn any conversation into a reusable, scheduled app. Your AI, your workflow.
+Turn any conversation into a reusable, scheduled app — focused on web search and content generation tasks. Your AI, your workflow.
+
+### 🛡️ Safety Architecture
+
+Safety is MyxAI's first design principle, enforced across every layer of conversations and apps.
+
+- **Zero deletion** — no file is ever permanently deleted anywhere in the system. All "deletes" move to a trash folder (`~/.nanobot/trash/`), fully recoverable
+- **Execution confirmation** — any local file system operation in chat requires the AI to show an execution plan first; only proceeds after explicit user approval
+- **Dangerous operations refused** — destructive actions (delete files, format disks, empty trash, etc.) are refused even if the user explicitly requests them
+- **Tool-level interception** — dangerous commands are intercepted in real-time before execution
+- **Custom app sandbox** — custom apps can only use web search tools, no local operations allowed
+- **Local processing** — all data processing happens locally on your device; nothing is uploaded to any server
 
 ---
 
@@ -121,7 +134,8 @@ A native desktop window opens. Configure your LLM API key in Settings, and you'r
 | 📊 **Reports Hub** | Unified view of all reports with inline browsing |
 | 📈 **Usage Stats** | Token & search API consumption tracking |
 | 🔍 **Web Monitor** | Track page changes with AI-powered summaries |
-| 🧩 **Custom Apps** | Turn any prompt into a reusable automated workflow |
+| 🛡️ **Safety** | Zero deletion, execution confirmation, danger interception, app sandbox |
+| 🧩 **Custom Apps** | Web search + content generation reusable workflows |
 
 ---
 
@@ -143,16 +157,17 @@ For developers curious about the architecture:
 
 ```
 myai/
-├── app.py              # Flask backend + pywebview
+├── app.py               # Flask backend + pywebview + safety interception
 ├── requirements.txt
 ├── apps/
-│   ├── daily_digest.py # Daily Briefing pipeline
-│   ├── email_summary.py# Email Briefing (IMAP + AI)
-│   ├── web_monitor.py  # Page change detection
-│   ├── focus_timer.py  # Pomodoro timer
-│   ├── custom_app.py   # Custom app framework
-│   ├── web_search.py   # Multi-engine search + quota
-│   └── llm_utils.py    # Shared LLM utils + token tracking
+│   ├── daily_digest.py  # Daily Briefing pipeline
+│   ├── email_summary.py # Email Briefing (IMAP + AI)
+│   ├── web_monitor.py   # Page change detection
+│   ├── focus_timer.py   # Pomodoro timer
+│   ├── custom_app.py    # Custom app framework
+│   ├── web_search.py    # Multi-engine search + quota
+│   ├── safe_fs.py       # Safe file operations (zero deletion, trash-based)
+│   └── llm_utils.py     # Shared LLM utils + token tracking
 └── frontend/
     ├── index.html
     ├── style.css

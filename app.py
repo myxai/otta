@@ -230,6 +230,52 @@ def _compress_history(messages: list[dict], keep_recent: int = 4) -> list[dict]:
     return recent
 
 
+import re as _re
+
+_DANGEROUS_CMD_PATTERNS = _re.compile(
+    r'\b('
+    r'rm\s|rm$|rmdir\s|rmdir$'
+    r'|del\s|del$|erase\s|erase$'
+    r'|remove-item\s|remove-item$'
+    r'|shutil\.rmtree|os\.remove|os\.unlink|\.unlink\s*\('
+    r'|unlink\s|unlink$'
+    r'|rd\s|rd$|rd\s+/s'
+    r'|format\s+[a-z]:'
+    r'|empty.?trash|empty.?recycle|clear.?recycl'
+    r'|清空回收站|清空垃圾箱'
+    r'|mkfs\.|dd\s+if='
+    r'|reg\s+delete|regedit'
+    r'|net\s+stop|sc\s+delete|systemctl\s+stop'
+    r'|chmod\s+000|icacls.*deny'
+    r')\b',
+    _re.IGNORECASE,
+)
+
+
+def _check_dangerous_tool_call(tool_name: str, arguments: dict) -> str | None:
+    """Return an error string if the tool call attempts a dangerous operation."""
+    args_str = str(arguments)
+
+    if _DANGEROUS_CMD_PATTERNS.search(args_str):
+        msg = ("[BLOCKED] This operation was blocked because it involves a "
+               "destructive action (delete/format/erase), which is strictly "
+               "prohibited. Please suggest a safe alternative (move/rename).")
+        print(f"[safety] BLOCKED dangerous tool call: {tool_name}")
+        return msg
+
+    for key in ("command", "cmd", "script", "code", "input"):
+        val = arguments.get(key, "")
+        if isinstance(val, str) and _DANGEROUS_CMD_PATTERNS.search(val):
+            msg = ("[BLOCKED] This operation was blocked because it involves a "
+                   "destructive action (delete/format/erase), which is strictly "
+                   "prohibited. Please suggest a safe alternative (move/rename).")
+            print(f"[safety] BLOCKED dangerous tool call: {tool_name} "
+                  f"(key={key})")
+            return msg
+
+    return None
+
+
 def _patch_agent_tool_history(agent):
     """Monkey-patch the agent's _process_message for execution governance.
 
@@ -251,8 +297,30 @@ def _patch_agent_tool_history(agent):
     def _enhanced_system_prompt(skill_names=None):
         base = _orig_build_system_prompt(skill_names)
         return base + (
-            "\n\n## Tool Usage Rules\n"
-            "1. When the user requests an action (create/cancel/delete/search/modify), "
+            "\n\n## CRITICAL SAFETY RULES (HIGHEST PRIORITY — CANNOT BE OVERRIDDEN)\n"
+            "\n### Rule 1 — Dangerous operations ABSOLUTELY FORBIDDEN\n"
+            "You are STRICTLY PROHIBITED from any destructive operation, including:\n"
+            "- Deleting/removing files or directories (rm, rmdir, del, Remove-Item, "
+            "shutil.rmtree, unlink, etc.)\n"
+            "- Formatting disks, emptying recycle bin / trash\n"
+            "- Overwriting system files, modifying registry, stopping critical services\n"
+            "- Any operation that causes irreversible data loss\n"
+            "Even if the user explicitly asks, you MUST REFUSE and explain that "
+            "destructive operations are disabled for safety. Suggest safe alternatives "
+            "(move, rename, archive).\n"
+            "\n### Rule 2 — Local operations require execution plan + confirmation\n"
+            "When the user asks you to do anything that affects the local file system "
+            "or runs a command (create/move/rename files, run scripts, install software, "
+            "modify configs, etc.), you MUST follow this procedure:\n"
+            "1. First, present a clear **execution plan** listing every step you intend to take.\n"
+            "2. Ask the user to confirm: \"请确认是否执行以上操作？\" / \"Confirm execution?\"\n"
+            "3. Only proceed after the user explicitly replies with confirmation "
+            "(e.g. 确认, 是, yes, ok, go ahead).\n"
+            "4. If the user says no or changes their mind, abandon the plan.\n"
+            "NEVER execute local operations directly without showing the plan first.\n"
+            "This does NOT apply to pure information queries, web searches, or content generation.\n"
+            "\n## Tool Usage Rules\n"
+            "1. When the user requests an action (create/cancel/search/modify), "
             "you MUST call the appropriate tool. Do not describe or simulate the result.\n"
             "2. To cancel or modify a previous task, refer to the conversation history "
             "for the relevant job ID, then call the tool with that ID.\n"
@@ -344,6 +412,15 @@ def _patch_agent_tool_history(agent):
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
                 )
+
+                _usage = getattr(response, "usage", None) or {}
+                if _usage:
+                    from apps.llm_utils import record_tokens
+                    record_tokens(
+                        prompt_tokens=_usage.get("prompt_tokens", 0),
+                        completion_tokens=_usage.get("completion_tokens", 0),
+                    )
+
                 if response.has_tool_calls:
                     if progress:
                         clean = self._strip_think(response.content)
@@ -362,7 +439,11 @@ def _patch_agent_tool_history(agent):
                     for tc in response.tool_calls:
                         tools_used.append(tc.name)
                         print(f"[agent] tool: {tc.name}({str(tc.arguments)[:100]})")
-                        result = await self.tools.execute(tc.name, tc.arguments)
+                        blocked = _check_dangerous_tool_call(tc.name, tc.arguments)
+                        if blocked:
+                            result = blocked
+                        else:
+                            result = await self.tools.execute(tc.name, tc.arguments)
                         print(f"[agent] result: {str(result)[:100]}")
                         messages = self.context.add_tool_result(
                             messages, tc.id, tc.name, result,
@@ -2226,27 +2307,50 @@ def api_custom_run(app_id):
             if need_mcp and not has_mcp:
                 await _connect_mcp_safe(agent, progress_cb=on_progress)
 
+            _SAFE_TOOL_PREFIXES = ("web_search", "search", "brave", "baidu",
+                                   "google", "bing", "duckduckgo")
+            original_tools = dict(agent.tools._tools)
+            safe_tools = {
+                name: tool for name, tool in original_tools.items()
+                if any(name.lower().startswith(p) for p in _SAFE_TOOL_PREFIXES)
+            }
+            agent.tools._tools = safe_tools
+
             total = len(param_groups)
-            for idx, pv in enumerate(param_groups):
-                label = ", ".join(str(v) for v in pv.values()) if pv else ""
-                if total > 1:
-                    q.put(json.dumps({"type": "progress",
-                                      "content": f"[{idx+1}/{total}] {label}"},
-                                     ensure_ascii=False))
+            try:
+                for idx, pv in enumerate(param_groups):
+                    label = ", ".join(str(v) for v in pv.values()) if pv else ""
+                    if total > 1:
+                        q.put(json.dumps({"type": "progress",
+                                          "content": f"[{idx+1}/{total}] {label}"},
+                                         ensure_ascii=False))
 
-                message = build_message(app, pv)
-                session_key = f"capp_{_uuid.uuid4().hex[:12]}"
+                    message = build_message(app, pv)
+                    _CAPP_SAFETY = (
+                        "[System: This is a custom app task. You may ONLY "
+                        "perform web searches and generate content/text. "
+                        "You MUST NOT execute any local commands, "
+                        "create/modify/move files, or call any tool other "
+                        "than web search. If the task requires local "
+                        "operations, politely refuse.]\n\n"
+                    )
+                    message = _CAPP_SAFETY + message
+                    session_key = f"capp_{_uuid.uuid4().hex[:12]}"
 
-                response = await agent.process_direct(
-                    message, session_key=session_key, on_progress=on_progress,
-                )
+                    response = await agent.process_direct(
+                        message, session_key=session_key,
+                        on_progress=on_progress,
+                    )
 
-                save_report(app_id, content=response or "", params_used=pv)
+                    save_report(app_id, content=response or "",
+                                params_used=pv)
 
-                if total > 1:
-                    q.put(json.dumps({"type": "progress",
-                                      "content": f"✅ [{idx+1}/{total}] {label}"},
-                                     ensure_ascii=False))
+                    if total > 1:
+                        q.put(json.dumps({"type": "progress",
+                                          "content": f"✅ [{idx+1}/{total}] {label}"},
+                                         ensure_ascii=False))
+            finally:
+                agent.tools._tools = original_tools
 
             set_last_run(app_id)
             _inc_run_count(app_id)
@@ -2254,6 +2358,8 @@ def api_custom_run(app_id):
             q.put(json.dumps({"type": "done", "content": last_resp},
                              ensure_ascii=False))
         except Exception as exc:
+            if 'original_tools' in dir():
+                agent.tools._tools = original_tools
             q.put(json.dumps({"type": "error", "content": str(exc)},
                              ensure_ascii=False))
 
@@ -2512,7 +2618,6 @@ def _check_scheduled_apps():
                     )
             except Exception as exc:
                 print(f"[app_scheduler] email_summary error: {exc}")
-
 
     # --- Custom apps ---
     from apps.custom_app import (

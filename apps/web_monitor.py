@@ -137,13 +137,13 @@ def remove_site(site_id: str) -> bool:
     if len(sites) == before:
         return False
     _save_sites(sites)
-    # Clean up snapshot and history
+    from apps.safe_fs import safe_remove
     snap = _SNAPSHOTS_DIR / f"{site_id}.json"
     if snap.exists():
-        snap.unlink()
+        safe_remove(snap)
     hist = _HISTORY_DIR / f"{site_id}.json"
     if hist.exists():
-        hist.unlink()
+        safe_remove(hist)
     return True
 
 

@@ -282,7 +282,8 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
             print(f"[daily_digest] read error ({hist_path}): {exc}")
         finally:
             try:
-                os.unlink(tmp_name)
+                from apps.safe_fs import safe_remove
+                safe_remove(tmp_name)
             except OSError:
                 pass
 
@@ -1280,9 +1281,10 @@ def list_reports(limit: int = 30) -> list[dict]:
 
 
 def delete_report(date_str: str) -> bool:
+    from apps.safe_fs import safe_remove
     fp = _REPORTS_DIR / f"{date_str}.json"
     if fp.exists():
-        fp.unlink()
+        safe_remove(fp)
         return True
     return False
 

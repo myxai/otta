@@ -128,14 +128,14 @@ def update_app(app_id: str, **kwargs) -> dict | None:
 
 
 def delete_app(app_id: str) -> bool:
+    from apps.safe_fs import safe_remove
     fp = _app_file(app_id)
     if not fp.exists():
         return False
-    fp.unlink()
+    safe_remove(fp)
     d = _BASE_DIR / app_id
     if d.exists():
-        import shutil
-        shutil.rmtree(d, ignore_errors=True)
+        safe_remove(d)
     return True
 
 
@@ -340,11 +340,12 @@ def get_report(app_id: str, key: str) -> dict | None:
 
 
 def delete_report(app_id: str, key: str) -> bool:
-    """Delete a single report file."""
+    """Move a single report file to trash."""
+    from apps.safe_fs import safe_remove
     fp = _reports_dir(app_id) / f"{key}.json"
     if not fp.exists():
         return False
-    fp.unlink()
+    safe_remove(fp)
     app = get_app(app_id)
     if app:
         read_set = set(app.get("read_reports", []))

@@ -70,6 +70,7 @@ const I18N = {
     "apps.installFail":"安装失败","apps.uninstallFail":"卸载失败",
     "apps.version":"版本","apps.author":"作者",
     "digest.title":"每日私享会","digest.subtitle":"你的私人资讯策展人——每天精选最值得关注的内容",
+    "digest.privacyNote":"🔒 浏览记录仅在本地读取和分析，不会上传至任何服务器。",
     "digest.status":"状态","digest.config":"配置",
     "digest.browser":"浏览器","digest.browserAuto":"自动检测","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
     "digest.historyHours":"历史范围（小时）","digest.scheduleTime":"每日生成时间",
@@ -119,7 +120,8 @@ const I18N = {
     "custom.title":"自定义应用","custom.create":"新建自定义应用","custom.createFromChat":"保存为应用",
     "custom.name":"应用名称","custom.icon":"图标","custom.template":"任务描述",
     "custom.templateHelp":"用 {{变量名}} 标记可变部分，如：搜索{{关键词}}的最新资讯",
-    "custom.appType":"应用类型","custom.type.search":"网络搜索","custom.type.local":"本地处理","custom.type.reminder":"定时提醒",
+    "custom.appType":"应用类型","custom.type.search":"网络搜索","custom.type.content":"内容生成",
+    "custom.safetyNote":"自定义应用仅支持网络搜索和内容生成，不可执行本地操作",
     "custom.searchEngine":"搜索引擎",
     "custom.outputFmt":"输出格式","custom.fmt.report":"HTML报告","custom.fmt.notification":"通知","custom.fmt.text":"纯文本",
     "custom.schedule":"定时任务","custom.scheduleTime":"执行时间","custom.scheduleEnabled":"启用定时",
@@ -206,6 +208,7 @@ const I18N = {
     "apps.installFail":"Install failed","apps.uninstallFail":"Uninstall failed",
     "apps.version":"Version","apps.author":"Author",
     "digest.title":"Daily Briefing","digest.subtitle":"Your personal curator — daily picks tailored to your interests",
+    "digest.privacyNote":"🔒 Browsing history is read and analysed locally on your device only — never uploaded to any server.",
     "digest.status":"Status","digest.config":"Settings",
     "digest.browser":"Browser","digest.browserAuto":"Auto detect","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
     "digest.historyHours":"History range (hours)","digest.scheduleTime":"Daily generation time",
@@ -255,7 +258,8 @@ const I18N = {
     "custom.title":"Custom App","custom.create":"New Custom App","custom.createFromChat":"Save as App",
     "custom.name":"App Name","custom.icon":"Icon","custom.template":"Task Description",
     "custom.templateHelp":"Use {{variable}} for dynamic parts, e.g.: Search {{keywords}} for latest news",
-    "custom.appType":"App Type","custom.type.search":"Web Search","custom.type.local":"Local","custom.type.reminder":"Reminder",
+    "custom.appType":"App Type","custom.type.search":"Web Search","custom.type.content":"Content Generation",
+    "custom.safetyNote":"Custom apps only support web search and content generation — no local operations",
     "custom.searchEngine":"Search Engine",
     "custom.outputFmt":"Output Format","custom.fmt.report":"HTML Report","custom.fmt.notification":"Notification","custom.fmt.text":"Plain Text",
     "custom.schedule":"Schedule","custom.scheduleTime":"Run Time","custom.scheduleEnabled":"Enable Schedule",
@@ -1453,6 +1457,42 @@ function toast(message, type = "info", duration = 4000) {
   setTimeout(() => div.remove(), duration);
 }
 
+function showConfirm(message, { confirmText, cancelText, danger } = {}) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById("modal-overlay");
+    const body = document.getElementById("modal-body");
+    const footer = document.getElementById("modal-footer");
+
+    body.textContent = message;
+
+    const okLabel = confirmText || (_lang === "zh" ? "确定" : "OK");
+    const noLabel = cancelText || (_lang === "zh" ? "取消" : "Cancel");
+
+    footer.innerHTML = "";
+    const btnCancel = document.createElement("button");
+    btnCancel.className = "btn modal-btn-cancel";
+    btnCancel.textContent = noLabel;
+    const btnOk = document.createElement("button");
+    btnOk.className = danger ? "btn btn-danger modal-btn-ok" : "btn btn-primary modal-btn-ok";
+    btnOk.textContent = okLabel;
+    footer.appendChild(btnCancel);
+    footer.appendChild(btnOk);
+
+    overlay.style.display = "";
+    requestAnimationFrame(() => overlay.classList.add("modal-visible"));
+
+    function close(result) {
+      overlay.classList.remove("modal-visible");
+      setTimeout(() => { overlay.style.display = "none"; }, 200);
+      resolve(result);
+    }
+
+    btnOk.onclick = () => close(true);
+    btnCancel.onclick = () => close(false);
+    overlay.onclick = (e) => { if (e.target === overlay) close(false); };
+  });
+}
+
 // ── Voice Input (STT) ────────────────────────────────────────────────
 let _recognition = null;
 let _voiceActive = false;
@@ -1879,7 +1919,7 @@ async function installApp(appId) {
 }
 
 async function uninstallApp(appId) {
-  if (!confirm(_lang === "zh" ? "确定要卸载此应用吗？" : "Uninstall this app?")) return;
+  if (!await showConfirm(_lang === "zh" ? "确定要卸载此应用吗？" : "Uninstall this app?", { danger: true })) return;
   try {
     const res = await api(`/api/apps/${appId}/uninstall`, "POST");
     if (res.success) {
@@ -1970,6 +2010,7 @@ async function openDigestDetail() {
 
     <div class="app-detail-section">
       <h3>${t("digest.config")}</h3>
+      <div class="safety-hint" style="margin-bottom:12px">${t("digest.privacyNote")}</div>
       <div class="digest-config-grid">
         <div class="form-group">
           <label>${t("digest.browser")}</label>
@@ -2353,7 +2394,7 @@ async function monitorAddSite() {
 }
 
 async function monitorDeleteSite(siteId) {
-  if (!confirm(_lang === "zh" ? "确定删除此站点？" : "Delete this site?")) return;
+  if (!await showConfirm(_lang === "zh" ? "确定删除此站点？" : "Delete this site?", { danger: true })) return;
   try {
     await api(`/api/apps/web_monitor/sites/${siteId}`, "DELETE");
     document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
@@ -3104,6 +3145,7 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
       <div class="wizard-body">
         <!-- Step 1: Task -->
         <div class="wizard-page" id="wizard-page-1">
+          <div class="safety-hint" style="margin-bottom:12px">🔒 ${t("custom.safetyNote")}</div>
           <label>${t("custom.template")}</label>
           <p class="wizard-help">${t("custom.templateHelp")}</p>
           <textarea id="wizard-template" class="wizard-textarea" rows="5">${escapeHtml(tpl)}</textarea>
@@ -3341,7 +3383,7 @@ async function _wizardSave() {
 }
 
 async function deleteCustomApp(appId) {
-  if (!confirm(_lang === "zh" ? "确定删除此自定义应用？" : "Delete this custom app?")) return;
+  if (!await showConfirm(_lang === "zh" ? "确定删除此自定义应用？" : "Delete this custom app?", { danger: true })) return;
   try {
     const res = await api(`/api/apps/custom/${appId}`, "DELETE");
     if (res.success) { toast(t("apps.uninstallOk"), "info"); await loadApps(); }
@@ -3432,6 +3474,7 @@ async function openCustomAppDetail(appId) {
     </div>
 
     <div class="app-detail-section">
+      <div class="safety-hint" style="margin-bottom:8px">🔒 ${t("custom.safetyNote")}</div>
       <h3>${t("custom.template")}</h3>
       <div class="custom-template-preview">${escapeHtml(capp.prompt_template)}</div>
     </div>
@@ -3749,8 +3792,7 @@ function _reportItemHtml(appId, r, icon) {
 }
 
 async function deleteCustomReport(appId, key) {
-  const yes = confirm(_lang === "zh" ? "确定删除此报告？" : "Delete this report?");
-  if (!yes) return;
+  if (!await showConfirm(_lang === "zh" ? "确定删除此报告？" : "Delete this report?", { danger: true })) return;
   try {
     await api(`/api/apps/custom/${appId}/report/${encodeURIComponent(key)}`, "DELETE");
     const item = document.querySelector(`.digest-report-item[data-report-key="${key}"]`);

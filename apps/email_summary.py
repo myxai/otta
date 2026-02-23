@@ -63,9 +63,10 @@ def get_report(date_str: str) -> dict | None:
 
 
 def delete_report(date_str: str) -> bool:
+    from apps.safe_fs import safe_remove
     fp = _REPORTS_DIR / f"{date_str}.json"
     if fp.exists():
-        fp.unlink()
+        safe_remove(fp)
         return True
     return False
 

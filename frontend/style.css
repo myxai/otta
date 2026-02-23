@@ -1329,6 +1329,57 @@ a:hover { text-decoration: underline; }
 .toast.info    { background: var(--blue);  color: var(--bg-crust); }
 @keyframes slideIn { from { transform: translateX(60px); opacity: 0; } to { transform: none; opacity: 1; } }
 
+/* ── Modal ─────────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.modal-visible {
+  opacity: 1;
+}
+.modal-dialog {
+  background: var(--bg-base);
+  border: 1px solid var(--bg-surface1);
+  border-radius: var(--radius);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+  min-width: 320px;
+  max-width: 440px;
+  width: 90%;
+  padding: 0;
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+}
+.modal-visible .modal-dialog {
+  transform: scale(1);
+}
+.modal-body {
+  padding: 24px 24px 16px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 24px 20px;
+}
+.modal-btn-cancel {
+  background: var(--bg-surface1);
+  color: var(--text-sub);
+}
+.modal-btn-cancel:hover {
+  background: var(--bg-surface2);
+}
+
 /* ── Apps page ─────────────────────────────────────────────────────── */
 .apps-header-actions {
   display: flex;
@@ -2710,6 +2761,68 @@ a:hover { text-decoration: underline; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.safety-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 8px 10px;
+  background: var(--bg-surface0);
+  border-radius: 6px;
+  border-left: 3px solid var(--green);
+  line-height: 1.5;
+}
+
+.badge-muted {
+  background: var(--bg-surface1);
+  color: var(--text-dim);
+  font-size: 10px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  margin-left: 6px;
+}
+.toggle-sm .toggle-slider {
+  width: 32px;
+  height: 18px;
+}
+.toggle-sm .toggle-slider::before {
+  width: 14px;
+  height: 14px;
+}
+.toggle-sm input:checked + .toggle-slider::before {
+  transform: translateX(14px);
+}
+.config-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px 16px;
+  align-items: start;
+}
+.config-grid > label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  padding-top: 6px;
+}
+.config-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 6px;
+}
+.config-row {
+  display: flex;
+  align-items: center;
+}
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--red);
+  color: var(--red);
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.btn-danger:hover {
+  background: var(--red);
+  color: #fff;
 }
 
 /* ── Scrollbar global ──────────────────────────────────────────────── */
