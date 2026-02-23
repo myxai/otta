@@ -17,6 +17,7 @@ import time
 import threading
 import urllib.parse
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -59,8 +60,14 @@ _DEFAULT_DAILY_LIMITS = {
 }
 
 
+_USAGE_DIR = Path.home() / ".nanobot" / "usage"
+_SEARCH_FILE = _USAGE_DIR / "search_usage.json"
+_SEARCH_HISTORY_FILE = _USAGE_DIR / "search_history.json"
+
+
 class QuotaManager:
-    """Thread-safe daily API call counter with optional hard limit."""
+    """Thread-safe daily API call counter with optional hard limit.
+    Persists counts to disk so data survives app restarts."""
 
     def __init__(self):
         self._lock = threading.Lock()
@@ -68,12 +75,57 @@ class QuotaManager:
         self._counts: dict[str, int] = {}
         self._limits: dict[str, int] = dict(_DEFAULT_DAILY_LIMITS)
         self._quota_only: bool = True
+        self._loaded = False
+        self._history: dict[str, int] = {}
+
+    def _ensure_loaded(self):
+        if self._loaded:
+            return
+        _USAGE_DIR.mkdir(parents=True, exist_ok=True)
+        if _SEARCH_FILE.exists():
+            try:
+                data = json.loads(_SEARCH_FILE.read_text(encoding="utf-8"))
+                self._date = data.get("date", "")
+                self._counts = data.get("counts", {})
+            except Exception:
+                pass
+        if _SEARCH_HISTORY_FILE.exists():
+            try:
+                self._history = json.loads(
+                    _SEARCH_HISTORY_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                self._history = {}
+        self._loaded = True
+
+    def _persist(self):
+        try:
+            _USAGE_DIR.mkdir(parents=True, exist_ok=True)
+            _SEARCH_FILE.write_text(json.dumps({
+                "date": self._date,
+                "counts": self._counts,
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
+    def _persist_history(self):
+        try:
+            _USAGE_DIR.mkdir(parents=True, exist_ok=True)
+            _SEARCH_HISTORY_FILE.write_text(
+                json.dumps(self._history, ensure_ascii=False, indent=2),
+                encoding="utf-8")
+        except Exception:
+            pass
 
     def _reset_if_new_day(self):
+        self._ensure_loaded()
         today = date.today().isoformat()
         if today != self._date:
+            if self._date and sum(self._counts.values()) > 0:
+                self._history[self._date] = sum(self._counts.values())
+                self._persist_history()
             self._date = today
             self._counts = {}
+            self._persist()
 
     def set_limits(self, limits: dict[str, int]):
         with self._lock:
@@ -100,6 +152,7 @@ class QuotaManager:
         with self._lock:
             self._reset_if_new_day()
             self._counts[engine] = self._counts.get(engine, 0) + 1
+            self._persist()
 
     def get_usage(self) -> dict:
         with self._lock:
@@ -115,6 +168,21 @@ class QuotaManager:
                     for eng in self._limits
                 },
             }
+
+    def get_history(self, days: int = 30) -> list[dict]:
+        from datetime import timedelta
+        with self._lock:
+            self._reset_if_new_day()
+            today_total = sum(self._counts.values())
+            result = []
+            td = date.today()
+            for i in range(days):
+                d = (td - timedelta(days=days - 1 - i)).isoformat()
+                if d == self._date:
+                    result.append({"date": d, "calls": today_total})
+                else:
+                    result.append({"date": d, "calls": self._history.get(d, 0)})
+            return result
 
 
 quota = QuotaManager()

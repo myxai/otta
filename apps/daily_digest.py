@@ -1,19 +1,23 @@
-"""Today's Reading App — personal interest recommendation engine.
+"""Daily Briefing (每日私享会) — personal curator & deep-dive exploration.
+
+Your private information curator that understands your interests over time,
+picks the most relevant content, and lets you explore any item in depth.
 
 Data sources:
   - Chrome / Edge browser history
   - nanobot conversation history (chat messages)
+  - Historical interest profile (multi-day trend tracking)
 
 Pipeline:
   1. Read browser history + recent chat conversations
   2. Filter noise
-  3. **LLM interest analysis** — extract interests, classify (work/study/life),
-     and generate high-quality search queries in one step.
-     Falls back to rule-based extraction + classification when LLM unavailable.
-  4. **Web search** (Brave → Bing → DuckDuckGo auto-fallback) using
-     LLM-generated (or rule-built) queries
-  5. **LLM report generation** — curate a personalised daily reading from
-     real search results with explanations and action items
+  3. LLM interest analysis with trend awareness — extract interests,
+     classify (work/study/life), and generate search queries.
+     Falls back to rule-based extraction when LLM unavailable.
+  4. Web search (Brave / Baidu auto-fallback)
+  5. LLM report generation — personalised daily reading with
+     real search results, tailored to user context
+  6. Deep-dive exploration — click any card to start a contextual chat
 """
 
 import html as _html
@@ -197,6 +201,7 @@ _DOMAIN_NOISE = {
 _APPS_DIR = Path.home() / ".nanobot" / "apps"
 _DIGEST_DIR = _APPS_DIR / "daily_digest"
 _REPORTS_DIR = _DIGEST_DIR / "reports"
+_PROFILE_FILE = _DIGEST_DIR / "user_profile.json"
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -348,8 +353,13 @@ def read_chat_history(hours: int = 72) -> list[dict]:
     return sessions
 
 
-def _build_chat_block(sessions: list[dict], limit: int = 60) -> str:
-    """Build a concise conversation summary block for the LLM prompt."""
+def _build_chat_block(sessions: list[dict], limit: int = 40) -> str:
+    """Build a concise conversation summary block for the LLM prompt.
+
+    Only user messages are included — they reflect intent more directly
+    and the assistant replies roughly double the token count with little
+    extra signal for interest analysis.
+    """
     if not sessions:
         return ""
 
@@ -363,14 +373,12 @@ def _build_chat_block(sessions: list[dict], limit: int = 60) -> str:
         for m in msgs:
             role = m.get("role", "")
             content = (m.get("content") or "").strip()
-            if not content or role not in ("user", "assistant"):
+            if not content or role != "user":
                 continue
-            # Truncate long messages
-            preview = content[:200].replace("\n", " ")
-            if len(content) > 200:
+            preview = content[:150].replace("\n", " ")
+            if len(content) > 150:
                 preview += "…"
-            prefix = "👤 用户" if role == "user" else "🤖 助手"
-            lines.append(f"- {prefix}: {preview}")
+            lines.append(f"- 👤 {preview}")
 
             if len(lines) >= limit:
                 break
@@ -553,6 +561,13 @@ def _llm_call(
         temperature=temperature,
         max_tokens=max_tokens,
     )
+    usage = getattr(resp, "usage", None)
+    if usage:
+        from apps.llm_utils import record_tokens
+        record_tokens(
+            prompt_tokens=getattr(usage, "prompt_tokens", 0),
+            completion_tokens=getattr(usage, "completion_tokens", 0),
+        )
     return resp.choices[0].message.content or ""
 
 
@@ -561,18 +576,21 @@ def _llm_call(
 # ===================================================================
 
 _INTEREST_ANALYSIS_PROMPT = """\
-你是一个个人兴趣分析专家。下面是用户最近的两个数据来源：
+你是用户的私人兴趣分析专家。下面是用户最近的多维数据：
 1. 浏览器历史摘要（页面标题 + 域名）
 2. 与 AI 助手的对话记录（用户提问和讨论的主题）
+3. 近期兴趣趋势（过去几天的关注方向）
 
-请你综合这两个来源：
+请你综合分析：
 1. 推断出用户真正的**兴趣主题**（忽略工具/平台本身的名字，比如 github、chatgpt、bing 等不是兴趣）
 2. 将兴趣归入适用的类别：work（工作/职业相关）、study（学习/研究相关）、life（生活/娱乐相关）
 3. 为每个**有内容的**类别生成 2-4 个高质量搜索词
 
 关键规则：
-- **综合分析两个来源**。对话中讨论的主题往往比浏览历史更能反映深层兴趣和当前关注
-- **只输出确实有兴趣的类别**。如果数据中完全没有某类内容，该类别留空数组即可，不要凑数
+- **综合分析所有数据源**。对话中讨论的主题往往比浏览历史更能反映深层兴趣
+- **关注兴趣变化**。如果近几天出现新的关注方向，优先为其生成搜索词
+- **持续关注的深化**。对于用户连续多天关注的主题，搜索词应更深入、更具体
+- **只输出确实有兴趣的类别**。如果数据中完全没有某类内容，该类别留空数组即可
 - 搜索词必须是**语义完整的自然语言短句**，可以直接粘贴到搜索引擎使用
   - 好的搜索词："Python FastAPI 异步性能优化最佳实践"、"2026年最佳降噪耳机评测对比"
   - 差的搜索词："python"、"耳机"、"FastAPI OR performance"（太短 / 不完整 / 拼凑）
@@ -585,6 +603,9 @@ _INTEREST_ANALYSIS_PROMPT = """\
 
 ═══ 用户 AI 对话记录 ═══
 {chat_block}
+
+═══ 近期兴趣趋势 ═══
+{trend_block}
 
 ═══ 请严格以 JSON 格式输出，不要输出其他内容 ═══
 ```json
@@ -608,7 +629,7 @@ _INTEREST_JSON_SCHEMA = """\
 }"""
 
 
-def _build_history_block(records: list[dict], limit: int = 80) -> str:
+def _build_history_block(records: list[dict], limit: int = 50) -> str:
     """Build a concise browsing history block for the LLM prompt."""
     seen_titles: set[str] = set()
     lines: list[str] = []
@@ -647,9 +668,11 @@ def llm_analyze_interests(
 
     history_block = _build_history_block(records) if records else "（无浏览记录）"
     chat_block = _build_chat_block(chat_sessions or []) or "（无对话记录）"
+    trend_block = _load_interest_history(days=7) or "（首次使用，暂无历史趋势）"
     prompt = _INTEREST_ANALYSIS_PROMPT.format(
         history_block=history_block,
         chat_block=chat_block,
+        trend_block=trend_block,
         json_schema=_INTEREST_JSON_SCHEMA,
     )
 
@@ -824,7 +847,7 @@ def search_for_recommendations(
 # Step 6 — Build LLM prompt (includes real search results)
 # ===================================================================
 
-def _fmt_results(results: list[dict], limit: int = 15) -> str:
+def _fmt_results(results: list[dict], limit: int = 10) -> str:
     """Format search results into a readable block for the LLM prompt."""
     if not results:
         return "(无搜索结果)"
@@ -833,30 +856,89 @@ def _fmt_results(results: list[dict], limit: int = 15) -> str:
         lines.append(
             f"{i}. [{r['title']}]({r['url']})\n"
             f"   关联兴趣: {r.get('query_keyword', '?')}\n"
-            f"   摘要: {r['description'][:200]}"
+            f"   摘要: {r['description'][:120]}"
         )
     return "\n".join(lines)
 
 
 _CAT_META = {
-    "work":  {"emoji": "🧠", "zh": "工作推荐"},
-    "study": {"emoji": "📚", "zh": "学习推荐"},
-    "life":  {"emoji": "🌿", "zh": "生活推荐"},
+    "work":  {"emoji": "🧠", "zh": "工作精选"},
+    "study": {"emoji": "📚", "zh": "学习精选"},
+    "life":  {"emoji": "🌿", "zh": "生活精选"},
 }
 
-# ── HTML card template shown to LLM as output example ──
-_HTML_CARD_EXAMPLE = """\
-<div class="dr-card">
-  <h3><a href="真实URL" target="_blank">标题</a></h3>
-  <span class="dr-tag">关联兴趣关键词</span>
-  <p class="dr-desc">一句话说明亮点或核心内容</p>
-  <p class="dr-action">💡 建议行动或推荐理由</p>
-</div>"""
+
+def _load_interest_history(days: int = 7) -> str:
+    """Load interests from past reports to build a multi-day user profile."""
+    if not _REPORTS_DIR.exists():
+        return ""
+    today = datetime.now().strftime("%Y-%m-%d")
+    lines: list[str] = []
+    for f in sorted(_REPORTS_DIR.glob("*.json"), reverse=True):
+        if f.stem == today:
+            continue
+        if len(lines) >= days:
+            break
+        try:
+            d = json.loads(f.read_text(encoding="utf-8"))
+            interests = d.get("interests")
+            if not interests:
+                continue
+            day_kws: list[str] = []
+            for cat in ("work", "study", "life"):
+                for item in (interests.get(cat) or [])[:5]:
+                    kw = item["keyword"] if isinstance(item, dict) else str(item)
+                    day_kws.append(kw)
+            if day_kws:
+                lines.append(f"- {f.stem}: {', '.join(day_kws)}")
+        except Exception:
+            pass
+    return "\n".join(lines)
+
+
+def _update_user_profile(interests: dict) -> None:
+    """Incrementally update persistent user profile with today's interests."""
+    _DIGEST_DIR.mkdir(parents=True, exist_ok=True)
+    profile: dict = {}
+    if _PROFILE_FILE.exists():
+        try:
+            profile = json.loads(_PROFILE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    kw_counts: dict = profile.get("keyword_counts", {})
+    for cat in ("work", "study", "life"):
+        for item in (interests.get(cat) or []):
+            kw = item["keyword"] if isinstance(item, dict) else str(item)
+            kw_counts[kw] = kw_counts.get(kw, 0) + 1
+
+    top_keywords = sorted(kw_counts.items(), key=lambda x: x[1], reverse=True)[:50]
+    profile["keyword_counts"] = dict(top_keywords)
+    profile["last_updated"] = datetime.now().astimezone().isoformat()
+
+    _PROFILE_FILE.write_text(
+        json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8",
+    )
+
+_JSON_SCHEMA_EXAMPLE = """\
+{
+  "sections": [
+    {
+      "category": "work",
+      "items": [
+        {"title":"文章标题","url":"https://真实链接","tag":"关联关键词","desc":"推荐理由","action":"具体建议"}
+      ]
+    }
+  ],
+  "focus": "今日重点洞察（1-2句）",
+  "actions": ["建议行动1","建议行动2"]
+}"""
 
 
 def build_report_prompt(categories: dict[str, list],
                         search_results: dict[str, list[dict]],
-                        date_str: str) -> str:
+                        date_str: str,
+                        prev_titles: list[str] | None = None) -> str:
     def _top_kw(cat, n=8):
         return ", ".join(i["keyword"] for i in categories.get(cat, [])[:n])
 
@@ -866,6 +948,10 @@ def build_report_prompt(categories: dict[str, list],
         if kws:
             profile_lines.append(f"- {_CAT_META[cat]['zh']}：{kws}")
     interest_block = "\n".join(profile_lines) if profile_lines else "- (未检测到明确兴趣)"
+
+    history_block = _load_interest_history(days=7)
+    if history_block:
+        interest_block += "\n\n近一周关注变化趋势：\n" + history_block
 
     results_block_parts = []
     active_cats = []
@@ -880,60 +966,63 @@ def build_report_prompt(categories: dict[str, list],
         )
     results_block = "\n\n".join(results_block_parts) if results_block_parts else "(无搜索结果)"
 
-    # Per-category section headers the LLM should output
-    cat_section_hints = []
-    for cat in active_cats:
-        meta = _CAT_META[cat]
-        cat_section_hints.append(
-            f'<section class="dr-section">\n'
-            f'  <h2>{meta["emoji"]} {meta["zh"]}</h2>\n'
-            f'  <!-- 从该类搜索结果中精选 3-5 条卡片 -->\n'
-            f'</section>'
-        )
-    sections_hint = "\n".join(cat_section_hints)
+    active_cats_hint = ", ".join(
+        f'"{c}"' for c in active_cats
+    ) if active_cats else '"work"'
 
-    return f"""你是一个高质量个人阅读策展人。根据用户浏览兴趣、AI 对话主题和全网搜索结果，精选最有价值的推荐。
+    if prev_titles:
+        dedup_list = "\n".join(f"- {t}" for t in prev_titles)
+        dedup_block = (
+            "以下是昨天已经推荐过的内容标题，今天的推荐**必须与这些完全不同**，"
+            "不要推荐相同主题、相同工具、相同项目的内容：\n"
+            f"{dedup_list}\n\n"
+            "同时，今天输出的各条卡片之间也不能主题重复。"
+        )
+    else:
+        dedup_block = "今天输出的各条卡片之间不能主题重复，每条必须是不同的话题/工具/项目。"
+
+    return f"""你是用户的私人资讯策展人，像一位见多识广的老朋友在私下分享最值得关注的内容。
+你非常了解这位用户——他最近在关注什么、工作中遇到什么挑战、学习什么新东西、生活中对什么感兴趣。
+你的目标不是堆砌链接，而是挑选"他一定不想错过"的内容，用他能共鸣的方式呈现。
 
 今日日期：{date_str}
 
-═══ 用户今日兴趣画像 ═══
+═══ 用户兴趣画像（你对他的了解） ═══
 {interest_block}
 
 ═══ 全网搜索结果（真实链接，请从中精选） ═══
 
 {results_block}
 
+═══ 去重要求（非常重要） ═══
+
+{dedup_block}
+
 ═══ 输出要求 ═══
 
-请输出一段**纯 HTML**（不要 Markdown、不要 ```html 包裹），直接以 <h1> 开头。
+请输出一个**纯 JSON 对象**（不要 Markdown 包裹、不要 ```json 标记、不要任何其他文字），严格遵循以下 schema：
 
-重要规则：
-1. **必须使用搜索结果中的真实 URL**，禁止编造链接
-2. 所有 <a> 标签加 target="_blank"
-3. 每个类别精选 3-5 条内容，用卡片展示
-4. **只输出有搜索结果的类别**
-5. 用中文输出
+{_JSON_SCHEMA_EXAMPLE}
 
-HTML 结构要求（严格使用以下 CSS class）：
+字段说明：
+- sections: 数组，每个元素对应一个类别。category 只能是 {active_cats_hint} 中有搜索结果的类别
+- items: 每个类别精选 3-5 条最有价值的内容。如果有价值的不多，宁少勿凑
+- title: 文章标题
+- url: **必须使用搜索结果中的真实 URL**，禁止编造
+- tag: 关联的用户兴趣关键词
+- desc: 推荐理由——结合用户兴趣说"这对你有什么用"，语气像朋友分享，不要泛泛复述标题
+- action: 针对用户当前情况的一句具体建议
+- focus: 结合用户最核心的兴趣，给出 1-2 个深度洞察
+- actions: 2-3 个和用户当前关注直接相关的具体行动
 
-<h1>📅 {date_str} 今日私读</h1>
+规则：
+1. 必须使用搜索结果中的真实 URL，禁止编造链接
+2. 只输出有搜索结果的类别
+3. 用中文输出所有文本字段
+4. 当天各条卡片主题必须彼此不同
+5. 质量优先于数量
 
-{sections_hint}
-
-每条推荐用卡片格式：
-{_HTML_CARD_EXAMPLE}
-
-最后加上：
-<section class="dr-section dr-focus">
-  <h2>🔥 今日重点关注</h2>
-  <p>1-2 个最强兴趣主题的趋势洞察</p>
-</section>
-<section class="dr-section dr-actions">
-  <h2>🎯 今日建议行动</h2>
-  <ul><li>具体可执行行动 1</li><li>行动 2</li></ul>
-</section>
-
-现在请直接输出 HTML："""
+现在请直接输出 JSON："""
 
 
 # ===================================================================
@@ -941,15 +1030,24 @@ HTML 结构要求（严格使用以下 CSS class）：
 # ===================================================================
 
 def generate_report_llm(prompt: str, model: str, api_key: str,
-                        api_base: str | None = None) -> str:
-    return _llm_call(
+                        api_base: str | None = None,
+                        date_str: str = "") -> tuple[str, dict | None]:
+    """Generate report via LLM.  Returns (html_content, items_data_or_None)."""
+    raw = _llm_call(
         messages=[{"role": "user", "content": prompt}],
         model=model,
         api_key=api_key,
         api_base=api_base,
         temperature=0.7,
-        max_tokens=4096,
+        max_tokens=2048,
     )
+    parsed = _extract_json_from_llm(raw)
+    if parsed:
+        html = _json_to_html(parsed, date_str)
+        print("[daily_digest] JSON output parsed OK, rendered via template")
+        return html, parsed
+    print("[daily_digest] JSON parse failed, using raw LLM output as HTML")
+    return raw, None
 
 
 def _esc(text: str) -> str:
@@ -962,11 +1060,89 @@ def _esc(text: str) -> str:
     )
 
 
+def _json_to_html(data: dict, date_str: str) -> str:
+    """Render the structured JSON report into HTML matching existing CSS classes."""
+    parts: list[str] = [f'<h1>\U0001f4c5 {date_str} 每日私享会</h1>']
+
+    for sec in data.get("sections", []):
+        cat = sec.get("category", "")
+        meta = _CAT_META.get(cat)
+        if not meta:
+            continue
+        parts.append(f'<section class="dr-section">')
+        parts.append(f'<h2>{meta["emoji"]} {meta["zh"]}</h2>')
+        for item in sec.get("items", []):
+            title = _esc(str(item.get("title", "")))
+            url = _esc(str(item.get("url", "")))
+            tag = _esc(str(item.get("tag", "")))
+            desc = _esc(str(item.get("desc", "")))
+            action = _esc(str(item.get("action", "")))
+            parts.append(
+                f'<div class="dr-card">'
+                f'<h3><a href="{url}" target="_blank">{title}</a></h3>'
+                f'<span class="dr-tag">{tag}</span>'
+                f'<p class="dr-desc">{desc}</p>'
+            )
+            if action:
+                parts.append(f'<p class="dr-action">\U0001f4a1 {action}</p>')
+            parts.append('</div>')
+        parts.append('</section>')
+
+    focus = data.get("focus", "")
+    if focus:
+        parts.append('<section class="dr-section dr-focus">')
+        parts.append('<h2>\U0001f525 今日重点关注</h2>')
+        parts.append(f'<p>{_esc(focus)}</p>')
+        parts.append('</section>')
+
+    actions = data.get("actions", [])
+    if actions:
+        parts.append('<section class="dr-section dr-actions">')
+        parts.append('<h2>\U0001f3af 今日建议行动</h2>')
+        parts.append('<ul>')
+        for a in actions:
+            parts.append(f'<li>{_esc(str(a))}</li>')
+        parts.append('</ul>')
+        parts.append('</section>')
+
+    return "\n".join(parts)
+
+
+def _extract_json_from_llm(text: str) -> dict | None:
+    """Try to parse a JSON object from LLM output, handling common wrapping."""
+    text = text.strip()
+    if text.startswith("```"):
+        first_nl = text.find("\n")
+        if first_nl != -1:
+            text = text[first_nl + 1:]
+        if text.endswith("```"):
+            text = text[:-3].strip()
+
+    for start_char, end_char in [("{", "}"), ]:
+        idx_start = text.find(start_char)
+        idx_end = text.rfind(end_char)
+        if idx_start != -1 and idx_end > idx_start:
+            candidate = text[idx_start:idx_end + 1]
+            try:
+                obj = json.loads(candidate)
+                if isinstance(obj, dict) and "sections" in obj:
+                    return obj
+            except json.JSONDecodeError:
+                pass
+    try:
+        obj = json.loads(text)
+        if isinstance(obj, dict):
+            return obj
+    except json.JSONDecodeError:
+        pass
+    return None
+
+
 def generate_report_fallback(categories: dict[str, list],
                              search_results: dict[str, list[dict]],
                              date_str: str) -> str:
     """HTML report when LLM is unavailable — still uses real search links."""
-    parts: list[str] = [f'<h1>📅 {date_str} 今日私读</h1>']
+    parts: list[str] = [f'<h1>📅 {date_str} 每日私享会</h1>']
 
     for cat in ("work", "study", "life"):
         meta = _CAT_META[cat]
@@ -1021,17 +1197,32 @@ def generate_report_fallback(categories: dict[str, list],
 
 def save_report(content: str, date_str: str | None = None,
                 interests: dict | None = None,
-                search_stats: dict | None = None) -> dict:
+                search_stats: dict | None = None,
+                search_results: dict | None = None,
+                items: dict | None = None) -> dict:
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    sr_compact: dict[str, list[dict]] | None = None
+    if search_results:
+        sr_compact = {}
+        for cat, sr_items in search_results.items():
+            sr_compact[cat] = [
+                {"title": r["title"][:120], "url": r["url"],
+                 "description": r["description"][:300],
+                 "query_keyword": r.get("query_keyword", "")}
+                for r in sr_items[:20]
+            ]
     data = {
         "date": date_str,
         "content": content,
         "interests": interests,
         "search_stats": search_stats,
+        "search_results": sr_compact,
         "generated_at": datetime.now().astimezone().isoformat(),
     }
+    if items is not None:
+        data["items"] = items
     (_REPORTS_DIR / f"{date_str}.json").write_text(
         json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
     )
@@ -1045,6 +1236,31 @@ def load_report(date_str: str | None = None) -> dict | None:
     if fp.exists():
         return json.loads(fp.read_text(encoding="utf-8"))
     return None
+
+
+def _extract_prev_titles(date_str: str) -> list[str]:
+    """Extract card titles from yesterday's report to avoid duplication."""
+    import re
+    from datetime import timedelta
+    yesterday = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
+    rpt = load_report(yesterday)
+    if not rpt:
+        return []
+    items = rpt.get("items")
+    if items and isinstance(items, dict):
+        titles = []
+        for sec in items.get("sections", []):
+            for it in sec.get("items", []):
+                t = it.get("title", "").strip()
+                if t:
+                    titles.append(t)
+        if titles:
+            return titles
+    content = rpt.get("content", "")
+    if not content:
+        return []
+    titles = re.findall(r'<h3[^>]*>(.*?)</h3>', content, re.S)
+    return [re.sub(r"<[^>]+>", "", t).strip() for t in titles if t.strip()]
 
 
 def list_reports(limit: int = 30) -> list[dict]:
@@ -1061,6 +1277,68 @@ def list_reports(limit: int = 30) -> list[dict]:
         except Exception:
             pass
     return reports
+
+
+def delete_report(date_str: str) -> bool:
+    fp = _REPORTS_DIR / f"{date_str}.json"
+    if fp.exists():
+        fp.unlink()
+        return True
+    return False
+
+
+# ===================================================================
+# Explore — deep-dive into a specific content item
+# ===================================================================
+
+_EXPLORE_PROMPT_TEMPLATE = """\
+你是用户的私人资讯分析师。用户对下面这条资讯产生了兴趣，请帮助他深入理解。
+
+【资讯标题】{title}
+【摘要】{description}
+【来源链接】{url}
+【关联兴趣】{keyword}
+
+{context_block}
+
+请输出（中文）：
+1. **核心要点**：用 3-5 个要点概括这条资讯的关键信息
+2. **为什么值得关注**：结合用户的兴趣方向，解释这条内容对他的潜在价值
+3. **延伸思考**：提出 2-3 个值得进一步探索的方向或问题
+4. **行动建议**：给出 1-2 条具体可执行的下一步
+
+风格要求：像一位见多识广的同事在私下交流，语气自然、信息量大、不说废话。"""
+
+
+def build_explore_prompt(item: dict, interests: dict | None = None) -> str:
+    """Build a chat prompt for exploring a specific digest content item."""
+    title = item.get("title", "")
+    description = item.get("description", "")
+    url = item.get("url", "")
+    keyword = item.get("query_keyword", "")
+
+    context_lines = []
+    if interests:
+        for cat in ("work", "study", "life"):
+            kws = interests.get(cat, [])
+            if kws:
+                cat_name = {"work": "工作", "study": "学习", "life": "生活"}[cat]
+                kw_text = ", ".join(
+                    k["keyword"] if isinstance(k, dict) else str(k) for k in kws[:5]
+                )
+                context_lines.append(f"- {cat_name}兴趣：{kw_text}")
+    context_block = (
+        "【用户兴趣画像】\n" + "\n".join(context_lines)
+        if context_lines else ""
+    )
+
+    return _EXPLORE_PROMPT_TEMPLATE.format(
+        title=title,
+        description=description,
+        url=url,
+        keyword=keyword,
+        context_block=context_block,
+    )
 
 
 # ===================================================================
@@ -1178,12 +1456,20 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
 
     # ── 6. Generate report ──────────────────────────────────────────
     if progress_cb:
-        progress_cb("正在生成今日私读…")
+        progress_cb("正在生成每日私享会…")
 
+    prev_titles = _extract_prev_titles(date_str)
+    if prev_titles:
+        print(f"[daily_digest] dedup: {len(prev_titles)} titles from yesterday")
+
+    items_data: dict | None = None
     if has_llm:
         try:
-            prompt = build_report_prompt(categories, search_results, date_str)
-            report_text = generate_report_llm(prompt, model, api_key, api_base)
+            prompt = build_report_prompt(categories, search_results, date_str,
+                                         prev_titles=prev_titles)
+            report_text, items_data = generate_report_llm(
+                prompt, model, api_key, api_base, date_str=date_str,
+            )
         except Exception as exc:
             print(f"[daily_digest] LLM report error, falling back: {exc}")
             report_text = generate_report_fallback(
@@ -1194,10 +1480,16 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
             categories, search_results, date_str,
         )
 
-    # ── 7. Save ─────────────────────────────────────────────────────
+    # ── 7. Save + update profile ─────────────────────────────────────
     report_data = save_report(
         report_text, date_str, interests_summary, search_stats,
+        search_results=search_results,
+        items=items_data,
     )
+    try:
+        _update_user_profile(interests_summary)
+    except Exception as exc:
+        print(f"[daily_digest] profile update error: {exc}")
 
     return {
         "status": "ok",

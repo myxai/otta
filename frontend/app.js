@@ -54,8 +54,14 @@ const I18N = {
     "common.onboardOk":"初始化成功！","common.onboardFail":"初始化失败",
     "voice.ttsToggle":"语音提醒","voice.listening":"正在聆听…","voice.unsupported":"浏览器不支持语音输入",
     "voice.ttsOn":"语音提醒已开启","voice.ttsOff":"语音提醒已关闭",
-    "nav.apps":"应用",
+    "nav.reports":"报告","nav.apps":"应用",
+    "reports.title":"报告","reports.unread":"未读","reports.24h":"24小时","reports.3d":"3天","reports.7d":"7天","reports.30d":"30天","reports.all":"全部",
+    "reports.empty":"暂无报告","reports.allRead":"全部已读，去看看其他时间段吧","reports.viewReport":"查看",
+    "reports.markAllRead":"全部已读","reports.delete":"删除","reports.deleteOk":"已删除","reports.deleteFail":"删除失败",
+    "nav.stats":"统计","stats.todayPrefix":"今日","stats.tokenTitle":"Token 消耗","stats.searchTitle":"搜索 API 调用",
+    "stats.rangeTotal":"累计","stats.tokenTip":"今日 LLM Token 消耗量","stats.searchTip":"今日各搜索引擎用量 / 额度",
     "apps.title":"应用中心","apps.search":"搜索应用…","apps.back":"返回",
+    "apps.sortRecommended":"推荐","apps.sortFrequency":"使用频率","apps.sortCreated":"创建时间","apps.sortName":"名称",
     "apps.installed":"已安装","apps.notInstalled":"未安装","apps.comingSoon":"即将推出",
     "apps.install":"安装","apps.uninstall":"卸载","apps.configure":"配置","apps.viewReports":"报告",
     "apps.enabled":"已启用","apps.disabled":"已停用",
@@ -63,23 +69,24 @@ const I18N = {
     "apps.installOk":"应用安装成功","apps.uninstallOk":"应用已卸载",
     "apps.installFail":"安装失败","apps.uninstallFail":"卸载失败",
     "apps.version":"版本","apps.author":"作者",
-    "digest.title":"今日私读","digest.subtitle":"基于浏览器历史和对话内容，AI 自动分析兴趣并全网搜索推荐",
+    "digest.title":"每日私享会","digest.subtitle":"你的私人资讯策展人——每天精选最值得关注的内容",
     "digest.status":"状态","digest.config":"配置",
     "digest.browser":"浏览器","digest.browserAuto":"自动检测","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
     "digest.historyHours":"历史范围（小时）","digest.scheduleTime":"每日生成时间",
     "digest.pushNotification":"弹窗提醒","digest.pushEmail":"邮箱推送",
     "digest.runNow":"立即生成","digest.running":"正在生成…","digest.saveConfig":"保存设置",
     "digest.configSaved":"设置已保存","digest.configFail":"保存失败",
-    "digest.reports":"历史报告","digest.noReports":"暂无报告",
+    "digest.reports":"往期私享会","digest.noReports":"暂无报告",
     "digest.preview":"兴趣预览","digest.previewDesc":"快速分析当前浏览器历史中的兴趣分布（优先使用 AI 分析）",
     "digest.previewBtn":"预览兴趣","digest.previewLoading":"正在分析…",
     "digest.previewMethod":"分析方式","digest.previewRuleBased":"规则",
     "digest.work":"工作","digest.study":"学习","digest.life":"生活",
     "digest.rawCount":"原始记录","digest.filteredCount":"有效记录","digest.chatCount":"对话/消息","digest.keywordCount":"兴趣数","digest.searchResults":"搜索推荐",
     "digest.viewReport":"查看","digest.lastRun":"上次运行",
-    "digest.generating":"日报生成中，请稍候…","digest.generateOk":"日报生成完成！",
-    "digest.generateFail":"日报生成失败","digest.noHistory":"未找到浏览记录",
-    "digest.latestReport":"最新报告",
+    "digest.generating":"正在为你准备私享会…","digest.generateOk":"今日私享会已准备好！",
+    "digest.generateFail":"生成失败","digest.noHistory":"未找到浏览记录",
+    "digest.latestReport":"最新私享会",
+    "digest.explore":"一起探讨吧","digest.exploreFail":"探索失败",
     "monitor.title":"网页监控","monitor.subtitle":"监控指定网页变化，有更新时自动提醒",
     "monitor.sites":"监控站点","monitor.addSite":"添加站点",
     "monitor.url":"网页 URL","monitor.name":"名称（可选）","monitor.mode":"检测模式",
@@ -89,7 +96,7 @@ const I18N = {
     "monitor.changed":"有变化","monitor.unchanged":"无变化","monitor.pending":"待检查","monitor.error":"错误",
     "monitor.history":"变化历史","monitor.delete":"删除","monitor.checkOne":"检查",
     "monitor.interval":"检查间隔（分钟）","monitor.scheduleEnabled":"定时检查","monitor.defaultMode":"默认模式",
-    "email.title":"邮件摘要","email.subtitle":"连接邮箱，自动汇总未读邮件",
+    "email.title":"邮件简报","email.subtitle":"连接邮箱，AI 分类归纳生成邮件简报",
     "email.imapConfig":"IMAP 配置","email.host":"服务器","email.port":"端口",
     "email.user":"账号","email.password":"密码/授权码","email.ssl":"SSL",
     "email.folder":"文件夹","email.hours":"时间范围（小时）","email.maxEmails":"最大邮件数",
@@ -183,8 +190,14 @@ const I18N = {
     "common.onboardOk":"Initialization successful!","common.onboardFail":"Initialization failed",
     "voice.ttsToggle":"Voice alerts","voice.listening":"Listening…","voice.unsupported":"Voice input not supported",
     "voice.ttsOn":"Voice alerts enabled","voice.ttsOff":"Voice alerts disabled",
-    "nav.apps":"Apps",
+    "nav.reports":"Reports","nav.apps":"Apps",
+    "reports.title":"Reports","reports.unread":"Unread","reports.24h":"24h","reports.3d":"3 Days","reports.7d":"7 Days","reports.30d":"30 Days","reports.all":"All",
+    "reports.empty":"No reports yet","reports.allRead":"All caught up! Try another time range","reports.viewReport":"View",
+    "reports.markAllRead":"Mark all read","reports.delete":"Delete","reports.deleteOk":"Deleted","reports.deleteFail":"Delete failed",
+    "nav.stats":"Statistics","stats.todayPrefix":"Today","stats.tokenTitle":"Token Usage","stats.searchTitle":"Search API Calls",
+    "stats.rangeTotal":"Total","stats.tokenTip":"Today's LLM token usage","stats.searchTip":"Today's search usage / quota per engine",
     "apps.title":"App Center","apps.search":"Search apps…","apps.back":"Back",
+    "apps.sortRecommended":"Recommended","apps.sortFrequency":"Most used","apps.sortCreated":"Newest","apps.sortName":"Name",
     "apps.installed":"Installed","apps.notInstalled":"Not installed","apps.comingSoon":"Coming Soon",
     "apps.install":"Install","apps.uninstall":"Uninstall","apps.configure":"Configure","apps.viewReports":"Reports",
     "apps.enabled":"Enabled","apps.disabled":"Disabled",
@@ -192,23 +205,24 @@ const I18N = {
     "apps.installOk":"App installed successfully","apps.uninstallOk":"App uninstalled",
     "apps.installFail":"Install failed","apps.uninstallFail":"Uninstall failed",
     "apps.version":"Version","apps.author":"Author",
-    "digest.title":"Today's Reading","digest.subtitle":"AI-powered interest analysis from browser history and chat, with web search recommendations",
+    "digest.title":"Daily Briefing","digest.subtitle":"Your personal curator — daily picks tailored to your interests",
     "digest.status":"Status","digest.config":"Settings",
     "digest.browser":"Browser","digest.browserAuto":"Auto detect","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
     "digest.historyHours":"History range (hours)","digest.scheduleTime":"Daily generation time",
     "digest.pushNotification":"Push notification","digest.pushEmail":"Email push",
     "digest.runNow":"Generate Now","digest.running":"Generating…","digest.saveConfig":"Save Settings",
     "digest.configSaved":"Settings saved","digest.configFail":"Save failed",
-    "digest.reports":"Report History","digest.noReports":"No reports yet",
+    "digest.reports":"Past Briefings","digest.noReports":"No briefings yet",
     "digest.preview":"Interest Preview","digest.previewDesc":"Quick analysis of current browser history interests (AI-powered when available)",
     "digest.previewBtn":"Preview Interests","digest.previewLoading":"Analyzing…",
     "digest.previewMethod":"Method","digest.previewRuleBased":"Rule-based",
     "digest.work":"Work","digest.study":"Study","digest.life":"Life",
     "digest.rawCount":"Raw records","digest.filteredCount":"Valid records","digest.chatCount":"Chats/Msgs","digest.keywordCount":"Interests","digest.searchResults":"Recommendations",
     "digest.viewReport":"View","digest.lastRun":"Last run",
-    "digest.generating":"Generating digest, please wait…","digest.generateOk":"Digest generated!",
+    "digest.generating":"Preparing your briefing…","digest.generateOk":"Your briefing is ready!",
     "digest.generateFail":"Generation failed","digest.noHistory":"No browser history found",
-    "digest.latestReport":"Latest Report",
+    "digest.latestReport":"Latest Briefing",
+    "digest.explore":"Let's Discuss","digest.exploreFail":"Explore failed",
     "monitor.title":"Web Monitor","monitor.subtitle":"Monitor web pages for changes, notify on updates",
     "monitor.sites":"Sites","monitor.addSite":"Add Site",
     "monitor.url":"Page URL","monitor.name":"Name (optional)","monitor.mode":"Detection Mode",
@@ -218,7 +232,7 @@ const I18N = {
     "monitor.changed":"Changed","monitor.unchanged":"No Change","monitor.pending":"Pending","monitor.error":"Error",
     "monitor.history":"Change History","monitor.delete":"Delete","monitor.checkOne":"Check",
     "monitor.interval":"Check Interval (min)","monitor.scheduleEnabled":"Scheduled Check","monitor.defaultMode":"Default Mode",
-    "email.title":"Email Summary","email.subtitle":"Connect your mailbox, auto-summarize unread emails",
+    "email.title":"Email Briefing","email.subtitle":"Connect your mailbox, AI-powered categorised briefing",
     "email.imapConfig":"IMAP Settings","email.host":"Server","email.port":"Port",
     "email.user":"Username","email.password":"Password / App Key","email.ssl":"SSL",
     "email.folder":"Folder","email.hours":"Time Range (hours)","email.maxEmails":"Max Emails",
@@ -369,6 +383,7 @@ async function checkSystem() {
     hideSplash();
     startNotificationPoll();
     updateUnreadBadges();
+    updateSidebarStats();
     _startBadgePoll();
   } catch (e) {
     hideSplash();
@@ -428,10 +443,12 @@ function switchPage(page) {
     const np = n.dataset.page;
     n.classList.toggle("active", np === page || (np === "apps" && page === "app-detail"));
   });
-  if (page === "settings") loadConfig();
+  if (page === "settings") { loadConfig(); _syncGwSettings(); }
+  if (page === "stats") { loadTokenChart(); loadSearchChart(); }
   if (page === "status") loadStatus();
   if (page === "gateway") loadGatewayStatus();
   if (page === "apps") loadApps();
+  if (page === "reports") loadReportsPage();
 }
 
 // ── Session list (sidebar) ────────────────────────────────────────────
@@ -1043,22 +1060,25 @@ function collectConfigForm() {
     for (let i = 0; i < path.length - 1; i++) { if (!obj[path[i]]) obj[path[i]] = {}; obj = obj[path[i]]; }
     obj[path[path.length - 1]] = val;
   };
+  const del = (obj, path) => {
+    for (let i = 0; i < path.length - 1; i++) { if (!obj[path[i]]) return; obj = obj[path[i]]; }
+    delete obj[path[path.length - 1]];
+  };
+  const setOrDel = (path, val) => { if (val) set(cfg, path, val); else del(cfg, path); };
   set(cfg, ["agents", "defaults", "model"], document.getElementById("cfg-model").value);
   set(cfg, ["agents", "defaults", "temperature"], parseFloat(document.getElementById("cfg-temperature").value) || 0.7);
   const maxTokens = parseInt(document.getElementById("cfg-max-tokens").value);
-  if (maxTokens) set(cfg, ["agents", "defaults", "maxTokens"], maxTokens);
+  if (maxTokens) set(cfg, ["agents", "defaults", "maxTokens"], maxTokens); else del(cfg, ["agents", "defaults", "maxTokens"]);
   const maxIter = parseInt(document.getElementById("cfg-max-iterations").value);
-  if (maxIter) set(cfg, ["agents", "defaults", "maxToolIterations"], maxIter);
+  if (maxIter) set(cfg, ["agents", "defaults", "maxToolIterations"], maxIter); else del(cfg, ["agents", "defaults", "maxToolIterations"]);
   const memWin = parseInt(document.getElementById("cfg-memory-window").value);
-  if (memWin) set(cfg, ["agents", "defaults", "memoryWindow"], memWin);
-  PROVIDER_FIELDS.forEach(({ id, path }) => { const val = document.getElementById(id).value; if (val) set(cfg, path, val); });
-  const baiduKey = document.getElementById("cfg-baidu-key").value;
-  if (baiduKey) set(cfg, ["tools", "web", "search", "baiduApiKey"], baiduKey);
-  const braveKey = document.getElementById("cfg-brave-key").value;
-  if (braveKey) set(cfg, ["tools", "web", "search", "apiKey"], braveKey);
+  if (memWin) set(cfg, ["agents", "defaults", "memoryWindow"], memWin); else del(cfg, ["agents", "defaults", "memoryWindow"]);
+  PROVIDER_FIELDS.forEach(({ id, path }) => { setOrDel(path, document.getElementById(id).value); });
+  setOrDel(["tools", "web", "search", "baiduApiKey"], document.getElementById("cfg-baidu-key").value);
+  setOrDel(["tools", "web", "search", "apiKey"], document.getElementById("cfg-brave-key").value);
   set(cfg, ["tools", "web", "search", "quotaOnly"], document.getElementById("cfg-quota-only").checked);
   const execTimeout = parseInt(document.getElementById("cfg-exec-timeout").value);
-  if (execTimeout) set(cfg, ["tools", "exec", "timeout"], execTimeout);
+  if (execTimeout) set(cfg, ["tools", "exec", "timeout"], execTimeout); else del(cfg, ["tools", "exec", "timeout"]);
   set(cfg, ["tools", "restrictToWorkspace"], document.getElementById("cfg-restrict-workspace").checked);
   document.querySelectorAll("[data-channel]").forEach((input) => { set(cfg, ["channels", input.dataset.channel, "enabled"], input.checked); });
   if (!cfg.tools) cfg.tools = {};
@@ -1090,6 +1110,95 @@ function applyRawJson() {
     fillConfigForm(data);
     toast(t("settings.jsonApplied"), "info");
   } catch (e) { toast(t("settings.jsonError") + e.message, "error"); }
+}
+
+// ── Stats charts ──────────────────────────────────────────────────────
+
+let _tokenChartDays = 7;
+let _searchChartDays = 7;
+
+function _fmtNum(n) { return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n); }
+
+function _renderBarChart(container, items, valueKey, unit) {
+  const max = Math.max(...items.map(d => d[valueKey]), 1);
+  container.innerHTML = items.map(d => {
+    const v = d[valueKey];
+    const pct = Math.max((v / max) * 100, v > 0 ? 2 : 0);
+    const label = d.date.slice(5);
+    return `<div class="token-bar-col">
+      <span class="token-bar-tooltip">${d.date}: ${_fmtNum(v)} ${unit}</span>
+      <div class="token-bar" style="height:${pct}%"></div>
+      <span class="token-bar-label">${label}</span>
+    </div>`;
+  }).join("");
+}
+
+async function loadTokenChart(days) {
+  _tokenChartDays = days || _tokenChartDays;
+  document.querySelectorAll("#token-chart-tabs .token-chart-tab").forEach(btn => {
+    btn.classList.toggle("active", Number(btn.dataset.days) === _tokenChartDays);
+  });
+  const container = document.getElementById("token-chart-container");
+  const totalEl = document.getElementById("token-chart-total");
+  if (!container) return;
+  try {
+    const data = await api(`/api/token/history?days=${_tokenChartDays}`);
+    const history = data.history || [];
+    const totalIn = history.reduce((s, d) => s + (d.input || 0), 0);
+    const totalOut = history.reduce((s, d) => s + (d.output || 0), 0);
+    if (totalEl) totalEl.textContent = `↓${_fmtNum(totalIn)}  ↑${_fmtNum(totalOut)}  ${t("stats.rangeTotal")} ${_fmtNum(totalIn + totalOut)}`;
+    const max = Math.max(...history.map(d => (d.input || 0) + (d.output || 0)), 1);
+    container.innerHTML = history.map(d => {
+      const inp = d.input || 0, out = d.output || 0, total = inp + out;
+      const pctIn = Math.max((inp / max) * 100, inp > 0 ? 1 : 0);
+      const pctOut = Math.max((out / max) * 100, out > 0 ? 1 : 0);
+      const label = d.date.slice(5);
+      return `<div class="token-bar-col">
+        <span class="token-bar-tooltip">${d.date}: ↓${_fmtNum(inp)} ↑${_fmtNum(out)}</span>
+        <div class="token-bar token-bar-out" style="height:${pctOut}%"></div>
+        <div class="token-bar token-bar-in" style="height:${pctIn}%"></div>
+        <span class="token-bar-label">${label}</span>
+      </div>`;
+    }).join("");
+  } catch (_) {
+    container.innerHTML = `<span style="color:var(--text-dim);font-size:12px">—</span>`;
+  }
+}
+
+async function loadSearchChart(days) {
+  _searchChartDays = days || _searchChartDays;
+  document.querySelectorAll("#search-chart-tabs .token-chart-tab").forEach(btn => {
+    btn.classList.toggle("active", Number(btn.dataset.days) === _searchChartDays);
+  });
+  const container = document.getElementById("search-chart-container");
+  const totalEl = document.getElementById("search-chart-total");
+  if (!container) return;
+  try {
+    const data = await api(`/api/search/history?days=${_searchChartDays}`);
+    const history = data.history || [];
+    const total = data.total || 0;
+    if (totalEl) totalEl.textContent = `${t("stats.rangeTotal")} ${_fmtNum(total)} 次`;
+    _renderBarChart(container, history, "calls", "次");
+  } catch (_) {
+    container.innerHTML = `<span style="color:var(--text-dim);font-size:12px">—</span>`;
+  }
+}
+
+// ── Gateway settings sync ─────────────────────────────────────────────
+
+async function _syncGwSettings() {
+  try {
+    const s = await api("/api/gateway/status");
+    const running = s && s.running;
+    const ind = document.getElementById("gw-settings-indicator");
+    const txt = document.getElementById("gw-settings-status");
+    const startBtn = document.getElementById("gw-settings-start");
+    const stopBtn = document.getElementById("gw-settings-stop");
+    if (ind) ind.className = `gateway-indicator ${running ? "on" : "off"}`;
+    if (txt) txt.textContent = running ? t("gw.running") : t("gw.stopped");
+    if (startBtn) startBtn.style.display = running ? "none" : "";
+    if (stopBtn) stopBtn.style.display = running ? "" : "none";
+  } catch (_) {}
 }
 
 // ── Status ────────────────────────────────────────────────────────────
@@ -1604,6 +1713,7 @@ document.addEventListener("DOMContentLoaded", _loadTTSSetting);
 // ── Apps ──────────────────────────────────────────────────────────────
 
 let _appsCache = [];
+let _appsSortOrder = "recommended";
 
 async function loadApps() {
   try {
@@ -1612,19 +1722,55 @@ async function loadApps() {
     _appsCache = [];
   }
   await updateUnreadBadges();
-  renderApps(_appsCache);
+  const sel = document.getElementById("apps-sort");
+  if (sel) _appsSortOrder = sel.value;
+  renderApps(_sortApps(_appsCache));
+}
+
+function _sortApps(apps) {
+  const sorted = [...apps];
+  sorted.sort((a, b) => {
+    const fa = a.favorite ? 0 : 1;
+    const fb = b.favorite ? 0 : 1;
+    if (fa !== fb) return fa - fb;
+    switch (_appsSortOrder) {
+      case "frequency":
+        return (b.run_count || 0) - (a.run_count || 0);
+      case "created":
+        return (b.created_at || "").localeCompare(a.created_at || "");
+      case "name":
+        return (_appName(a)).localeCompare(_appName(b));
+      case "recommended":
+      default: {
+        const ia = (a.installed || a.type === "custom") ? 0 : 1;
+        const ib = (b.installed || b.type === "custom") ? 0 : 1;
+        if (ia !== ib) return ia - ib;
+        return (b.run_count || 0) - (a.run_count || 0);
+      }
+    }
+  });
+  return sorted;
+}
+
+function sortApps(order) {
+  _appsSortOrder = order;
+  const query = (document.getElementById("apps-search")?.value || "").trim();
+  const list = query ? _appsCache.filter(a => _appMatchesQuery(a, query)) : _appsCache;
+  renderApps(_sortApps(list));
+}
+
+function _appMatchesQuery(a, query) {
+  const q = query.toLowerCase();
+  return (a.name || "").toLowerCase().includes(q) ||
+    (a.name_en || "").toLowerCase().includes(q) ||
+    (a.description || "").toLowerCase().includes(q) ||
+    (a.description_en || "").toLowerCase().includes(q);
 }
 
 function filterApps(query) {
-  if (!query) { renderApps(_appsCache); return; }
-  const q = query.toLowerCase();
-  const filtered = _appsCache.filter(a =>
-    (a.name || "").toLowerCase().includes(q) ||
-    (a.name_en || "").toLowerCase().includes(q) ||
-    (a.description || "").toLowerCase().includes(q) ||
-    (a.description_en || "").toLowerCase().includes(q)
-  );
-  renderApps(filtered);
+  if (!query) { renderApps(_sortApps(_appsCache)); return; }
+  const filtered = _appsCache.filter(a => _appMatchesQuery(a, query));
+  renderApps(_sortApps(filtered));
 }
 
 function _appName(a) { return _lang === "en" ? (a.name_en || a.name) : a.name; }
@@ -1662,10 +1808,6 @@ function renderApps(apps) {
     if (isCustom) {
       statusBadge = `<span class="app-badge app-badge-custom">${t("custom.badge")}</span>`;
       actions = `
-        <div class="app-card-actions-left">
-          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">⚙️ ${t("apps.configure")}</button>
-          <button class="btn btn-sm" onclick="event.stopPropagation();openAppReports('${a.id}')">📋 ${t("apps.viewReports")}</button>
-        </div>
         <div class="app-card-actions-right">
           <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();deleteCustomApp('${a.id}')">🗑 ${t("custom.delete")}</button>
         </div>`;
@@ -1676,10 +1818,6 @@ function renderApps(apps) {
         ? `<span class="app-badge app-badge-on">${t("apps.enabled")}</span>`
         : `<span class="app-badge app-badge-off">${t("apps.disabled")}</span>`;
       actions = `
-        <div class="app-card-actions-left">
-          <button class="btn btn-sm btn-primary" onclick="event.stopPropagation();openAppDetail('${a.id}')">⚙️ ${t("apps.configure")}</button>
-          <button class="btn btn-sm" onclick="event.stopPropagation();openAppReports('${a.id}')">📋 ${t("apps.viewReports")}</button>
-        </div>
         <div class="app-card-actions-right">
           <button class="btn btn-sm btn-danger-subtle" onclick="event.stopPropagation();uninstallApp('${a.id}')">📦 ${t("apps.uninstall")}</button>
         </div>`;
@@ -1689,11 +1827,17 @@ function renderApps(apps) {
     }
 
     const unreadBadge = isCustom ? _appCardBadge(a.id) : "";
+    const isFav = a.favorite;
+    const favHeart = isFav ? "❤️" : "🤍";
+    const favBtn = `<button class="app-fav-btn${isFav ? ' favorited' : ''}" onclick="event.stopPropagation();toggleFavorite('${a.id}')" title="${isFav ? '取消收藏' : '收藏'}">${favHeart}</button>`;
 
     return `<div class="app-card${isInstalled || isCustom ? ' installed' : ''}${comingSoon ? ' coming-soon' : ''}" onclick="${(isInstalled || isCustom) && !comingSoon ? `openAppDetail('${a.id}')` : ''}">
       <div class="app-card-header">
         <div class="app-card-icon">${icon}${unreadBadge}</div>
-        ${statusBadge}
+        <div class="app-card-header-right">
+          ${statusBadge}
+          ${favBtn}
+        </div>
       </div>
       <div class="app-card-body">
         <h3 class="app-card-name">${name}</h3>
@@ -1707,6 +1851,19 @@ function renderApps(apps) {
   }).join("");
 
   grid.innerHTML = html;
+}
+
+async function toggleFavorite(appId) {
+  try {
+    const res = await api(`/api/apps/${appId}/favorite`, "POST");
+    if (res.success) {
+      const app = _appsCache.find(a => a.id === appId);
+      if (app) app.favorite = res.favorite;
+      const query = (document.getElementById("apps-search")?.value || "").trim();
+      const list = query ? _appsCache.filter(a => _appMatchesQuery(a, query)) : _appsCache;
+      renderApps(_sortApps(list));
+    }
+  } catch (_) {}
 }
 
 async function installApp(appId) {
@@ -1758,7 +1915,7 @@ async function openAppReports(appId) {
 }
 
 async function openDigestDetail() {
-  document.getElementById("app-detail-title").textContent = `📰 ${t("digest.title")}`;
+  document.getElementById("app-detail-title").textContent = `🎯 ${t("digest.title")}`;
   switchPage("app-detail");
 
   const container = document.getElementById("app-detail-content");
@@ -1951,12 +2108,89 @@ function _showDigestReport(reportData) {
   const title = document.getElementById("digest-report-view-title");
   if (!section || !content) return;
 
-  title.textContent = `📅 ${reportData.date || ""} ${t("digest.latestReport")}`;
+  title.textContent = `🎯 ${reportData.date || ""} ${t("digest.latestReport")}`;
   const raw = reportData.content || "";
-  // New reports are HTML (start with "<"); legacy reports may be Markdown
   content.innerHTML = raw.trimStart().startsWith("<") ? raw : renderMarkdown(raw);
+
+  _injectExploreButtons(content, reportData);
+
   section.style.display = "block";
   section.scrollIntoView({ behavior: "smooth" });
+}
+
+function _injectExploreButtons(container, reportData) {
+  const cards = container.querySelectorAll(".dr-card");
+  const items = reportData.items;
+
+  /* Build a flat list from structured items data if available */
+  const structuredItems = [];
+  if (items && items.sections) {
+    for (const sec of items.sections) {
+      for (const it of (sec.items || [])) {
+        structuredItems.push(it);
+      }
+    }
+  }
+
+  const searchResults = reportData.search_results || {};
+  const allResults = [];
+  for (const cat of Object.keys(searchResults)) {
+    for (const r of searchResults[cat]) {
+      allResults.push({...r, _cat: cat});
+    }
+  }
+
+  cards.forEach((card, idx) => {
+    const linkEl = card.querySelector("h3 a");
+    if (!linkEl) return;
+    const cardUrl = linkEl.href || "";
+    const cardTitle = linkEl.textContent || "";
+
+    const tagEl = card.querySelector(".dr-tag");
+    const descEl = card.querySelector(".dr-desc");
+    const keyword = tagEl ? tagEl.textContent.trim() : "";
+    const description = descEl ? descEl.textContent.trim() : "";
+
+    let itemData;
+    /* Prefer structured items data (exact match by index or URL) */
+    const siByUrl = structuredItems.find(si => si.url && cardUrl && (cardUrl.includes(si.url.replace(/\/$/, "")) || si.url.includes(cardUrl.replace(/\/$/, ""))));
+    if (siByUrl) {
+      itemData = { title: siByUrl.title, url: siByUrl.url, description: siByUrl.desc || description, query_keyword: siByUrl.tag || keyword };
+    } else {
+      const matched = allResults.find(r =>
+        cardUrl && r.url && (cardUrl.includes(r.url.replace(/\/$/, "")) || r.url.includes(cardUrl.replace(/\/$/, "")))
+      );
+      itemData = matched
+        ? { title: matched.title, url: matched.url, description: matched.description || description, query_keyword: matched.query_keyword || keyword }
+        : { title: cardTitle, url: cardUrl, description: description, query_keyword: keyword };
+    }
+
+    const btn = document.createElement("button");
+    btn.className = "btn btn-sm btn-explore-digest";
+    btn.textContent = `🚀 ${t("digest.explore")}`;
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      exploreDigestItem(itemData, reportData.date);
+    };
+    card.appendChild(btn);
+  });
+}
+
+async function exploreDigestItem(item, dateStr) {
+  try {
+    const res = await api("/api/apps/daily_digest/explore", "POST", { item, date: dateStr });
+    if (res.prompt) {
+      switchPage("chat");
+      const input = document.getElementById("chat-input");
+      if (input) {
+        input.value = res.prompt;
+        input.focus();
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+  } catch (e) {
+    toast(t("digest.exploreFail") + ": " + e.message, "error");
+  }
 }
 
 async function viewDigestReport(dateStr) {
@@ -1985,6 +2219,7 @@ async function _refreshDigestReports() {
     }
   } catch (_) {}
 }
+
 
 // ── Web Monitor Detail ─────────────────────────────────────────────────
 
@@ -3545,6 +3780,189 @@ async function _refreshCustomReports(appId) {
   } catch (_) {}
 }
 
+// ── Reports Page ──────────────────────────────────────────────────────
+
+let _allReports = [];
+let _reportsFilter = "unread";
+const _reportsCollapsed = new Set();
+
+async function loadReportsPage() {
+  const filtersEl = document.getElementById("reports-filters");
+  const contentEl = document.getElementById("reports-content");
+  if (!filtersEl || !contentEl) return;
+
+  const filters = [
+    { id: "unread", label: t("reports.unread") },
+    { id: "24h", label: t("reports.24h") },
+    { id: "3d", label: t("reports.3d") },
+    { id: "7d", label: t("reports.7d") },
+    { id: "30d", label: t("reports.30d") },
+    { id: "all", label: t("reports.all") },
+  ];
+  filtersEl.innerHTML = filters.map(f =>
+    `<button class="reports-filter-btn${_reportsFilter === f.id ? ' active' : ''}" data-filter="${f.id}" onclick="setReportsFilter('${f.id}')">${f.label}</button>`
+  ).join("");
+
+  contentEl.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+  try {
+    _allReports = await api("/api/reports");
+  } catch (_) {
+    _allReports = [];
+  }
+  _renderReports();
+}
+
+function setReportsFilter(filter) {
+  _reportsFilter = filter;
+  document.querySelectorAll(".reports-filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.filter === filter);
+  });
+  _renderReports();
+}
+
+function _renderReports() {
+  const contentEl = document.getElementById("reports-content");
+  if (!contentEl) return;
+
+  const now = Date.now();
+  const filtered = _allReports.filter(r => {
+    const ts = new Date(r.generated_at || r.date).getTime();
+    switch (_reportsFilter) {
+      case "unread": return !r.read;
+      case "24h": return now - ts < 86400000;
+      case "3d": return now - ts < 259200000;
+      case "7d": return now - ts < 604800000;
+      case "30d": return now - ts < 2592000000;
+      default: return true;
+    }
+  });
+
+  let topBar = `<div class="reports-top-bar">`;
+  topBar += `<button class="btn btn-sm reports-mark-all-read" onclick="markAllReportsRead()">✓ ${t("reports.markAllRead")}</button>`;
+  topBar += `</div>`;
+
+  if (!filtered.length) {
+    const hint = _reportsFilter === "unread" ? t("reports.allRead") : t("reports.empty");
+    contentEl.innerHTML = `${topBar}<div class="digest-empty">${hint}</div>`;
+    return;
+  }
+
+  const groups = {};
+  for (const r of filtered) {
+    const gKey = r.app_id;
+    if (!groups[gKey]) groups[gKey] = { name: r.app_name, icon: r.app_icon, items: [] };
+    groups[gKey].items.push(r);
+  }
+
+  let html = topBar;
+  for (const [appId, group] of Object.entries(groups)) {
+    const unreadCount = group.items.filter(r => !r.read).length;
+    const unreadBadge = unreadCount > 0 ? `<span class="reports-group-badge">${unreadCount}</span>` : "";
+    const collapsed = _reportsCollapsed.has(appId);
+    html += `<div class="reports-group${collapsed ? ' collapsed' : ''}">
+      <div class="reports-group-header" onclick="toggleReportsGroup('${escapeAttr(appId)}')">
+        <span class="reports-group-arrow">${collapsed ? '▶' : '▼'}</span>
+        ${group.icon} ${escapeHtml(group.name)} ${unreadBadge}
+      </div>
+      <div class="reports-group-list"${collapsed ? ' style="display:none"' : ''}>`;
+
+    for (const r of group.items) {
+      const time = (r.generated_at || "").replace("T", " ").slice(0, 16);
+      const unreadDot = r.read ? "" : `<span class="reports-unread-dot"></span>`;
+      const summary = r.summary ? `<span class="reports-item-summary">${escapeHtml(r.summary)}</span>` : "";
+      html += `<div class="reports-item${r.read ? '' : ' unread'}">
+        ${unreadDot}
+        <span class="reports-item-date" onclick="openReportInline('${escapeAttr(appId)}','${escapeAttr(r.key)}')">${escapeHtml(r.date)}</span>
+        <span class="reports-item-summary-wrap" onclick="openReportInline('${escapeAttr(appId)}','${escapeAttr(r.key)}')">${summary}</span>
+        <span class="reports-item-time">${escapeHtml(time)}</span>
+        <button class="btn btn-sm" onclick="openReportInline('${escapeAttr(appId)}','${escapeAttr(r.key)}')">${t("reports.viewReport")}</button>
+        <button class="btn btn-sm reports-item-delete" onclick="event.stopPropagation();deleteReport('${escapeAttr(appId)}','${escapeAttr(r.key)}')" title="${t("reports.delete")}">🗑</button>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+  contentEl.innerHTML = html;
+}
+
+async function openReportInline(appId, key) {
+  const filtersEl = document.getElementById("reports-filters");
+  const contentEl = document.getElementById("reports-content");
+  if (!contentEl) return;
+
+  if (filtersEl) filtersEl.style.display = "none";
+  contentEl.classList.add("viewing-report");
+  contentEl.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+
+  try {
+    const report = await api(`/api/reports/${encodeURIComponent(appId)}/${encodeURIComponent(key)}`);
+    if (report.error) { toast(report.error, "error"); _closeReportInline(); return; }
+
+    const r = _allReports.find(x => x.app_id === appId && x.key === key);
+    const reportTitle = report.title || (r ? `${r.app_icon || ''} ${r.app_name || ''} — ${r.date}` : key);
+
+    const raw = report.content || "";
+    const htmlContent = raw.trimStart().startsWith("<") ? raw : (typeof renderMarkdown === "function" ? renderMarkdown(raw) : `<pre>${escapeHtml(raw)}</pre>`);
+
+    contentEl.innerHTML = `<div class="report-inline-viewer">
+      <div class="report-inline-header">
+        <button class="btn btn-sm" onclick="_closeReportInline()">\u2190 ${t("apps.back")}</button>
+        <h2>${escapeHtml(reportTitle)}</h2>
+      </div>
+      <div class="report-inline-body">
+        <div class="report-inline-content digest-report-content">${htmlContent}</div>
+      </div>
+    </div>`;
+
+    _injectExploreButtonsForInline(contentEl, report, appId);
+
+    if (r) r.read = true;
+    updateUnreadBadges();
+  } catch (e) {
+    toast(e.message, "error");
+    _closeReportInline();
+  }
+}
+
+function _injectExploreButtonsForInline(container, report, appId) {
+  if (appId !== "daily_digest") return;
+  const wrapper = container.querySelector(".report-inline-content");
+  if (wrapper) _injectExploreButtons(wrapper, report);
+}
+
+function _closeReportInline() {
+  const filtersEl = document.getElementById("reports-filters");
+  const contentEl = document.getElementById("reports-content");
+  if (filtersEl) filtersEl.style.display = "";
+  if (contentEl) contentEl.classList.remove("viewing-report");
+  _renderReports();
+}
+
+function toggleReportsGroup(appId) {
+  if (_reportsCollapsed.has(appId)) _reportsCollapsed.delete(appId);
+  else _reportsCollapsed.add(appId);
+  _renderReports();
+}
+
+async function markAllReportsRead() {
+  try {
+    await api("/api/reports/mark_all_read", "POST");
+    _allReports.forEach(r => { r.read = true; });
+    _renderReports();
+    updateUnreadBadges();
+  } catch (e) { toast(e.message, "error"); }
+}
+
+async function deleteReport(appId, key) {
+  try {
+    const res = await api(`/api/reports/${encodeURIComponent(appId)}/${encodeURIComponent(key)}`, "DELETE");
+    if (res.error) { toast(t("reports.deleteFail"), "error"); return; }
+    _allReports = _allReports.filter(r => !(r.app_id === appId && r.key === key));
+    toast(t("reports.deleteOk"), "ok");
+    _renderReports();
+    updateUnreadBadges();
+  } catch (e) { toast(t("reports.deleteFail"), "error"); }
+}
+
 // ── Unread badges ─────────────────────────────────────────────────────
 
 let _unreadCounts = {};
@@ -3552,12 +3970,12 @@ let _unreadCounts = {};
 async function updateUnreadBadges() {
   try { _unreadCounts = await api("/api/apps/custom/unread"); } catch (_) { _unreadCounts = {}; }
   const total = Object.values(_unreadCounts).reduce((s, n) => s + n, 0);
-  let navBadge = document.getElementById("nav-apps-badge");
+  let navBadge = document.getElementById("nav-reports-badge");
   if (!navBadge) {
-    const navItem = document.querySelector('.nav-item[data-page="apps"]');
+    const navItem = document.querySelector('.nav-item[data-page="reports"]');
     if (navItem) {
       navBadge = document.createElement("span");
-      navBadge.id = "nav-apps-badge";
+      navBadge.id = "nav-reports-badge";
       navBadge.className = "nav-badge";
       navItem.appendChild(navBadge);
     }
@@ -3569,14 +3987,43 @@ async function updateUnreadBadges() {
 }
 
 function _appCardBadge(appId) {
-  const c = _unreadCounts[appId] || 0;
-  return c > 0 ? `<span class="app-card-unread">${c}</span>` : "";
+  return "";
 }
 
 let _badgePollTimer = null;
 function _startBadgePoll() {
   if (_badgePollTimer) return;
-  _badgePollTimer = setInterval(updateUnreadBadges, 30000);
+  _badgePollTimer = setInterval(() => { updateUnreadBadges(); updateSidebarStats(); }, 30000);
+}
+
+async function updateSidebarStats() {
+  const tokEl = document.getElementById("stat-tokens");
+  const searchEl = document.getElementById("stat-search");
+  if (!tokEl || !searchEl) return;
+  try {
+    const [tok, search] = await Promise.all([
+      api("/api/token/usage").catch(() => null),
+      api("/api/search/usage").catch(() => null),
+    ]);
+    if (tok) {
+      const inp = tok.input_tokens || 0;
+      const out = tok.output_tokens || 0;
+      tokEl.textContent = `${t("stats.todayPrefix")} ↓${_fmtNum(inp)} ↑${_fmtNum(out)}`;
+      tokEl.title = t("stats.tokenTip");
+    }
+    if (search && search.engines) {
+      const parts = [];
+      for (const [eng, v] of Object.entries(search.engines)) {
+        if (!v.has_key) continue;
+        const label = eng.charAt(0).toUpperCase() + eng.slice(1);
+        parts.push(`${label} ${v.used || 0}/${v.limit || 1000}`);
+      }
+      searchEl.textContent = parts.length ? parts.join("  ") : "";
+      searchEl.title = parts.length ? t("stats.searchTip") : "";
+      const sep = document.getElementById("stat-sep");
+      if (sep) sep.style.display = parts.length ? "" : "none";
+    }
+  } catch (_) {}
 }
 
 async function openCustomAppWizardEdit(appId) {

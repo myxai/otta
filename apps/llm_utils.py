@@ -1,12 +1,91 @@
 """Shared LLM call utility for all apps."""
 
+import json
 import os
+import threading
+from datetime import date, timedelta
+from pathlib import Path
 
 _KNOWN_LITELLM_PREFIXES = (
     "openai/", "azure/", "anthropic/", "bedrock/", "vertex_ai/",
     "cohere/", "huggingface/", "ollama/", "deepseek/", "groq/",
     "together_ai/", "openrouter/", "gemini/", "mistral/",
 )
+
+_USAGE_DIR = Path.home() / ".nanobot" / "usage"
+_TOKEN_FILE = _USAGE_DIR / "token_usage.json"
+
+_token_lock = threading.Lock()
+# {"2026-02-23": {"input": 800, "output": 700}, ...}
+_token_data: dict[str, dict] = {}
+_loaded = False
+
+
+def _ensure_loaded():
+    global _token_data, _loaded
+    if _loaded:
+        return
+    _USAGE_DIR.mkdir(parents=True, exist_ok=True)
+    if _TOKEN_FILE.exists():
+        try:
+            raw = json.loads(_TOKEN_FILE.read_text(encoding="utf-8"))
+            for k, v in raw.items():
+                if isinstance(v, int):
+                    _token_data[k] = {"input": v, "output": 0}
+                elif isinstance(v, dict):
+                    _token_data[k] = v
+        except Exception:
+            _token_data = {}
+    _loaded = True
+
+
+def _persist():
+    try:
+        _USAGE_DIR.mkdir(parents=True, exist_ok=True)
+        _TOKEN_FILE.write_text(
+            json.dumps(_token_data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception:
+        pass
+
+
+def record_tokens(prompt_tokens: int = 0, completion_tokens: int = 0):
+    with _token_lock:
+        _ensure_loaded()
+        today = date.today().isoformat()
+        day = _token_data.setdefault(today, {"input": 0, "output": 0})
+        day["input"] = day.get("input", 0) + prompt_tokens
+        day["output"] = day.get("output", 0) + completion_tokens
+        _persist()
+
+
+def get_token_usage() -> dict:
+    with _token_lock:
+        _ensure_loaded()
+        today = date.today().isoformat()
+        day = _token_data.get(today, {"input": 0, "output": 0})
+        return {
+            "date": today,
+            "input_tokens": day.get("input", 0),
+            "output_tokens": day.get("output", 0),
+            "total_tokens": day.get("input", 0) + day.get("output", 0),
+        }
+
+
+def get_token_history(days: int = 30) -> list[dict]:
+    """Return daily token usage for the last N days."""
+    with _token_lock:
+        _ensure_loaded()
+        result = []
+        today = date.today()
+        for i in range(days):
+            d = (today - timedelta(days=days - 1 - i)).isoformat()
+            day = _token_data.get(d, {"input": 0, "output": 0})
+            inp = day.get("input", 0) if isinstance(day, dict) else day
+            out = day.get("output", 0) if isinstance(day, dict) else 0
+            result.append({"date": d, "input": inp, "output": out, "tokens": inp + out})
+        return result
 
 
 def litellm_model_name(model: str, api_base: str | None) -> str:
@@ -39,4 +118,10 @@ def llm_call(
         temperature=temperature,
         max_tokens=max_tokens,
     )
+    usage = getattr(resp, "usage", None)
+    if usage:
+        record_tokens(
+            prompt_tokens=getattr(usage, "prompt_tokens", 0),
+            completion_tokens=getattr(usage, "completion_tokens", 0),
+        )
     return resp.choices[0].message.content or ""

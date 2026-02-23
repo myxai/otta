@@ -777,12 +777,44 @@ def api_save_config():
 
 @flask_app.route("/api/search/usage")
 def api_search_usage():
-    """Return today's search API usage stats."""
+    """Return today's search API usage stats, with key availability."""
     try:
         from apps.web_search import quota
-        return jsonify(quota.get_usage())
+        data = quota.get_usage()
+        mcfg = _get_model_config()
+        key_map = {
+            "brave": bool(mcfg.get("brave_api_key")),
+            "baidu": bool(mcfg.get("baidu_api_key")),
+        }
+        for eng in list(data.get("engines", {})):
+            data["engines"][eng]["has_key"] = key_map.get(eng, False)
+        return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/token/usage")
+def api_token_usage():
+    from apps.llm_utils import get_token_usage
+    return jsonify(get_token_usage())
+
+
+@flask_app.route("/api/token/history")
+def api_token_history():
+    days = request.args.get("days", 30, type=int)
+    from apps.llm_utils import get_token_history
+    history = get_token_history(min(days, 90))
+    total = sum(d["tokens"] for d in history)
+    return jsonify({"days": len(history), "total": total, "history": history})
+
+
+@flask_app.route("/api/search/history")
+def api_search_history():
+    days = request.args.get("days", 30, type=int)
+    from apps.web_search import quota
+    history = quota.get_history(min(days, 90))
+    total = sum(d["calls"] for d in history)
+    return jsonify({"days": len(history), "total": total, "history": history})
 
 
 # ---------------------------------------------------------------------------
@@ -1217,20 +1249,47 @@ def api_history_delete(session_id):
 
 _APPS_DIR = Path.home() / ".nanobot" / "apps"
 _APPS_REGISTRY = _APPS_DIR / "registry.json"
+_APPS_PREFS = _APPS_DIR / "prefs.json"
+
+
+def _load_apps_prefs() -> dict:
+    """Load app preferences (favorites, run_count, etc.)."""
+    if _APPS_PREFS.exists():
+        try:
+            return json.loads(_APPS_PREFS.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return {}
+
+
+def _save_apps_prefs(data: dict):
+    _APPS_DIR.mkdir(parents=True, exist_ok=True)
+    _APPS_PREFS.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def _inc_run_count(app_id: str):
+    prefs = _load_apps_prefs()
+    p = prefs.setdefault(app_id, {})
+    p["run_count"] = p.get("run_count", 0) + 1
+    _save_apps_prefs(prefs)
+
 
 _digest_task_lock = threading.Lock()
 _digest_task_status: dict = {}  # {"status": "idle"|"running"|"done"|"error", ...}
+
 
 # Built-in app catalog
 _APP_CATALOG = {
     "daily_digest": {
         "id": "daily_digest",
-        "name": "今日私读",
-        "name_en": "Today's Reading",
-        "icon": "📰",
-        "description": "基于浏览器历史，自动分析个人兴趣，每日推荐工作、学习、生活相关内容",
-        "description_en": "Analyze browser history to discover interests, generate daily recommendations for work, study and life",
-        "version": "1.0.0",
+        "name": "每日私享会",
+        "name_en": "Daily Briefing",
+        "icon": "🎯",
+        "description": "你的私人资讯策展人——基于浏览和对话，每天精选最值得关注的内容，支持深入探索",
+        "description_en": "Your personal curator — daily picks based on your interests, with deep-dive exploration",
+        "version": "2.0.0",
         "author": "nanobot",
         "category": "productivity",
     },
@@ -1247,11 +1306,11 @@ _APP_CATALOG = {
     },
     "email_summary": {
         "id": "email_summary",
-        "name": "邮件摘要",
-        "name_en": "Email Summary",
+        "name": "邮件简报",
+        "name_en": "Email Briefing",
         "icon": "📧",
-        "description": "自动汇总未读邮件，生成每日邮件摘要",
-        "description_en": "Auto-summarize unread emails into a daily digest",
+        "description": "连接邮箱，AI 分类归纳生成每日邮件简报",
+        "description_en": "Connect your inbox, AI categorises and summarises into a daily briefing",
         "version": "1.0.0",
         "author": "nanobot",
         "category": "productivity",
@@ -1353,6 +1412,7 @@ def _get_model_config() -> dict:
 def api_apps_list():
     """Return all apps: catalog + installation status + custom apps."""
     registry = _load_apps_registry()
+    prefs = _load_apps_prefs()
     result = []
     for app_id, catalog in _APP_CATALOG.items():
         entry = {**catalog}
@@ -1362,6 +1422,10 @@ def api_apps_list():
         entry["enabled"] = installed.get("enabled", False) if installed else False
         entry["config"] = installed.get("config", {}) if installed else {}
         entry["last_run"] = installed.get("last_run") if installed else None
+        p = prefs.get(app_id, {})
+        entry["favorite"] = p.get("favorite", False)
+        entry["run_count"] = p.get("run_count", 0)
+        entry["created_at"] = installed.get("installed_at", "") if installed else ""
         result.append(entry)
     from apps.custom_app import list_apps as _list_custom
     import re as _re
@@ -1377,6 +1441,7 @@ def api_apps_list():
         if len(_pg) > 1:
             _desc += f" (+{len(_pg)-1})"
         _desc += "…"
+        p = prefs.get(capp["id"], {})
         result.append({
             "id": capp["id"],
             "name": capp["name"],
@@ -1392,6 +1457,9 @@ def api_apps_list():
             "enabled": capp.get("schedule", {}).get("enabled", False),
             "config": {},
             "last_run": capp.get("last_run"),
+            "favorite": p.get("favorite", False),
+            "run_count": p.get("run_count", 0),
+            "created_at": capp.get("created_at", ""),
         })
     return jsonify(result)
 
@@ -1448,6 +1516,26 @@ def api_app_disable(app_id):
     return jsonify({"success": True})
 
 
+@flask_app.route("/api/apps/<app_id>/favorite", methods=["POST"])
+def api_app_favorite(app_id):
+    """Toggle favorite status for any app (builtin or custom)."""
+    prefs = _load_apps_prefs()
+    p = prefs.setdefault(app_id, {})
+    p["favorite"] = not p.get("favorite", False)
+    _save_apps_prefs(prefs)
+    return jsonify({"success": True, "favorite": p["favorite"]})
+
+
+@flask_app.route("/api/apps/<app_id>/record-run", methods=["POST"])
+def api_app_record_run(app_id):
+    """Increment run count for an app."""
+    prefs = _load_apps_prefs()
+    p = prefs.setdefault(app_id, {})
+    p["run_count"] = p.get("run_count", 0) + 1
+    _save_apps_prefs(prefs)
+    return jsonify({"success": True, "run_count": p["run_count"]})
+
+
 @flask_app.route("/api/apps/<app_id>/config", methods=["GET"])
 def api_app_get_config(app_id):
     registry = _load_apps_registry()
@@ -1472,7 +1560,7 @@ def api_digest_run():
     """Start a daily digest run in the background."""
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "今日私读应用未安装"}), 400
+        return jsonify({"error": "每日私享会未安装"}), 400
 
     with _digest_task_lock:
         if _digest_task_status.get("status") == "running":
@@ -1497,10 +1585,11 @@ def api_digest_run():
                 if "daily_digest" in reg:
                     reg["daily_digest"]["last_run"] = datetime.now(timezone.utc).isoformat()
                     _save_apps_registry(reg)
+                _inc_run_count("daily_digest")
 
                 stats = result.get("stats", {})
                 _push_notification(
-                    title="📰 今日私读已生成",
+                    title="🎯 每日私享会已更新",
                     content=(
                         f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
                         f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
@@ -1557,7 +1646,7 @@ def api_digest_preview():
     """
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "今日私读应用未安装"}), 400
+        return jsonify({"error": "每日私享会未安装"}), 400
 
     from apps.daily_digest import (
         read_browser_history, filter_history,
@@ -1622,6 +1711,197 @@ def api_digest_preview():
         "interests": interests,
         "method": analysis_method,
     })
+
+
+@flask_app.route("/api/apps/daily_digest/explore", methods=["POST"])
+def api_digest_explore():
+    """Build an explore prompt for a specific content item in the digest."""
+    body = request.json or {}
+    item = body.get("item")
+    date_str = body.get("date")
+    if not item or not isinstance(item, dict):
+        return jsonify({"error": "item is required"}), 400
+
+    interests = None
+    if date_str:
+        from apps.daily_digest import load_report
+        report = load_report(date_str)
+        if report:
+            interests = report.get("interests")
+
+    from apps.daily_digest import build_explore_prompt
+    prompt = build_explore_prompt(item, interests=interests)
+    return jsonify({"prompt": prompt})
+
+
+# ---------------------------------------------------------------------------
+# Routes — Unified Reports
+# ---------------------------------------------------------------------------
+
+def _html_to_summary(html: str, max_len: int = 60) -> str:
+    """Extract plain-text summary from HTML content."""
+    import re as _re
+    text = _re.sub(r"<[^>]+>", " ", html)
+    text = _re.sub(r"\s+", " ", text).strip()
+    for prefix in ("📅", "📧", "🎯"):
+        text = text.lstrip(prefix).strip()
+    text = _re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", text).strip()
+    for skip in ("每日私享会", "每日资讯", "Daily"):
+        if text.startswith(skip):
+            text = text[len(skip):].strip()
+    return text[:max_len] if text else ""
+
+
+@flask_app.route("/api/reports")
+def api_all_reports():
+    """Aggregate reports from all apps into a single list."""
+    result: list[dict] = []
+
+    # Daily Digest
+    try:
+        from apps.daily_digest import list_reports as digest_list, load_report as digest_load
+        for r in digest_list(limit=60):
+            date = r.get("date", "")
+            summary = ""
+            try:
+                rpt = digest_load(date)
+                if rpt and rpt.get("content"):
+                    summary = _html_to_summary(rpt["content"])
+            except Exception:
+                pass
+            result.append({
+                "app_id": "daily_digest",
+                "app_name": "每日私享会",
+                "app_icon": "🎯",
+                "date": date,
+                "generated_at": r.get("generated_at", ""),
+                "key": date,
+                "type": "digest",
+                "read": True,
+                "summary": summary,
+            })
+    except Exception:
+        pass
+
+    # Email Summary
+    try:
+        from apps.email_summary import list_reports as email_list, get_report as email_get
+        for r in email_list():
+            date = r.get("date", "")
+            summary = ""
+            email_count = r.get("email_count", 0)
+            if email_count:
+                summary = f"{email_count} 封邮件简报"
+            else:
+                try:
+                    rpt = email_get(date)
+                    if rpt and rpt.get("content"):
+                        summary = _html_to_summary(rpt["content"])
+                except Exception:
+                    pass
+            result.append({
+                "app_id": "email_summary",
+                "app_name": "邮件简报",
+                "app_icon": "📧",
+                "date": date,
+                "generated_at": r.get("generated_at", ""),
+                "key": date,
+                "type": "email",
+                "read": True,
+                "summary": summary,
+            })
+    except Exception:
+        pass
+
+    # Custom Apps
+    try:
+        from apps.custom_app import (
+            list_apps as _list_custom, list_reports as custom_list,
+            get_report as custom_get,
+        )
+        for app in _list_custom():
+            app_id = app["id"]
+            app_name = app.get("name", app_id)
+            app_icon = app.get("icon", "🧩")
+            for r in custom_list(app_id):
+                key = r.get("key", "")
+                summary = ""
+                try:
+                    rpt = custom_get(app_id, key)
+                    if rpt and rpt.get("content"):
+                        summary = _html_to_summary(rpt["content"])
+                except Exception:
+                    pass
+                result.append({
+                    "app_id": app_id,
+                    "app_name": app_name,
+                    "app_icon": app_icon,
+                    "date": r.get("date", ""),
+                    "generated_at": r.get("generated_at", ""),
+                    "key": key,
+                    "type": r.get("type", "run"),
+                    "read": r.get("read", True),
+                    "summary": summary,
+                })
+    except Exception:
+        pass
+
+    result.sort(key=lambda x: x.get("generated_at") or x.get("date") or "", reverse=True)
+    return jsonify(result)
+
+
+@flask_app.route("/api/reports/mark_all_read", methods=["POST"])
+def api_mark_all_reports_read():
+    try:
+        from apps.custom_app import list_apps as _list_custom, list_reports as custom_list, mark_report_read
+        for app in _list_custom():
+            for r in custom_list(app["id"]):
+                if not r.get("read"):
+                    mark_report_read(app["id"], r.get("key", ""))
+    except Exception:
+        pass
+    return jsonify({"ok": True})
+
+
+@flask_app.route("/api/reports/<app_id>/<path:key>", methods=["DELETE"])
+def api_delete_report(app_id, key):
+    ok = False
+    if app_id == "daily_digest":
+        from apps.daily_digest import delete_report
+        ok = delete_report(key)
+    elif app_id == "email_summary":
+        from apps.email_summary import delete_report
+        ok = delete_report(key)
+    else:
+        from apps.custom_app import delete_report
+        ok = delete_report(app_id, key)
+    if ok:
+        return jsonify({"ok": True})
+    return jsonify({"error": "not found"}), 404
+
+
+@flask_app.route("/api/reports/<app_id>/<path:key>")
+def api_report_content(app_id, key):
+    """Fetch a single report's full content for inline display."""
+    if app_id == "daily_digest":
+        from apps.daily_digest import load_report
+        report = load_report(key)
+        if not report:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(report)
+    elif app_id == "email_summary":
+        from apps.email_summary import get_report
+        report = get_report(key)
+        if not report:
+            return jsonify({"error": "not found"}), 404
+        return jsonify(report)
+    else:
+        from apps.custom_app import get_report, mark_report_read
+        report = get_report(app_id, key)
+        if not report:
+            return jsonify({"error": "not found"}), 404
+        mark_report_read(app_id, key)
+        return jsonify(report)
 
 
 # ---------------------------------------------------------------------------
@@ -1735,7 +2015,7 @@ def api_monitor_history(site_id):
 def api_email_run():
     registry = _load_apps_registry()
     if "email_summary" not in registry:
-        return jsonify({"error": "邮件摘要应用未安装"}), 400
+        return jsonify({"error": "邮件简报应用未安装"}), 400
     from apps.email_summary import run_email_summary
     app_config = registry["email_summary"].get("config", {})
     if not app_config.get("imap_host") or not app_config.get("imap_user"):
@@ -1750,7 +2030,7 @@ def api_email_run():
                 reg["email_summary"]["last_run"] = datetime.now(timezone.utc).isoformat()
                 _save_apps_registry(reg)
             _push_notification(
-                title="📧 邮件摘要已生成",
+                title="📧 邮件简报已生成",
                 content=f"汇总了 {result.get('email_count', 0)} 封邮件",
                 level="info",
             )
@@ -1784,7 +2064,7 @@ def api_email_report(date_str):
 def api_email_test():
     registry = _load_apps_registry()
     if "email_summary" not in registry:
-        return jsonify({"error": "邮件摘要应用未安装"}), 400
+        return jsonify({"error": "邮件简报应用未安装"}), 400
     from apps.email_summary import test_connection
     app_config = registry["email_summary"].get("config", {})
     return jsonify(test_connection(app_config))
@@ -1969,6 +2249,7 @@ def api_custom_run(app_id):
                                      ensure_ascii=False))
 
             set_last_run(app_id)
+            _inc_run_count(app_id)
             last_resp = ""
             q.put(json.dumps({"type": "done", "content": last_resp},
                              ensure_ascii=False))
@@ -2064,6 +2345,13 @@ def api_custom_summary(app_id):
                 temperature=0.5,
                 max_tokens=4096,
             )
+            _usage = getattr(resp, "usage", None)
+            if _usage:
+                from apps.llm_utils import record_tokens
+                record_tokens(
+                    prompt_tokens=getattr(_usage, "prompt_tokens", 0),
+                    completion_tokens=getattr(_usage, "completion_tokens", 0),
+                )
             content = resp.choices[0].message.content or ""
 
             save_report(app_id, content=content, params_used={},
@@ -2158,7 +2446,7 @@ def _check_scheduled_apps():
                     _save_apps_registry(registry)
                     stats = result.get("stats", {})
                     _push_notification(
-                        title="📰 今日私读已生成",
+                        title="🎯 每日私享会已更新",
                         content=(
                             f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
                             f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
@@ -2218,12 +2506,13 @@ def _check_scheduled_apps():
                     registry[app_id]["last_run"] = datetime.now(timezone.utc).isoformat()
                     _save_apps_registry(registry)
                     _push_notification(
-                        title="📧 邮件摘要已生成",
+                        title="📧 邮件简报已生成",
                         content=f"汇总了 {result.get('email_count', 0)} 封邮件",
                         level="info",
                     )
             except Exception as exc:
                 print(f"[app_scheduler] email_summary error: {exc}")
+
 
     # --- Custom apps ---
     from apps.custom_app import (
@@ -2249,6 +2538,7 @@ def _check_scheduled_apps():
                     result = _run_agent_with_prompt(message, session_key=session_key)
                     save_report(capp_id, content=result["content"], params_used=pv)
                 set_last_run(capp_id)
+                _inc_run_count(capp_id)
                 mark_triggered(capp_id, "schedule")
                 _push_notification(
                     title=f"{capp.get('icon', '🤖')} {capp['name']}",
@@ -2283,6 +2573,13 @@ def _check_scheduled_apps():
                             api_base=mcfg.get("api_base"),
                             temperature=0.5, max_tokens=4096,
                         )
+                        _u = getattr(resp, "usage", None)
+                        if _u:
+                            from apps.llm_utils import record_tokens as _rec
+                            _rec(
+                                prompt_tokens=getattr(_u, "prompt_tokens", 0),
+                                completion_tokens=getattr(_u, "completion_tokens", 0),
+                            )
                         content = resp.choices[0].message.content or ""
                         save_report(capp_id, content=content,
                                     params_used={}, report_type="summary")

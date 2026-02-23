@@ -1,178 +1,170 @@
-# 🌀 MyxAI Desk 
+<div align="center">
 
-A desktop GUI client for [nanobot](https://github.com/HKUDS/nanobot) — the ultra-lightweight personal AI assistant.
+# 🌀 MyxAI Desk
 
-[中文说明](README_CN.md)
+### Your Desktop AI That Actually Knows You
 
-## Features
+Every day, it reads what you browse, understands what you care about,
+and delivers a private briefing just for you — with one click to go deeper.
 
-- **Chat** — Real-time conversation with the nanobot AI agent, with Markdown rendering and code highlighting
-- **Apps** — Extensible app center; install, configure, and manage automated tasks
-  - **Today's Reading** — AI-powered personal interest recommendation engine based on browser history and chat conversations
-  - **Web Monitor** — Track changes on web pages with hash comparison or LLM-powered smart summaries
-  - **Email Summary** — Connect via IMAP, read recent emails, and generate daily AI-powered summaries
-  - **Focus Timer** — Full Pomodoro timer with custom durations, task tags, and statistical charts
-  - **Custom Apps** — Turn any nanobot conversation into a reusable, scheduled application
-- **Settings** — Visual configuration for API keys, model parameters, MCP tool servers, channel toggles, and more
-- **Status** — Overview of system status: providers, channels, model config, MCP tools, and feedback cases
-- **Gateway** — Start / stop the nanobot gateway with one click to connect Telegram, Discord, Feishu, etc.
-- **MCP Integration** — Connect external tool servers (e.g. Playwright for browser automation) via MCP protocol
-- **i18n** — Bilingual UI (Chinese / English), defaults to system language
+Not just another chatbot. A thinking companion that grows with you.
 
-## Today's Reading App
+[中文](README_CN.md) · [Quick Start](#-3-minutes-to-get-started) · [Why It's Different](#-why-its-different)
 
-An automated daily recommendation engine that analyzes your browser history **and nanobot conversation history**, then searches the web for high-quality content tailored to your interests.
+</div>
 
-**How it works:**
+---
 
-1. **Collect** — Reads Chrome / Edge browsing history (titles & URLs only) **plus recent nanobot chat conversations** (topics discussed with the AI)
-2. **Analyse** — LLM identifies your real interests from both sources and classifies them (work / study / life)
-3. **Search** — Generates semantic search queries and searches the web (Baidu API / Brave API with daily quota tracking)
-4. **Curate** — LLM selects the best content from search results, generates an HTML report with real links
+## 😵‍💫 Sound Familiar?
 
-**Key design:**
+- You open dozens of tabs every day — but nothing sticks.
+- You chat with AI about ideas — then forget them by tomorrow.
+- You're working on a project — but keep getting lost in the details.
+- You want to stay on top of trends — without spending hours reading.
+- Your inbox is flooded — you waste time scanning for what actually matters.
 
-- No browser plugins required; works with local history database
-- Analyses both browsing behaviour and AI conversation topics for deeper interest understanding
-- AI-powered interest extraction (falls back to rule-based when LLM unavailable)
-- API-only web search (Baidu / Brave) with daily quota tracking and free-tier enforcement
-- Structured HTML report with card layout
-- Scheduled auto-generation or manual trigger
-- Interest preview for quick analysis without full report
+**What if an AI assistant actually paid attention to what you're doing — and helped you make sense of it?**
 
-## Web Monitor App
+---
 
-Monitor any web page for changes and get notified automatically.
+## ✨ What MyxAI Does
 
-- **Hash mode** — Fast SHA-256 comparison of extracted page text, no LLM cost
-- **LLM mode** — Uses AI to summarise exactly what changed between page versions
-- Configurable check interval (default 30 minutes)
-- Change history with timestamped summaries
-- Manual or scheduled automatic checks
+### 🎯 Daily Briefing — Your Private Curator
 
-## Email Summary App
+Every day, MyxAI reads your browsing history and recent AI conversations,
+figures out what you truly care about, searches the web for the best content,
+and delivers a **personalised briefing** you actually want to read.
 
-Connect your email via IMAP and get a concise daily summary.
+- **Understands your context** — not just keywords, but your real interests across work, study, and life
+- **Searches the web for you** — finds fresh, relevant content you'd miss on your own
+- **Gets smarter over time** — tracks how your interests evolve week by week
+- **One-click deep dive** — see something interesting? Click to explore it in a focused conversation
+- **Token-efficient** — structured JSON output + template rendering, 60-70% less LLM cost
 
-- **Built-in IMAP** — Uses Python's standard `imaplib` + `email` (no extra deps)
-- **Quick presets** — One-click setup for QQ, 163, Gmail, Outlook, and more
-- **LLM-powered** — Groups emails by importance (important / normal / notifications) with one-line summaries
-- **Fallback** — Plain HTML list when no LLM is configured
-- Connection testing and scheduled auto-generation
+> No plugins. No manual input. It just works.
 
-## Focus Timer App
+### 📧 Email Briefing — Your Inbox, Distilled
 
-A full-featured Pomodoro timer to help you stay productive.
+Connect via IMAP. Instead of listing every email, MyxAI generates a **categorised briefing**:
 
-- **Timer** — Large ring countdown with start / pause / reset / skip controls
-- **Customizable** — Set focus, break, and long-break durations
-- **Task tags** — Label sessions (coding, reading, writing…) for tracking
-- **Statistics** — Today's stats, daily trend chart (CSS bars), and tag distribution
-- **History** — Browse completed sessions, all stored locally
-- Timer runs in the frontend; completed sessions are saved to the backend
+- Groups emails by theme (action needed, project updates, newsletters, etc.)
+- Summarises each category in one sentence
+- Highlights what deserves your attention
+- Tells you exactly what needs a reply
 
-## Custom Apps
+> 50 emails → one page you can scan in 30 seconds.
 
-Create your own automated applications powered by the full nanobot agent.
+### 💬 Smart Chat with Memory
 
-- **Prompt Template** — Define a task in natural language with `{{variable}}` placeholders for dynamic parts
-- **Parameter System** — Each variable becomes a configurable parameter (text, number, time, etc.)
-- **Agent-powered** — Every run goes through the full nanobot agent loop with MCP tools, web search, and more
-- **Save from Chat** — Click "Save as App" on any bot reply to turn that conversation into a reusable app
-- **Create from Scratch** — Or open the creation wizard directly from the App Center
-- **Scheduling** — Optional daily schedule with configurable run time
-- **Reports** — Each run saves a dated report you can browse later
+Chat naturally with AI — your conversations become part of its understanding of you.
 
-Unlike the built-in apps (which use optimised direct pipelines), custom apps leverage the full agent capabilities for maximum flexibility.
+### 📊 Unified Reports Hub
 
-## Prerequisites
+All reports in one place — Daily Briefing, Email Briefing, Custom Apps. Filter by time range, mark as read, browse inline without switching pages.
 
-| Requirement | Version | Notes |
+### 📈 Usage Statistics
+
+Track your LLM token consumption and search API usage with daily charts. Know exactly what you're spending.
+
+### 🔍 Web Monitor
+
+Track any web page for changes. Get notified when something updates — with an AI summary of what changed.
+
+### ⏱️ Focus Timer
+
+Full Pomodoro timer with task tags and beautiful stats — stay productive and track your focus habits.
+
+### 🧩 Custom Apps
+
+Turn any conversation into a reusable, scheduled app. Your AI, your workflow.
+
+---
+
+## 🔥 Why It's Different
+
+| | Typical AI Chat | MyxAI Desk |
 |---|---|---|
-| **Python** | 3.10+ | Required |
-| **pywebview** | — | Included in `requirements.txt`. Uses platform-native webview (EdgeWebView2 on Windows, WebKit on macOS/Linux). Falls back to browser mode if unavailable |
-| **Node.js** (optional) | 18+ | Only needed for MCP tool servers (e.g. Playwright browser automation). [Download](https://nodejs.org/) |
-| **LLM API Key** | — | At least one provider key (e.g. DashScope, OpenAI, DeepSeek, Anthropic). Configure in the Settings page after launch |
+| **Context** | Starts fresh every time | Knows what you've been exploring |
+| **Content** | You have to ask | It finds what matters to you |
+| **Continuity** | Conversations are disposable | Your interests accumulate over time |
+| **Depth** | Surface-level answers | One-click deep dive into any topic |
+| **Proactivity** | Waits for you | Delivers your briefing automatically |
+| **Efficiency** | Burns tokens on formatting | Structured output, minimal waste |
 
-## Quick Start
+---
 
-### 1. Install dependencies
+## 🚀 3 Minutes to Get Started
 
 ```bash
+# 1. Clone & install
+git clone https://github.com/your-org/myxai-desk.git
+cd myxai-desk
 pip install -r requirements.txt
-```
 
-### 2. First-time setup
-
-If nanobot has not been initialized, the app will guide you through the process. You can also run manually:
-
-```bash
-nanobot onboard
-```
-
-### 3. Launch the desktop app
-
-```bash
+# 2. Launch
 python app.py
 ```
 
-A native desktop window will open. If `pywebview` is not installed, it will fall back to browser mode.
+A native desktop window opens. Configure your LLM API key in Settings, and you're ready.
 
-## Tech Stack
+> First time? The app will walk you through setup.
 
-| Layer | Technology |
+---
+
+## 🧠 Core Capabilities
+
+| | |
 |---|---|
-| Native window | pywebview (platform-native webview) |
-| Backend API | Flask |
-| Frontend | Vanilla HTML / CSS / JS |
-| Markdown rendering | marked.js |
-| Code highlighting | highlight.js |
-| AI engine | nanobot-ai |
-| LLM routing | litellm (auto provider detection) |
-| Web search | Baidu qianfan API / Brave Search API (with daily quota management) |
+| 🎯 **Daily Briefing** | AI-curated content based on your real behaviour |
+| 📧 **Email Briefing** | Categorised inbox summary with action highlights |
+| 💬 **Contextual Chat** | Conversations that build on what you're doing |
+| 📊 **Reports Hub** | Unified view of all reports with inline browsing |
+| 📈 **Usage Stats** | Token & search API consumption tracking |
+| 🔍 **Web Monitor** | Track page changes with AI-powered summaries |
+| 🧩 **Custom Apps** | Turn any prompt into a reusable automated workflow |
 
-## Project Structure
+---
+
+## 🏗️ Under the Hood
+
+For developers curious about the architecture:
+
+| Layer | Tech |
+|---|---|
+| Desktop | pywebview (native window) |
+| Backend | Flask API |
+| Frontend | Vanilla HTML/CSS/JS |
+| AI Engine | nanobot + litellm |
+| Search | Baidu / Brave API |
+| Theme | Catppuccin Mocha |
+
+<details>
+<summary>Project Structure</summary>
 
 ```
 myai/
-├── app.py              # Main app: Flask backend + pywebview window
-├── requirements.txt    # Python dependencies
-├── README.md           # English documentation
-├── README_CN.md        # Chinese documentation
+├── app.py              # Flask backend + pywebview
+├── requirements.txt
 ├── apps/
-│   ├── __init__.py
-│   ├── llm_utils.py    # Shared LLM call utility
-│   ├── daily_digest.py # Today's Reading app: full pipeline
-│   ├── web_monitor.py  # Web Monitor app: page change detection
-│   ├── email_summary.py# Email Summary app: IMAP + LLM summary
-│   ├── focus_timer.py  # Focus Timer app: session persistence + stats
-│   ├── custom_app.py   # Custom App framework: CRUD, templates, reports
-│   └── web_search.py   # API-only web search: Baidu / Brave with quota tracking
+│   ├── daily_digest.py # Daily Briefing pipeline
+│   ├── email_summary.py# Email Briefing (IMAP + AI)
+│   ├── web_monitor.py  # Page change detection
+│   ├── focus_timer.py  # Pomodoro timer
+│   ├── custom_app.py   # Custom app framework
+│   ├── web_search.py   # Multi-engine search + quota
+│   └── llm_utils.py    # Shared LLM utils + token tracking
 └── frontend/
-    ├── index.html      # Frontend page
-    ├── style.css       # Styles (Catppuccin Mocha dark theme)
-    └── app.js          # Frontend logic (with i18n)
+    ├── index.html
+    ├── style.css
+    └── app.js
 ```
 
-## Configuration
+</details>
 
-All settings are stored in `~/.nanobot/config.json` and can be edited visually through the Settings page in the app.
+<details>
+<summary>LLM Provider Setup</summary>
 
-### Key settings
-
-- **Model** — Enter the model name in Settings (e.g. `qwen-plus`, `deepseek-chat`, `claude-opus-4-5`)
-- **API Key** — Fill in provider keys under the "API Keys" section
-- **MCP Servers** — Add tool servers (like Playwright) under "MCP Tool Services"
-- **Channels** — Toggle channel switches; use the Advanced JSON Editor for detailed channel config
-- **Language** — Switch between Chinese and English in the sidebar or Settings page
-
-### Model provider recommendation
-
-Most LLM providers (DashScope / DeepSeek / Moonshot / SiliconFlow / Groq, etc.) offer an **OpenAI-compatible** API endpoint. It is recommended to configure them under the **OpenAI** provider:
-
-1. Go to **Settings → API Keys → openai**
-2. Set **API Key** to the key from your provider
-3. Set **API Base** to the provider's OpenAI-compatible endpoint, for example:
+Most providers (DashScope, DeepSeek, Moonshot, SiliconFlow, Groq) offer OpenAI-compatible endpoints. Configure in **Settings → API Keys → openai**:
 
 | Provider | API Base |
 |---|---|
@@ -183,6 +175,14 @@ Most LLM providers (DashScope / DeepSeek / Moonshot / SiliconFlow / Groq, etc.) 
 | Groq | `https://api.groq.com/openai/v1` |
 | OpenRouter | `https://openrouter.ai/api/v1` |
 
-4. Set the **Model** name to the model you want to use (e.g. `qwen-plus`, `deepseek-chat`)
+</details>
 
-This approach provides the best compatibility and avoids per-provider SDK issues.
+---
+
+<div align="center">
+
+**Make AI a thinking companion that sits on your desktop.**
+
+⭐ Star this repo if it resonates with you.
+
+</div>
