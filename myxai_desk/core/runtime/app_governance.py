@@ -35,11 +35,6 @@ _FALLBACK_DECLARATIONS: dict[str, dict] = {
         "min_mode": "Observer",
         "capabilities": ["profile.read.summary", "search.web", "net.http_get", "notify.push"],
     },
-    "web_monitor": {
-        "source": "official",
-        "min_mode": "Observer",
-        "capabilities": ["net.http_get", "notify.push", "fs.write"],
-    },
     "email_summary": {
         "source": "official",
         "min_mode": "Assistant",

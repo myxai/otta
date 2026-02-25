@@ -2249,18 +2249,6 @@ _APP_CATALOG = {
         "category": "productivity",
         "min_mode": "Observer",
     },
-    "web_monitor": {
-        "id": "web_monitor",
-        "name": "网页监控",
-        "name_en": "Web Monitor",
-        "icon": "🔍",
-        "description": "监控指定网页变化，有更新时自动提醒",
-        "description_en": "Monitor web pages for changes, notify on updates",
-        "version": "1.0.0",
-        "author": "nanobot",
-        "category": "tools",
-        "min_mode": "Observer",
-    },
     "email_summary": {
         "id": "email_summary",
         "name": "邮件简报",
@@ -2281,12 +2269,6 @@ _DEFAULT_DIGEST_CONFIG = {
     "schedule_time": "22:00",
     "push_notification": True,
     "push_email": "",
-}
-
-_DEFAULT_MONITOR_CONFIG = {
-    "check_interval_minutes": 30,
-    "default_mode": "hash",
-    "schedule_enabled": True,
 }
 
 _DEFAULT_EMAIL_CONFIG = {
@@ -2417,7 +2399,6 @@ def api_app_install(app_id):
         return jsonify({"error": "应用已安装"}), 400
     default_configs = {
         "daily_digest": _DEFAULT_DIGEST_CONFIG,
-        "web_monitor": _DEFAULT_MONITOR_CONFIG,
         "email_summary": _DEFAULT_EMAIL_CONFIG,
     }
     registry[app_id] = {
@@ -2962,144 +2943,6 @@ def api_report_content(app_id, key):
 
 
 # ---------------------------------------------------------------------------
-# Routes — Web Monitor
-# ---------------------------------------------------------------------------
-
-_monitor_task_lock = threading.Lock()
-_monitor_task_status: dict = {}
-
-
-@flask_app.route("/api/apps/web_monitor/sites")
-def api_monitor_sites():
-    from apps.web_monitor import list_sites
-    return jsonify(list_sites())
-
-
-@flask_app.route("/api/apps/web_monitor/sites", methods=["POST"])
-def api_monitor_add_site():
-    from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("web_monitor", capabilities=["fs.write", "net.http_get"])
-    if not decision["allowed"]:
-        return jsonify({"error": decision["reason"]}), 403
-
-    body = request.json or {}
-    url = body.get("url", "").strip()
-    if not url:
-        return jsonify({"error": "URL 不能为空"}), 400
-    from apps.web_monitor import add_site
-    site = add_site(url, name=body.get("name", ""), mode=body.get("mode", "hash"))
-    try:
-        from myxai_desk.core.audit.ledger import AuditLedger
-        AuditLedger().append_entry(
-            capability="app.web_monitor.add_site", args={"url": url},
-            action_id="", result_summary=f"added {site.get('id', '')}",
-        )
-    except Exception:
-        pass
-    return jsonify(site)
-
-
-@flask_app.route("/api/apps/web_monitor/sites/<site_id>", methods=["DELETE"])
-def api_monitor_remove_site(site_id):
-    from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("web_monitor", capabilities=["fs.write"])
-    if not decision["allowed"]:
-        return jsonify({"error": decision["reason"]}), 403
-
-    from apps.web_monitor import remove_site
-    if remove_site(site_id):
-        try:
-            from myxai_desk.core.audit.ledger import AuditLedger
-            AuditLedger().append_entry(
-                capability="app.web_monitor.remove_site", args={"site_id": site_id},
-                action_id="", result_summary="removed",
-            )
-        except Exception:
-            pass
-        return jsonify({"success": True})
-    return jsonify({"error": "站点不存在"}), 404
-
-
-@flask_app.route("/api/apps/web_monitor/check", methods=["POST"])
-def api_monitor_check_all():
-    """Trigger a check on all enabled sites (background)."""
-    from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("web_monitor")
-    if not decision["allowed"]:
-        return jsonify({"error": decision["reason"]}), 403
-
-    with _monitor_task_lock:
-        if _monitor_task_status.get("status") == "running":
-            return jsonify({"error": "正在检查中"}), 409
-        _monitor_task_status.update({"status": "running", "progress": ""})
-
-    def _run():
-        try:
-            from apps.web_monitor import check_all_sites
-            model_cfg = _get_model_config()
-
-            def _progress(msg):
-                with _monitor_task_lock:
-                    _monitor_task_status["progress"] = msg
-
-            results = check_all_sites(
-                model=model_cfg.get("model"),
-                api_key=model_cfg.get("api_key"),
-                api_base=model_cfg.get("api_base"),
-                progress_cb=_progress,
-            )
-            changed = [r for r in results if r.get("changed")]
-            if changed:
-                _push_notification(
-                    title="🔍 网页变化通知",
-                    content=f"检测到 {len(changed)} 个网页有更新",
-                    level="info",
-                )
-            reg = _load_apps_registry()
-            if "web_monitor" in reg:
-                reg["web_monitor"]["last_run"] = datetime.now().strftime("%Y-%m-%d")
-                _save_apps_registry(reg)
-            with _monitor_task_lock:
-                _monitor_task_status.update({"status": "done", "results": results})
-        except Exception as exc:
-            print(f"[web_monitor] check error: {exc}")
-            with _monitor_task_lock:
-                _monitor_task_status.update({"status": "error", "error": str(exc)})
-
-    threading.Thread(target=_run, daemon=True).start()
-    return jsonify({"status": "running"})
-
-
-@flask_app.route("/api/apps/web_monitor/check/<site_id>", methods=["POST"])
-def api_monitor_check_one(site_id):
-    from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("web_monitor")
-    if not decision["allowed"]:
-        return jsonify({"error": decision["reason"]}), 403
-    from apps.web_monitor import check_site
-    model_cfg = _get_model_config()
-    result = check_site(
-        site_id,
-        model=model_cfg.get("model"),
-        api_key=model_cfg.get("api_key"),
-        api_base=model_cfg.get("api_base"),
-    )
-    return jsonify(result)
-
-
-@flask_app.route("/api/apps/web_monitor/status")
-def api_monitor_status():
-    with _monitor_task_lock:
-        return jsonify(dict(_monitor_task_status) if _monitor_task_status else {"status": "idle"})
-
-
-@flask_app.route("/api/apps/web_monitor/history/<site_id>")
-def api_monitor_history(site_id):
-    from apps.web_monitor import get_history
-    return jsonify(get_history(site_id))
-
-
-# ---------------------------------------------------------------------------
 # Routes — Email Summary
 # ---------------------------------------------------------------------------
 
@@ -3597,23 +3440,6 @@ def _load_official_tasks() -> list["_TaskDescriptor"]:
                 extra={"kind": "email_summary", "config": config, "registry_app": app},
             ))
 
-        elif app_id == "web_monitor":
-            if not config.get("schedule_enabled", True):
-                continue
-            interval_min = config.get("check_interval_minutes", 30)
-            cron_expr = f"*/{interval_min} * * * *"
-            descriptors.append(_TaskDescriptor(
-                task_id="web_monitor",
-                schedule={"enabled": True, "mode": "daily", "time": "00:00"},
-                cron_expr=cron_expr,
-                created_at=app.get("installed_at", "2024-01-01T00:00:00"),
-                last_success_at=app.get("last_run"),
-                catchup_policy="NONE",
-                catchup_window_hours=1,
-                max_catchup_runs=1,
-                extra={"kind": "web_monitor", "config": config, "registry_app": app},
-            ))
-
     return descriptors
 
 
@@ -3716,40 +3542,6 @@ def _exec_email_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str)
         )
     else:
         raise RuntimeError("email_summary failed")
-
-
-def _exec_web_monitor(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
-    config = task.extra["config"]
-    with _monitor_task_lock:
-        if _monitor_task_status.get("status") == "running":
-            return
-
-    from myxai_desk.core.runtime.app_governance import gate_app_run
-    _gate = gate_app_run("web_monitor")
-    if not _gate["allowed"]:
-        print(f"[scheduler] web_monitor blocked: {_gate['reason']}")
-        return
-
-    print(f"[scheduler] triggering web_monitor check (trigger={trigger})")
-    from apps.web_monitor import check_all_sites
-    model_cfg = _get_model_config()
-    results = check_all_sites(
-        model=model_cfg.get("model"),
-        api_key=model_cfg.get("api_key"),
-        api_base=model_cfg.get("api_base"),
-    )
-    changed = [r for r in results if r.get("changed")]
-    if changed:
-        _push_notification(
-            title="🔍 网页变化通知",
-            content=f"检测到 {len(changed)} 个网页有更新",
-            level="info",
-        )
-    today = datetime.now().strftime("%Y-%m-%d")
-    registry = _load_apps_registry()
-    if "web_monitor" in registry:
-        registry["web_monitor"]["last_run"] = today
-        _save_apps_registry(registry)
 
 
 def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
@@ -3858,7 +3650,6 @@ def _init_scheduler_service():
     _scheduler_svc.register_task_loader(_load_custom_tasks)
     _scheduler_svc.register_executor("daily_digest", _exec_daily_digest)
     _scheduler_svc.register_executor("email_summary", _exec_email_summary)
-    _scheduler_svc.register_executor("web_monitor", _exec_web_monitor)
     _scheduler_svc.register_executor("custom", _exec_custom_app)
     _scheduler_svc.register_executor("custom_summary", _exec_custom_summary)
 
@@ -3935,7 +3726,6 @@ def api_scheduler_status():
 _OFFICIAL_APP_META = {
     "daily_digest":  {"name_zh": "每日私享会", "name_en": "Daily Briefing", "icon": "🎯"},
     "email_summary": {"name_zh": "邮件简报",  "name_en": "Email Briefing", "icon": "📧"},
-    "web_monitor":   {"name_zh": "网页监控",  "name_en": "Web Monitor",    "icon": "🔍"},
 }
 
 

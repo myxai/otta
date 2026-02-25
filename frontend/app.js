@@ -132,15 +132,6 @@ const I18N = {
     "digest.generateFail":"生成失败","digest.noHistory":"未找到浏览记录",
     "digest.latestReport":"最新私享会",
     "digest.explore":"一起探讨吧","digest.exploreFail":"探索失败",
-    "monitor.title":"网页监控","monitor.subtitle":"监控指定网页变化，有更新时自动提醒",
-    "monitor.sites":"监控站点","monitor.addSite":"添加站点",
-    "monitor.url":"网页 URL","monitor.name":"名称（可选）","monitor.mode":"检测模式",
-    "monitor.modeHash":"哈希对比","monitor.modeLlm":"LLM 智能分析",
-    "monitor.add":"添加","monitor.checkAll":"检查全部","monitor.checking":"检查中…",
-    "monitor.noSites":"暂无监控站点","monitor.lastCheck":"上次检查","monitor.status":"状态",
-    "monitor.changed":"有变化","monitor.unchanged":"无变化","monitor.pending":"待检查","monitor.error":"错误",
-    "monitor.history":"变化历史","monitor.delete":"删除","monitor.checkOne":"检查",
-    "monitor.interval":"检查间隔（分钟）","monitor.scheduleEnabled":"定时检查","monitor.defaultMode":"默认模式",
     "email.title":"邮件简报","email.subtitle":"连接邮箱，AI 分类归纳生成邮件简报",
     "email.imapConfig":"IMAP 配置","email.host":"服务器","email.port":"端口",
     "email.user":"账号","email.password":"密码/授权码","email.ssl":"SSL",
@@ -322,15 +313,6 @@ const I18N = {
     "digest.generateFail":"Generation failed","digest.noHistory":"No browser history found",
     "digest.latestReport":"Latest Briefing",
     "digest.explore":"Let's Discuss","digest.exploreFail":"Explore failed",
-    "monitor.title":"Web Monitor","monitor.subtitle":"Monitor web pages for changes, notify on updates",
-    "monitor.sites":"Sites","monitor.addSite":"Add Site",
-    "monitor.url":"Page URL","monitor.name":"Name (optional)","monitor.mode":"Detection Mode",
-    "monitor.modeHash":"Hash Compare","monitor.modeLlm":"LLM Analysis",
-    "monitor.add":"Add","monitor.checkAll":"Check All","monitor.checking":"Checking…",
-    "monitor.noSites":"No sites monitored","monitor.lastCheck":"Last Check","monitor.status":"Status",
-    "monitor.changed":"Changed","monitor.unchanged":"No Change","monitor.pending":"Pending","monitor.error":"Error",
-    "monitor.history":"Change History","monitor.delete":"Delete","monitor.checkOne":"Check",
-    "monitor.interval":"Check Interval (min)","monitor.scheduleEnabled":"Scheduled Check","monitor.defaultMode":"Default Mode",
     "email.title":"Email Briefing","email.subtitle":"Connect your mailbox, AI-powered categorised briefing",
     "email.imapConfig":"IMAP Settings","email.host":"Server","email.port":"Port",
     "email.user":"Username","email.password":"Password / App Key","email.ssl":"SSL",
@@ -2370,7 +2352,6 @@ async function uninstallApp(appId) {
 
 async function openAppDetail(appId) {
   if (appId === "daily_digest") { await openDigestDetail(); return; }
-  if (appId === "web_monitor") { await openMonitorDetail(); return; }
   if (appId === "email_summary") { await openEmailDetail(); return; }
   if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
@@ -2380,7 +2361,7 @@ async function openAppReports(appId) {
   await openAppDetail(appId);
   setTimeout(() => {
     const targets = ["digest-report-list", "email-report-list", "capp-report-list",
-                     "monitor-sites-list", "focus-stats-content"];
+                     "focus-stats-content"];
     for (const id of targets) {
       const el = document.getElementById(id);
       if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
@@ -2696,215 +2677,6 @@ async function _refreshDigestReports() {
   } catch (_) {}
 }
 
-
-// ── Web Monitor Detail ─────────────────────────────────────────────────
-
-async function openMonitorDetail() {
-  document.getElementById("app-detail-title").textContent = `🔍 ${t("monitor.title")}`;
-  switchPage("app-detail");
-  const container = document.getElementById("app-detail-content");
-  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
-
-  let appData = _appsCache.find(a => a.id === "web_monitor");
-  if (!appData) { await loadApps(); appData = _appsCache.find(a => a.id === "web_monitor"); }
-  if (!appData || !appData.installed) {
-    container.innerHTML = `<div class="app-detail-loading">${t("apps.notInstalled")}</div>`;
-    return;
-  }
-
-  const config = appData.config || {};
-  const isEnabled = appData.enabled;
-  const interval = config.check_interval_minutes || 30;
-  const defaultMode = config.default_mode || "hash";
-  const schedEnabled = config.schedule_enabled !== false;
-
-  let sitesHtml = await _renderMonitorSites();
-
-  container.innerHTML = `
-    <div class="app-detail-section">
-      <div class="digest-status-bar">
-        <div class="digest-status-left">
-          ${_renderModeBadge("Observer")}
-          <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
-          <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="monitor-enabled" ${isEnabled ? "checked" : ""} onchange="toggleAppEnabled('web_monitor',this)" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>${t("digest.config")}</h3>
-      <div class="digest-config-grid">
-        <div class="form-group">
-          <label>${t("monitor.interval")}</label>
-          <input type="number" id="monitor-interval" value="${interval}" min="5" max="1440" />
-        </div>
-        <div class="form-group">
-          <label>${t("monitor.defaultMode")}</label>
-          <select id="monitor-default-mode" class="digest-select">
-            <option value="hash" ${defaultMode === "hash" ? "selected" : ""}>${t("monitor.modeHash")}</option>
-            <option value="llm" ${defaultMode === "llm" ? "selected" : ""}>${t("monitor.modeLlm")}</option>
-          </select>
-        </div>
-        <div class="form-group form-group-checkbox">
-          <label><input type="checkbox" id="monitor-sched-enabled" ${schedEnabled ? "checked" : ""} /><span>${t("monitor.scheduleEnabled")}</span></label>
-        </div>
-      </div>
-      <div class="digest-actions">
-        <button class="btn btn-primary" onclick="saveMonitorConfig()">${t("digest.saveConfig")}</button>
-        <button class="btn btn-primary" id="monitor-check-btn" onclick="monitorCheckAll()">🔍 ${t("monitor.checkAll")}</button>
-      </div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>${t("monitor.addSite")}</h3>
-      <div class="monitor-add-form">
-        <input type="text" id="monitor-add-url" placeholder="${t("monitor.url")}" class="monitor-input" />
-        <input type="text" id="monitor-add-name" placeholder="${t("monitor.name")}" class="monitor-input monitor-input-sm" />
-        <select id="monitor-add-mode" class="digest-select monitor-input-sm">
-          <option value="hash">${t("monitor.modeHash")}</option>
-          <option value="llm">${t("monitor.modeLlm")}</option>
-        </select>
-        <button class="btn btn-primary" onclick="monitorAddSite()">+ ${t("monitor.add")}</button>
-      </div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>${t("monitor.sites")}</h3>
-      <div id="monitor-sites-list">${sitesHtml}</div>
-    </div>
-
-    <div class="app-detail-section" id="monitor-history-view" style="display:none;">
-      <h3 id="monitor-history-title">${t("monitor.history")}</h3>
-      <div id="monitor-history-content"></div>
-    </div>
-  `;
-}
-
-async function _renderMonitorSites() {
-  try {
-    const sites = await api("/api/apps/web_monitor/sites");
-    if (!sites.length) return `<div class="digest-empty">${t("monitor.noSites")}</div>`;
-    return sites.map(s => {
-      const statusCls = s.status === "changed" ? "monitor-changed" : s.status === "ok" ? "monitor-ok" : s.status === "error" ? "monitor-error" : "monitor-pending";
-      const statusText = s.status === "changed" ? t("monitor.changed") : s.status === "ok" ? t("monitor.unchanged") : s.status === "error" ? t("monitor.error") : t("monitor.pending");
-      const lastCheck = s.last_checked ? s.last_checked.replace("T"," ").slice(0,19) : "—";
-      const modeBadge = s.mode === "llm" ? "LLM" : "Hash";
-      return `<div class="monitor-site-item ${statusCls}">
-        <div class="monitor-site-info">
-          <div class="monitor-site-name">${escapeHtml(s.name)}</div>
-          <div class="monitor-site-url">${escapeHtml(s.url)}</div>
-          <div class="monitor-site-meta">
-            <span class="monitor-mode-badge">${modeBadge}</span>
-            <span class="monitor-status-badge ${statusCls}">${statusText}</span>
-            <span class="monitor-last-check">${t("monitor.lastCheck")}: ${lastCheck}</span>
-          </div>
-        </div>
-        <div class="monitor-site-actions">
-          <button class="btn btn-sm" onclick="monitorCheckOne('${s.id}')">${t("monitor.checkOne")}</button>
-          <button class="btn btn-sm" onclick="monitorViewHistory('${s.id}','${escapeAttr(s.name)}')">${t("monitor.history")}</button>
-          <button class="btn btn-sm btn-danger" onclick="monitorDeleteSite('${s.id}')">${t("monitor.delete")}</button>
-        </div>
-      </div>`;
-    }).join("");
-  } catch (_) {
-    return `<div class="digest-empty">${t("monitor.noSites")}</div>`;
-  }
-}
-
-async function monitorAddSite() {
-  const url = document.getElementById("monitor-add-url").value.trim();
-  if (!url) return;
-  const name = document.getElementById("monitor-add-name").value.trim();
-  const mode = document.getElementById("monitor-add-mode").value;
-  try {
-    const res = await api("/api/apps/web_monitor/sites", "POST", { url, name, mode });
-    if (res.error) { toast(res.error, "error"); return; }
-    document.getElementById("monitor-add-url").value = "";
-    document.getElementById("monitor-add-name").value = "";
-    document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
-  } catch (e) { toast(e.message, "error"); }
-}
-
-async function monitorDeleteSite(siteId) {
-  if (!await showConfirm(_lang === "zh" ? "确定删除此站点？" : "Delete this site?", { danger: true })) return;
-  try {
-    await api(`/api/apps/web_monitor/sites/${siteId}`, "DELETE");
-    document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
-  } catch (e) { toast(e.message, "error"); }
-}
-
-async function monitorCheckOne(siteId) {
-  try {
-    const res = await api(`/api/apps/web_monitor/check/${siteId}`, "POST");
-    if (res.error) { toast(res.error, "error"); } else {
-      toast(res.summary || t("monitor.unchanged"), res.changed ? "success" : "info");
-    }
-    document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
-  } catch (e) { toast(e.message, "error"); }
-}
-
-async function monitorCheckAll() {
-  const btn = document.getElementById("monitor-check-btn");
-  btn.disabled = true;
-  btn.textContent = "⏳ " + t("monitor.checking");
-  try {
-    await api("/api/apps/web_monitor/check", "POST");
-    const poll = setInterval(async () => {
-      const st = await api("/api/apps/web_monitor/status");
-      if (st.status === "done" || st.status === "error" || st.status === "idle") {
-        clearInterval(poll);
-        btn.disabled = false;
-        btn.textContent = "🔍 " + t("monitor.checkAll");
-        document.getElementById("monitor-sites-list").innerHTML = await _renderMonitorSites();
-        if (st.status === "done") toast(t("monitor.unchanged"), "success");
-      } else {
-        btn.textContent = "⏳ " + (st.progress || t("monitor.checking"));
-      }
-    }, 2000);
-    setTimeout(() => clearInterval(poll), 120000);
-  } catch (e) {
-    btn.disabled = false;
-    btn.textContent = "🔍 " + t("monitor.checkAll");
-    toast(e.message, "error");
-  }
-}
-
-async function monitorViewHistory(siteId, siteName) {
-  const section = document.getElementById("monitor-history-view");
-  const titleEl = document.getElementById("monitor-history-title");
-  const content = document.getElementById("monitor-history-content");
-  titleEl.textContent = `📋 ${siteName} — ${t("monitor.history")}`;
-  try {
-    const history = await api(`/api/apps/web_monitor/history/${siteId}`);
-    if (!history.length) { content.innerHTML = `<div class="digest-empty">—</div>`; }
-    else {
-      content.innerHTML = history.map(h => `
-        <div class="monitor-history-item ${h.changed ? 'changed' : ''}">
-          <span class="monitor-history-time">${h.timestamp ? h.timestamp.replace("T"," ").slice(0,19) : ""}</span>
-          <span class="monitor-history-summary">${escapeHtml(h.summary || "")}</span>
-        </div>`).join("");
-    }
-    section.style.display = "block";
-    section.scrollIntoView({ behavior: "smooth" });
-  } catch (e) { toast(e.message, "error"); }
-}
-
-async function saveMonitorConfig() {
-  const config = {
-    check_interval_minutes: parseInt(document.getElementById("monitor-interval").value) || 30,
-    default_mode: document.getElementById("monitor-default-mode").value,
-    schedule_enabled: document.getElementById("monitor-sched-enabled").checked,
-  };
-  try {
-    const res = await api("/api/apps/web_monitor/config", "POST", config);
-    if (res.success) toast(t("digest.configSaved"), "success");
-    else toast(res.error || t("digest.configFail"), "error");
-  } catch (e) { toast(e.message, "error"); }
-}
 
 // ── Email Summary Detail ──────────────────────────────────────────────
 

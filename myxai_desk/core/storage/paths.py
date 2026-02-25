@@ -30,7 +30,6 @@ APPS_PREFS_FILE: Path = APPS_DIR / "prefs.json"
 CUSTOM_APPS_DIR: Path = APPS_DIR / "custom"
 DAILY_DIGEST_DIR: Path = APPS_DIR / "daily_digest"
 EMAIL_SUMMARY_DIR: Path = APPS_DIR / "email_summary"
-WEB_MONITOR_DIR: Path = APPS_DIR / "web_monitor"
 
 # ── Profile ────────────────────────────────────────────────────────
 

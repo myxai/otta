@@ -68,10 +68,6 @@ All reports in one place — Daily Briefing, Email Briefing, Custom Apps. Filter
 
 Track your LLM token consumption and search API usage with daily charts. Know exactly what you're spending.
 
-### 🔍 Web Monitor
-
-Track any web page for changes. Get notified when something updates — with an AI summary of what changed.
-
 ### ⏱️ Focus Timer
 
 Full Pomodoro timer with task tags and beautiful stats — stay productive and track your focus habits.
@@ -133,7 +129,6 @@ A native desktop window opens. Configure your LLM API key in Settings, and you'r
 | 💬 **Contextual Chat** | Conversations that build on what you're doing |
 | 📊 **Reports Hub** | Unified view of all reports with inline browsing |
 | 📈 **Usage Stats** | Token & search API consumption tracking |
-| 🔍 **Web Monitor** | Track page changes with AI-powered summaries |
 | 🛡️ **Safety** | Zero deletion, execution confirmation, danger interception, app sandbox |
 | 🧩 **Custom Apps** | Web search + content generation reusable workflows |
 
@@ -162,7 +157,6 @@ myai/
 ├── apps/
 │   ├── daily_digest.py  # Daily Briefing pipeline
 │   ├── email_summary.py # Email Briefing (IMAP + AI)
-│   ├── web_monitor.py   # Page change detection
 │   ├── custom_app.py    # Custom app framework
 │   ├── web_search.py    # Multi-engine search + quota
 │   ├── safe_fs.py       # Safe file operations (zero deletion, trash-based)
