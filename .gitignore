@@ -1,5 +1,6 @@
 __pycache__/
 apps/__pycache__/
+myxai_desk/__pycache__/
 *.pyc
 *.pyo
 *.pyd
