@@ -15,8 +15,8 @@ import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 
-from myxai_desk.core.storage.paths import SESSIONS_FILE
 from myxai_desk.core.profile.events import ChatMessage, EventStore
+from myxai_desk.core.storage.paths import SESSIONS_FILE
 
 # ── Signal detection helpers ─────────────────────────────────────
 
@@ -64,13 +64,29 @@ def _detect_depth_preference(text: str) -> str:
 def _extract_goal_keywords(text: str) -> list[str]:
     if not _GOAL_PATTERNS.search(text):
         return []
-    words = re.findall(r'[\w\u4e00-\u9fff]{2,}', text)
-    stop = {"目标", "计划", "打算", "想要", "需要", "希望", "一个", "这个",
-            "goal", "plan", "want", "need", "the", "and", "for"}
+    words = re.findall(r"[\w\u4e00-\u9fff]{2,}", text)
+    stop = {
+        "目标",
+        "计划",
+        "打算",
+        "想要",
+        "需要",
+        "希望",
+        "一个",
+        "这个",
+        "goal",
+        "plan",
+        "want",
+        "need",
+        "the",
+        "and",
+        "for",
+    }
     return [w for w in words if w.lower() not in stop][:6]
 
 
 # ── Public API ────────────────────────────────────────────────────
+
 
 def read_chat_history(hours: int = 72) -> list[dict]:
     """Read recent nanobot chat conversations."""
@@ -96,17 +112,19 @@ def read_chat_history(hours: int = 72) -> list[dict]:
         msgs = sess.get("messages", [])
         if not msgs:
             continue
-        sessions.append({
-            "session_title": sess.get("title", sid),
-            "updated_at": updated,
-            "messages": msgs,
-        })
+        sessions.append(
+            {
+                "session_title": sess.get("title", sid),
+                "updated_at": updated,
+                "messages": msgs,
+            }
+        )
     return sessions
 
 
 def collect_chat_events(hours: int = 72) -> list[dict]:
     """Read chat history and return as event dicts (no persistence).
-    
+
     Returns list of chat_message event dicts for in-memory analysis only.
     """
     sessions = read_chat_history(hours=hours)
@@ -128,21 +146,22 @@ def collect_chat_events(hours: int = 72) -> list[dict]:
                 depth_pref = _detect_depth_preference(content)
                 goal_kws = _extract_goal_keywords(content)
 
-            events.append({
-                "event_type": "chat_message",
-                "role": role,
-                "text_digest": digest,
-                "ts": ts,
-                "session": sess["session_title"],
-                "output_preference": out_pref,
-                "depth_preference": depth_pref,
-                "goal_keywords": goal_kws or None,
-            })
+            events.append(
+                {
+                    "event_type": "chat_message",
+                    "role": role,
+                    "text_digest": digest,
+                    "ts": ts,
+                    "session": sess["session_title"],
+                    "output_preference": out_pref,
+                    "depth_preference": depth_pref,
+                    "goal_keywords": goal_kws or None,
+                }
+            )
     return events
 
 
-def collect_to_events(hours: int = 72,
-                      store: EventStore | None = None) -> int:
+def collect_to_events(hours: int = 72, store: EventStore | None = None) -> int:
     """Read chat history and record as profile events with structural signals."""
     store = store or EventStore()
     sessions = read_chat_history(hours=hours)
@@ -197,7 +216,7 @@ def aggregate_chat_signals(store: EventStore, n: int = 300) -> dict:
         dp = e.get("depth_preference", "")
         if dp:
             depth_counter[dp] += 1
-        for kw in (e.get("goal_keywords") or []):
+        for kw in e.get("goal_keywords") or []:
             goal_counter[kw] += 1
 
     return {

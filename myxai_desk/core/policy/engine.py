@@ -7,27 +7,26 @@ The engine dispatches to capability-specific rule modules and assembles a
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from typing import Any, Literal
 
+from myxai_desk.core.policy.explain import explain as _explain
 from myxai_desk.core.policy.modes import (
-    SecurityMode,
     ModePolicy,
+    SecurityMode,
     get_current_mode,
     get_current_policy,
 )
-from myxai_desk.core.policy.explain import explain as _explain
 from myxai_desk.core.policy.rules import fs as _fs_rules
-from myxai_desk.core.policy.rules import proc as _proc_rules
-from myxai_desk.core.policy.rules import net as _net_rules
 from myxai_desk.core.policy.rules import mcp as _mcp_rules
+from myxai_desk.core.policy.rules import net as _net_rules
+from myxai_desk.core.policy.rules import proc as _proc_rules
 from myxai_desk.core.policy.rules import profile as _profile_rules
 
 
 @dataclass
 class Decision:
-    action: Literal["ALLOW", "REQUIRE_CONFIRM", "REQUIRE_SANDBOX",
-                     "REQUIRE_COOLDOWN", "DENY"]
+    action: Literal["ALLOW", "REQUIRE_CONFIRM", "REQUIRE_SANDBOX", "REQUIRE_COOLDOWN", "DENY"]
     risk: int  # 0-100
     reason_code: str
     explain: str
@@ -103,11 +102,17 @@ def decide(
     # Profile rules need app source
     if capability == "profile":
         action, risk, reason = rule_mod.evaluate(
-            op, args, policy, app_source=source,
+            op,
+            args,
+            policy,
+            app_source=source,
         )
     elif capability == "fs":
         action, risk, reason = rule_mod.evaluate(
-            op, args, policy, workspace=context.get("workspace"),
+            op,
+            args,
+            policy,
+            workspace=context.get("workspace"),
         )
     else:
         action, risk, reason = rule_mod.evaluate(op, args, policy)
@@ -152,4 +157,5 @@ def decide(
 
 def _policy_for(mode: SecurityMode) -> ModePolicy:
     from myxai_desk.core.policy.modes import DEFAULT_POLICIES
+
     return DEFAULT_POLICIES[mode]

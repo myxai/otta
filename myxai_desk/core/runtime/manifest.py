@@ -9,10 +9,12 @@ A Prompt App package is a directory containing:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Literal
 
 import yaml
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass
@@ -94,11 +96,13 @@ def load_manifest(package_dir: Path) -> AppManifest:
 
     # Triggers
     for t in raw.get("triggers", []):
-        manifest.triggers.append(TriggerSpec(
-            type=t.get("type", "manual"),
-            cron=t.get("cron", ""),
-            event=t.get("event", ""),
-        ))
+        manifest.triggers.append(
+            TriggerSpec(
+                type=t.get("type", "manual"),
+                cron=t.get("cron", ""),
+                event=t.get("event", ""),
+            )
+        )
 
     # Permissions
     manifest.permissions = raw.get("permissions", [])
@@ -122,10 +126,12 @@ def load_manifest(package_dir: Path) -> AppManifest:
 
     # Outputs
     for o in raw.get("outputs", []):
-        manifest.outputs.append(OutputSpec(
-            type=o.get("type", "report.html"),
-            path=o.get("path", ""),
-        ))
+        manifest.outputs.append(
+            OutputSpec(
+                type=o.get("type", "report.html"),
+                path=o.get("path", ""),
+            )
+        )
 
     # UI
     ui = raw.get("ui", {})
@@ -157,11 +163,15 @@ def manifest_to_dict(m: AppManifest) -> dict:
         "author": m.author,
         "permissions": m.permissions,
         "triggers": [{"type": t.type, "cron": t.cron} for t in m.triggers],
-        "budgets": {"tokens_per_day": m.budgets.tokens_per_day,
-                    "search_calls_per_day": m.budgets.search_calls_per_day},
+        "budgets": {
+            "tokens_per_day": m.budgets.tokens_per_day,
+            "search_calls_per_day": m.budgets.search_calls_per_day,
+        },
         "mode_requirements": m.mode_requirements,
-        "data_policy": {"allow_raw_history": m.data_policy.allow_raw_history,
-                        "allow_network_exfiltration": m.data_policy.allow_network_exfiltration},
+        "data_policy": {
+            "allow_raw_history": m.data_policy.allow_raw_history,
+            "allow_network_exfiltration": m.data_policy.allow_network_exfiltration,
+        },
         "outputs": [{"type": o.type, "path": o.path} for o in m.outputs],
         "ui": {"icon": m.ui.icon, "category": m.ui.category},
     }

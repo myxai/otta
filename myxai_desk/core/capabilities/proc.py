@@ -67,14 +67,16 @@ class Proc:
 
         try:
             proc = await asyncio.create_subprocess_exec(
-                cmd, *fixed_args,
+                cmd,
+                *fixed_args,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 cwd=cwd,
                 env=env,
             )
             stdout_b, stderr_b = await asyncio.wait_for(
-                proc.communicate(), timeout=timeout,
+                proc.communicate(),
+                timeout=timeout,
             )
             stdout = stdout_b.decode("utf-8", errors="replace")[:50_000]
             stderr = stderr_b.decode("utf-8", errors="replace")[:10_000]
@@ -121,8 +123,10 @@ class Proc:
         try:
             result = subprocess.run(
                 [cmd, *fixed_args],
-                capture_output=True, text=True,
-                timeout=timeout, cwd=cwd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=cwd,
             )
             stdout = result.stdout[:50_000]
             stderr = result.stderr[:10_000]

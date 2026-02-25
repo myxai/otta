@@ -25,7 +25,6 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any
 
 # ── Fallback declarations (used ONLY when no app.yaml is found) ───
 
@@ -43,6 +42,7 @@ _FALLBACK_DECLARATIONS: dict[str, dict] = {
 }
 
 CUSTOM_APP_DEFAULT_CAPABILITIES = ["search.web", "net.http_get", "notify.push", "fs.read"]
+
 
 def _find_manifest_dir(app_id: str) -> Path | None:
     """Locate the app.yaml package directory for *app_id*.
@@ -74,9 +74,11 @@ def _manifest_to_decl(manifest_dir: Path) -> dict | None:
         return None
     try:
         import yaml
+
         raw = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
     except ImportError:
         import json
+
         raw = json.loads(yaml_path.read_text(encoding="utf-8"))
     except Exception:
         return None
@@ -92,8 +94,7 @@ def _manifest_to_decl(manifest_dir: Path) -> dict | None:
     }
 
 
-def _get_app_decl(app_id: str, source: str = "",
-                  capabilities: list[str] | None = None) -> dict:
+def _get_app_decl(app_id: str, source: str = "", capabilities: list[str] | None = None) -> dict:
     """Get the capability declaration for *app_id*.
 
     Resolution order:
@@ -128,6 +129,7 @@ def _get_app_decl(app_id: str, source: str = "",
 
 # ── Gate (pre-execution) ──────────────────────────────────────────
 
+
 def gate_app_run(
     app_id: str,
     *,
@@ -145,8 +147,11 @@ def gate_app_run(
     effective_mode = None
     try:
         from myxai_desk.core.policy.modes import (
-            SecurityMode, get_effective_mode, mode_index,
+            SecurityMode,
+            get_effective_mode,
+            mode_index,
         )
+
         effective_mode = get_effective_mode(app_id)
         try:
             required = SecurityMode(decl["min_mode"])
@@ -156,8 +161,9 @@ def gate_app_run(
         if mode_index(effective_mode) < mode_index(required):
             return {
                 "allowed": False,
-                "reason": (f"有效安全模式 {effective_mode.value} 不满足应用要求的最低模式 "
-                           f"{required.value}"),
+                "reason": (
+                    f"有效安全模式 {effective_mode.value} 不满足应用要求的最低模式 {required.value}"
+                ),
                 "warnings": [],
             }
     except Exception as e:
@@ -168,6 +174,7 @@ def gate_app_run(
     confirm_caps: list[str] = []
     try:
         from myxai_desk.core.policy.engine import decide
+
         for cap_str in decl.get("capabilities", []):
             parts = cap_str.split(".", 1)
             cap = parts[0]
@@ -200,6 +207,7 @@ def gate_app_run(
     # 3. Budget check (for apps with declared budgets)
     try:
         from myxai_desk.core.runtime.budget import check_budget
+
         # Use reasonable defaults for hardcoded apps
         ok, reason = check_budget(app_id, tokens_limit=200000, search_limit=100)
         if not ok:
@@ -214,6 +222,7 @@ def gate_app_run(
     # 4. Audit: log the app run attempt
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
             capability="app.run",
             args={"app_id": app_id, "source": decl.get("source", "")},
@@ -228,6 +237,7 @@ def gate_app_run(
 
 # ── Finish (post-execution) ───────────────────────────────────────
 
+
 def finish_app_run(
     app_id: str,
     *,
@@ -239,6 +249,7 @@ def finish_app_run(
     # Audit entry
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
             capability="app.run.complete",
             args={"app_id": app_id, "success": success},
@@ -252,18 +263,22 @@ def finish_app_run(
     if tokens_used > 0:
         try:
             from myxai_desk.core.runtime.budget import record_tokens
+
             record_tokens(app_id, tokens_used)
         except Exception:
             pass
 
     # Profile event
     try:
-        from myxai_desk.core.profile.events import EventStore, AppRun
-        EventStore().append(AppRun(
-            app_id=app_id,
-            ts=str(time.time()),
-            inputs_digest="",
-            outputs_digest="ok" if success else error[:100],
-        ))
+        from myxai_desk.core.profile.events import AppRun, EventStore
+
+        EventStore().append(
+            AppRun(
+                app_id=app_id,
+                ts=str(time.time()),
+                inputs_digest="",
+                outputs_digest="ok" if success else error[:100],
+            )
+        )
     except Exception:
         pass

@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
 from threading import Lock
-from typing import Any, Generator
+from typing import TYPE_CHECKING
 
 from myxai_desk.core.storage.paths import NANOBOT_HOME, ensure_dir
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+    from pathlib import Path
 
 _DB_PATH = NANOBOT_HOME / "storage" / "myxai.db"
 _lock = Lock()
@@ -63,7 +65,7 @@ def execute(sql: str, params: tuple = (), *, readonly: bool = False) -> list[dic
         cursor = conn.execute(sql, params)
         if cursor.description:
             cols = [d[0] for d in cursor.description]
-            return [dict(zip(cols, row)) for row in cursor.fetchall()]
+            return [dict(zip(cols, row, strict=False)) for row in cursor.fetchall()]
         return []
 
 
@@ -82,9 +84,12 @@ def ensure_table(name: str, schema: str) -> None:
 
 # ── Pre-defined schemas ───────────────────────────────────────────
 
+
 def init_default_tables() -> None:
     """Create the standard tables used by myxai_desk modules."""
-    ensure_table("audit_entries", """
+    ensure_table(
+        "audit_entries",
+        """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ts TEXT NOT NULL,
         app_id TEXT DEFAULT '',
@@ -98,25 +103,34 @@ def init_default_tables() -> None:
         reason_code TEXT DEFAULT '',
         undo_action_id TEXT DEFAULT '',
         entry_hash TEXT DEFAULT ''
-    """)
+    """,
+    )
 
-    ensure_table("budget_usage", """
+    ensure_table(
+        "budget_usage",
+        """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         app_id TEXT NOT NULL,
         date TEXT NOT NULL,
         tokens_used INTEGER DEFAULT 0,
         search_calls INTEGER DEFAULT 0,
         UNIQUE(app_id, date)
-    """)
+    """,
+    )
 
-    ensure_table("profile_events", """
+    ensure_table(
+        "profile_events",
+        """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         event_type TEXT NOT NULL,
         ts REAL NOT NULL,
         data_json TEXT DEFAULT '{}'
-    """)
+    """,
+    )
 
-    ensure_table("task_runs", """
+    ensure_table(
+        "task_runs",
+        """
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         task_id TEXT NOT NULL,
         idempotency_key TEXT NOT NULL,
@@ -128,4 +142,5 @@ def init_default_tables() -> None:
         error TEXT DEFAULT '',
         artifacts TEXT DEFAULT '{}',
         UNIQUE(idempotency_key)
-    """)
+    """,
+    )

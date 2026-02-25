@@ -16,10 +16,9 @@ from collections import Counter
 from datetime import datetime, timezone
 from typing import Any
 
-from myxai_desk.core.profile.events import EventStore
-from myxai_desk.core.profile.persona_model import StablePersona, RecentSnapshot
 from myxai_desk.core.profile import persona_store
-
+from myxai_desk.core.profile.events import EventStore
+from myxai_desk.core.profile.persona_model import RecentSnapshot, StablePersona
 
 # ── LLM Prompts ──────────────────────────────────────────────────
 
@@ -58,10 +57,12 @@ RECENT_SNAPSHOT_PROMPT = """\
 
 # ── Data Collection ──────────────────────────────────────────────
 
+
 def _collect_events(store: EventStore, days: int = 7) -> list[dict]:
     """Collect events in-memory only — no persistence to events.jsonl."""
     try:
         from myxai_desk.core.capabilities.profile import Profile
+
         settings = Profile().get_collection_settings()
     except Exception:
         settings = {}
@@ -72,6 +73,7 @@ def _collect_events(store: EventStore, days: int = 7) -> list[dict]:
     if settings.get("browser_history", True):
         try:
             from myxai_desk.core.profile.collectors.browser import collect_browser_events
+
             browser_events = collect_browser_events(hours=collect_days * 24)
             events.extend(browser_events)
         except Exception as e:
@@ -80,6 +82,7 @@ def _collect_events(store: EventStore, days: int = 7) -> list[dict]:
     if settings.get("chat_history", True):
         try:
             from myxai_desk.core.profile.collectors.chat import collect_chat_events
+
             chat_events = collect_chat_events(hours=collect_days * 24)
             events.extend(chat_events)
         except Exception as e:
@@ -88,6 +91,7 @@ def _collect_events(store: EventStore, days: int = 7) -> list[dict]:
     if settings.get("file_history") and settings.get("watch_paths"):
         try:
             from myxai_desk.core.profile.collectors.file_scanner import collect_file_events
+
             file_events = collect_file_events(settings["watch_paths"], days=collect_days)
             events.extend(file_events)
         except Exception as e:
@@ -97,6 +101,7 @@ def _collect_events(store: EventStore, days: int = 7) -> list[dict]:
 
 
 # ── Aggregation ──────────────────────────────────────────────────
+
 
 def _aggregate_events(events: list[dict]) -> dict[str, Any]:
     """Reduce raw events into a structured summary for prompt/rule input."""
@@ -122,7 +127,7 @@ def _aggregate_events(events: list[dict]) -> dict[str, Any]:
     for e in chats:
         if e.get("role") != "user":
             continue
-        for kw in (e.get("goal_keywords") or []):
+        for kw in e.get("goal_keywords") or []:
             goal_counter[kw] += 1
         op = e.get("output_preference", "")
         if op:
@@ -203,6 +208,7 @@ def _build_data_block(agg: dict) -> str:
 
 # ── LLM-based Generation ────────────────────────────────────────
 
+
 def _generate_with_llm(
     agg: dict,
     model: str,
@@ -222,7 +228,7 @@ def _generate_with_llm(
         prev_context += f"\n【上次稳定画像】\n{prev_stable.prompt_text}\n"
     if prev_recent and not prev_recent.is_empty():
         prev_context += f"\n【上次近期快照】\n{prev_recent.prompt_text}\n"
-    
+
     if prev_context:
         prev_context = "\n" + prev_context + "\n请结合上次画像和新数据，更新画像内容。\n"
 
@@ -230,8 +236,11 @@ def _generate_with_llm(
     stable_prompt = STABLE_PERSONA_PROMPT.format(data_block=data_block) + prev_context
     stable_text = llm_call(
         messages=[{"role": "user", "content": stable_prompt}],
-        model=model, api_key=api_key, api_base=api_base,
-        temperature=0.3, max_tokens=500,
+        model=model,
+        api_key=api_key,
+        api_base=api_base,
+        temperature=0.3,
+        max_tokens=500,
     )
     record_task_usage("persona", prompt_tokens=800, completion_tokens=300)
 
@@ -243,8 +252,11 @@ def _generate_with_llm(
     recent_prompt = RECENT_SNAPSHOT_PROMPT.format(data_block=data_block)
     recent_text = llm_call(
         messages=[{"role": "user", "content": recent_prompt}],
-        model=model, api_key=api_key, api_base=api_base,
-        temperature=0.3, max_tokens=600,
+        model=model,
+        api_key=api_key,
+        api_base=api_base,
+        temperature=0.3,
+        max_tokens=600,
     )
     record_task_usage("persona", prompt_tokens=800, completion_tokens=400)
 
@@ -266,13 +278,17 @@ def _parse_stable_output(text: str) -> StablePersona:
     for p in parts[1:]:
         low = p.lower()
         if low.startswith("目标:") or low.startswith("目标："):
-            persona.long_term_goals = [g.strip() for g in p.split(":", 1)[-1].split("：", 1)[-1].split(",")]
+            persona.long_term_goals = [
+                g.strip() for g in p.split(":", 1)[-1].split("：", 1)[-1].split(",")
+            ]
         elif low.startswith("能力:") or low.startswith("能力："):
             persona.capability_assessment = p.split(":", 1)[-1].split("：", 1)[-1].strip()
         elif low.startswith("偏好:") or low.startswith("偏好："):
             persona.decision_preference = p.split(":", 1)[-1].split("：", 1)[-1].strip()
         elif low.startswith("约束:") or low.startswith("约束："):
-            persona.output_constraints = [c.strip() for c in p.split(":", 1)[-1].split("：", 1)[-1].split("/")]
+            persona.output_constraints = [
+                c.strip() for c in p.split(":", 1)[-1].split("：", 1)[-1].split("/")
+            ]
     return persona
 
 
@@ -291,7 +307,10 @@ def _parse_recent_output(text: str) -> RecentSnapshot:
                     proj_str = proj_part.split(":", 1)[-1].split("：", 1)[-1].strip()
                     m = re.match(r"(.+?)\((.+?)\)", proj_str)
                     if m:
-                        snapshot.active_project = {"name": m.group(1).strip(), "stage": m.group(2).strip()}
+                        snapshot.active_project = {
+                            "name": m.group(1).strip(),
+                            "stage": m.group(2).strip(),
+                        }
 
             topic_str = topics_part.split(":", 1)[-1].split("：", 1)[-1].strip()
             for t in topic_str.split(","):
@@ -299,10 +318,12 @@ def _parse_recent_output(text: str) -> RecentSnapshot:
                 m = re.match(r"(.+?)\((↑|↓|=|升温|稳定|下降)\)", t)
                 if m:
                     trend_map = {"↑": "升温", "=": "稳定", "↓": "下降"}
-                    snapshot.core_topics.append({
-                        "topic": m.group(1).strip(),
-                        "trend": trend_map.get(m.group(2), m.group(2)),
-                    })
+                    snapshot.core_topics.append(
+                        {
+                            "topic": m.group(1).strip(),
+                            "trend": trend_map.get(m.group(2), m.group(2)),
+                        }
+                    )
                 elif t:
                     snapshot.core_topics.append({"topic": t, "trend": "稳定"})
 
@@ -314,6 +335,7 @@ def _parse_recent_output(text: str) -> RecentSnapshot:
 
 
 # ── Rule-based Fallback ──────────────────────────────────────────
+
 
 def _generate_with_rules(agg: dict) -> tuple[StablePersona, RecentSnapshot]:
     """Produce persona outputs from aggregated data without LLM."""
@@ -395,11 +417,13 @@ def _generate_with_rules(agg: dict) -> tuple[StablePersona, RecentSnapshot]:
 
     top_topics = merged.most_common(3)
     for kw, score in top_topics:
-        recent.core_topics.append({
-            "topic": kw,
-            "trend": "升温" if score > 5 else "稳定",
-            "evidence": f"加权得分 {score}",
-        })
+        recent.core_topics.append(
+            {
+                "topic": kw,
+                "trend": "升温" if score > 5 else "稳定",
+                "evidence": f"加权得分 {score}",
+            }
+        )
 
     # Active project from file keywords
     if agg["file_name_keywords"]:
@@ -416,9 +440,7 @@ def _generate_with_rules(agg: dict) -> tuple[StablePersona, RecentSnapshot]:
     for kw, _ in top_topics:
         recent.recommendations.append(f"关于「{kw}」的最新实践/工具")
     if recent.active_project.get("name"):
-        recent.recommendations.append(
-            f"与 {recent.active_project['name']} 同类项目的架构对比"
-        )
+        recent.recommendations.append(f"与 {recent.active_project['name']} 同类项目的架构对比")
     recent.recommendations.append("近期热门技术动态")
     recent.recommendations = recent.recommendations[:5]
 
@@ -446,6 +468,7 @@ def _generate_with_rules(agg: dict) -> tuple[StablePersona, RecentSnapshot]:
 
 
 # ── Public API ───────────────────────────────────────────────────
+
 
 def run_full_update(
     *,
@@ -476,7 +499,10 @@ def run_full_update(
     try:
         if use_llm:
             stable, recent = _generate_with_llm(
-                agg, model, api_key, api_base,
+                agg,
+                model,
+                api_key,
+                api_base,
                 prev_stable=prev_stable,
                 prev_recent=prev_recent,
             )

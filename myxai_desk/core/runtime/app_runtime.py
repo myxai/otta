@@ -5,19 +5,17 @@ Flow: manifest -> capability_factory -> plan -> confirm -> execute -> audit -> o
 
 from __future__ import annotations
 
-import json
-import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from myxai_desk.core.runtime.manifest import AppManifest, load_manifest
-from myxai_desk.core.policy.engine import decide, Decision
-from myxai_desk.core.policy.modes import SecurityMode, get_current_mode
 from myxai_desk.core.audit.ledger import AuditLedger
 from myxai_desk.core.audit.undo import UndoRegistry
-from myxai_desk.core.storage.paths import ensure_dir
+from myxai_desk.core.policy.engine import decide
+from myxai_desk.core.policy.modes import SecurityMode, get_current_mode
+from myxai_desk.core.runtime.manifest import AppManifest, load_manifest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass
@@ -42,9 +40,10 @@ class AppResult:
 
 # ── Capability factory ─────────────────────────────────────────────
 
-def capability_factory(permissions: list[str], *,
-                       undo: UndoRegistry | None = None,
-                       audit: AuditLedger | None = None) -> dict[str, Any]:
+
+def capability_factory(
+    permissions: list[str], *, undo: UndoRegistry | None = None, audit: AuditLedger | None = None
+) -> dict[str, Any]:
     """Create capability instances restricted to the declared permissions."""
     caps: dict[str, Any] = {}
 
@@ -52,34 +51,42 @@ def capability_factory(permissions: list[str], *,
 
     if any(p.startswith("fs.") or p.startswith("file.") for p in perm_set):
         from myxai_desk.core.capabilities.fs import FS
+
         caps["fs"] = FS(undo_registry=undo, audit_ledger=audit)
 
     if any(p.startswith("proc.") or p == "proc" for p in perm_set):
         from myxai_desk.core.capabilities.proc import Proc
+
         caps["proc"] = Proc(undo_registry=undo, audit_ledger=audit)
 
     if any(p.startswith("search.") for p in perm_set):
         from myxai_desk.core.capabilities.search import SearchCapability
+
         caps["search"] = SearchCapability(audit_ledger=audit)
 
     if any(p.startswith("net.") for p in perm_set):
         from myxai_desk.core.capabilities.net import Net
+
         caps["net"] = Net(audit_ledger=audit)
 
     if any(p.startswith("profile.") for p in perm_set):
         from myxai_desk.core.capabilities.profile import Profile
+
         caps["profile"] = Profile()
 
     if any(p.startswith("notify.") for p in perm_set):
         from myxai_desk.core.capabilities.notify import Notify
+
         caps["notify"] = Notify()
 
     if any(p.startswith("cron.") for p in perm_set):
         from myxai_desk.core.capabilities.cron import CronCapability
+
         caps["cron"] = CronCapability()
 
     if any(p.startswith("mcp.") for p in perm_set):
         from myxai_desk.core.capabilities.mcp import MCPCapability
+
         caps["mcp"] = MCPCapability(audit_ledger=audit)
 
     return caps
@@ -87,8 +94,12 @@ def capability_factory(permissions: list[str], *,
 
 # ── Mode check ─────────────────────────────────────────────────────
 
-_MODE_ORDER = [SecurityMode.OBSERVER, SecurityMode.ASSISTANT,
-               SecurityMode.OPERATOR, SecurityMode.DEVELOPER]
+_MODE_ORDER = [
+    SecurityMode.OBSERVER,
+    SecurityMode.ASSISTANT,
+    SecurityMode.OPERATOR,
+    SecurityMode.DEVELOPER,
+]
 
 
 def _mode_sufficient(current: SecurityMode, required_min: str) -> bool:
@@ -101,6 +112,7 @@ def _mode_sufficient(current: SecurityMode, required_min: str) -> bool:
 
 
 # ── Run App ────────────────────────────────────────────────────────
+
 
 def run_app(
     app_pkg: Path | AppManifest,
@@ -116,21 +128,18 @@ def run_app(
     input_ctx = input_ctx or {}
 
     # 1. Load manifest
-    if isinstance(app_pkg, AppManifest):
-        manifest = app_pkg
-    else:
-        manifest = load_manifest(app_pkg)
+    manifest = app_pkg if isinstance(app_pkg, AppManifest) else load_manifest(app_pkg)
 
     # 2. Signature verification for official apps
     if manifest.source == "official" and manifest.package_dir:
         from myxai_desk.core.runtime.signing import is_signed, verify_package
-        if is_signed(manifest.package_dir):
-            if not verify_package(manifest.package_dir):
-                return AppResult(
-                    app_id=manifest.id,
-                    success=False,
-                    error="Official app signature verification failed — package may be tampered",
-                )
+
+        if is_signed(manifest.package_dir) and not verify_package(manifest.package_dir):
+            return AppResult(
+                app_id=manifest.id,
+                success=False,
+                error="Official app signature verification failed — package may be tampered",
+            )
 
     # 3. Mode check (renumbered — was 2)
     current_mode = get_current_mode()
@@ -140,11 +149,12 @@ def run_app(
             app_id=manifest.id,
             success=False,
             error=f"Current mode ({current_mode.value}) does not meet "
-                  f"minimum requirement ({min_mode})",
+            f"minimum requirement ({min_mode})",
         )
 
     # 3. Budget check
     from myxai_desk.core.runtime.budget import check_budget
+
     budget_ok, budget_reason = check_budget(
         manifest.id,
         tokens_limit=manifest.budgets.tokens_per_day,
@@ -179,7 +189,7 @@ def run_app(
             )
 
     # 5. Prepare capabilities
-    caps = capability_factory(manifest.permissions, undo=undo, audit=audit)
+    capability_factory(manifest.permissions, undo=undo, audit=audit)
 
     # 6. Build prompt from template
     prompt = manifest.prompt_content
@@ -190,22 +200,21 @@ def run_app(
     if agent is not None:
         try:
             import asyncio
-            from nanobot.bus.events import InboundMessage
 
             loop = asyncio.get_event_loop()
             if loop.is_running():
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as pool:
                     result_text = pool.submit(
                         lambda: asyncio.run(_run_agent(agent, manifest.id, prompt))
                     ).result(timeout=120)
             else:
-                result_text = loop.run_until_complete(
-                    _run_agent(agent, manifest.id, prompt)
-                )
+                result_text = loop.run_until_complete(_run_agent(agent, manifest.id, prompt))
         except Exception as e:
             return AppResult(
-                app_id=manifest.id, success=False,
+                app_id=manifest.id,
+                success=False,
                 error=f"Agent execution failed: {e}",
             )
     else:
@@ -227,6 +236,7 @@ def run_app(
 async def _run_agent(agent: Any, app_id: str, prompt: str) -> str:
     """Run the prompt through the nanobot agent."""
     from nanobot.bus.events import InboundMessage
+
     msg = InboundMessage(
         channel="app",
         chat_id=app_id,
@@ -238,9 +248,11 @@ async def _run_agent(agent: Any, app_id: str, prompt: str) -> str:
 
 # ── Discovery ──────────────────────────────────────────────────────
 
+
 def default_search_dirs() -> list[Path]:
     """Return the standard app search directories."""
     from myxai_desk.core.storage.paths import APPS_DIR
+
     return [
         APPS_DIR / "user",
         APPS_DIR / "third_party",

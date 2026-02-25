@@ -16,12 +16,11 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from threading import Lock
 from typing import Any, Literal
 
 from myxai_desk.core.storage.paths import AUDIT_DIR, ensure_dir
-
 
 _PENDING_FILE = AUDIT_DIR / "pending_actions.json"
 
@@ -50,6 +49,7 @@ class PendingAction:
 @dataclass
 class ExecutionPlan:
     """A structured execution plan for multi-step operations."""
+
     plan_id: str
     steps: list[dict] = field(default_factory=list)
     total_risk: int = 0
@@ -57,16 +57,19 @@ class ExecutionPlan:
     reversible: bool = True
     requires_confirm: bool = False
 
-    def add_step(self, description: str, capability: str, op: str,
-                 risk: int, reversible: bool = True) -> None:
-        self.steps.append({
-            "index": len(self.steps) + 1,
-            "description": description,
-            "capability": capability,
-            "op": op,
-            "risk": risk,
-            "reversible": reversible,
-        })
+    def add_step(
+        self, description: str, capability: str, op: str, risk: int, reversible: bool = True
+    ) -> None:
+        self.steps.append(
+            {
+                "index": len(self.steps) + 1,
+                "description": description,
+                "capability": capability,
+                "op": op,
+                "risk": risk,
+                "reversible": reversible,
+            }
+        )
         self.total_risk = max(self.total_risk, risk)
         if not reversible:
             self.reversible = False
@@ -95,8 +98,7 @@ class PlanConfirmationManager:
 
     def _save(self) -> None:
         ensure_dir(_PENDING_FILE.parent)
-        active = [a for a in self._pending.values()
-                  if not a.is_expired]
+        active = [a for a in self._pending.values() if not a.is_expired]
         data = [asdict(a) for a in active]
         _PENDING_FILE.write_text(
             json.dumps(data, ensure_ascii=False, indent=2, default=str),
@@ -180,8 +182,7 @@ class PlanConfirmationManager:
         with self._lock:
             before = len(self._pending)
             self._pending = {
-                k: v for k, v in self._pending.items()
-                if not v.is_expired or v.status != "pending"
+                k: v for k, v in self._pending.items() if not v.is_expired or v.status != "pending"
             }
             self._save()
             return before - len(self._pending)

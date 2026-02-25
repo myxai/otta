@@ -19,17 +19,18 @@ _REPORTS_DIR = _APP_DIR / "reports"
 # ── IMAP presets for popular providers ──────────────────────────────
 
 IMAP_PRESETS = {
-    "qq":      {"host": "imap.qq.com",       "port": 993, "ssl": True},
-    "163":     {"host": "imap.163.com",       "port": 993, "ssl": True},
-    "gmail":   {"host": "imap.gmail.com",     "port": 993, "ssl": True},
+    "qq": {"host": "imap.qq.com", "port": 993, "ssl": True},
+    "163": {"host": "imap.163.com", "port": 993, "ssl": True},
+    "gmail": {"host": "imap.gmail.com", "port": 993, "ssl": True},
     "outlook": {"host": "outlook.office365.com", "port": 993, "ssl": True},
-    "126":     {"host": "imap.126.com",       "port": 993, "ssl": True},
-    "yeah":    {"host": "imap.yeah.net",      "port": 993, "ssl": True},
-    "aliyun":  {"host": "imap.aliyun.com",    "port": 993, "ssl": True},
+    "126": {"host": "imap.126.com", "port": 993, "ssl": True},
+    "yeah": {"host": "imap.yeah.net", "port": 993, "ssl": True},
+    "aliyun": {"host": "imap.aliyun.com", "port": 993, "ssl": True},
 }
 
 
 # ── Persistence ─────────────────────────────────────────────────────
+
 
 def _ensure_dirs():
     _APP_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,12 +68,14 @@ def list_reports() -> list[dict]:
         try:
             meta = json.loads(fp.read_text(encoding="utf-8"))
             key = fp.stem
-            reports.append({
-                "date": key,
-                "email_count": meta.get("email_count", 0),
-                "generated_at": meta.get("generated_at", ""),
-                "read": key in read_set,
-            })
+            reports.append(
+                {
+                    "date": key,
+                    "email_count": meta.get("email_count", 0),
+                    "generated_at": meta.get("generated_at", ""),
+                    "read": key in read_set,
+                }
+            )
         except Exception:
             pass
     return reports
@@ -90,6 +93,7 @@ def get_report(date_str: str) -> dict | None:
 
 def delete_report(date_str: str) -> bool:
     from apps.safe_fs import safe_remove
+
     fp = _REPORTS_DIR / f"{date_str}.json"
     if fp.exists():
         safe_remove(fp)
@@ -100,11 +104,13 @@ def delete_report(date_str: str) -> bool:
 def _save_report(date_str: str, data: dict):
     _ensure_dirs()
     (_REPORTS_DIR / f"{date_str}.json").write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
 
 # ── IMAP helpers ────────────────────────────────────────────────────
+
 
 def _decode_header(raw: str | None) -> str:
     if not raw:
@@ -151,10 +157,7 @@ def _extract_body(msg: email.message.Message, max_len: int = 500) -> str:
 
 def connect_imap(host: str, port: int, user: str, password: str, use_ssl: bool = True):
     """Connect and login. Returns the IMAP connection."""
-    if use_ssl:
-        conn = imaplib.IMAP4_SSL(host, port)
-    else:
-        conn = imaplib.IMAP4(host, port)
+    conn = imaplib.IMAP4_SSL(host, port) if use_ssl else imaplib.IMAP4(host, port)
     conn.login(user, password)
     return conn
 
@@ -163,8 +166,10 @@ def test_connection(config: dict) -> dict:
     """Test IMAP connection. Returns {success, message}."""
     try:
         conn = connect_imap(
-            config["imap_host"], config.get("imap_port", 993),
-            config["imap_user"], config["imap_password"],
+            config["imap_host"],
+            config.get("imap_port", 993),
+            config["imap_user"],
+            config["imap_password"],
             config.get("imap_ssl", True),
         )
         conn.select(config.get("imap_folder", "INBOX"), readonly=True)
@@ -175,8 +180,18 @@ def test_connection(config: dict) -> dict:
 
 
 _IMAP_MONTHS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
 ]
 
 
@@ -236,12 +251,14 @@ def fetch_recent_emails(
             subject = _decode_header(msg["Subject"])
             from_ = _decode_header(msg["From"])
             body = _extract_body(msg)
-            emails.append({
-                "subject": subject,
-                "from": from_,
-                "date": date_str,
-                "body_preview": body,
-            })
+            emails.append(
+                {
+                    "subject": subject,
+                    "from": from_,
+                    "date": date_str,
+                    "body_preview": body,
+                }
+            )
         except Exception:
             continue
 
@@ -250,6 +267,7 @@ def fetch_recent_emails(
 
 
 # ── Summary generation ──────────────────────────────────────────────
+
 
 def _esc(text: str) -> str:
     return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -291,9 +309,7 @@ def build_summary_prompt(emails_data: list[dict], date_str: str) -> str:
     ]
 
     for i, e in enumerate(emails_data, 1):
-        parts.append(
-            f"[{i}] {e['subject']} | {e['from']} | {e['body_preview'][:120]}"
-        )
+        parts.append(f"[{i}] {e['subject']} | {e['from']} | {e['body_preview'][:120]}")
 
     parts.append("\n═══ 请直接输出 JSON ═══")
     return "\n".join(parts)
@@ -302,18 +318,19 @@ def build_summary_prompt(emails_data: list[dict], date_str: str) -> str:
 def _extract_json(text: str) -> dict | None:
     """Try to parse a JSON object from LLM output."""
     import json as _json
+
     text = text.strip()
     if text.startswith("```"):
         first_nl = text.find("\n")
         if first_nl != -1:
-            text = text[first_nl + 1:]
+            text = text[first_nl + 1 :]
         if text.endswith("```"):
             text = text[:-3].strip()
     idx_s = text.find("{")
     idx_e = text.rfind("}")
     if idx_s != -1 and idx_e > idx_s:
         try:
-            obj = _json.loads(text[idx_s:idx_e + 1])
+            obj = _json.loads(text[idx_s : idx_e + 1])
             if isinstance(obj, dict) and "categories" in obj:
                 return obj
         except _json.JSONDecodeError:
@@ -338,7 +355,7 @@ def _json_to_html(data: dict, date_str: str, email_count: int) -> str:
         icon = _esc(str(cat.get("icon", "\U0001f4cb")))
         name = _esc(str(cat.get("name", "")))
         summary = _esc(str(cat.get("summary", "")))
-        parts.append(f'<div class="es-group">')
+        parts.append('<div class="es-group">')
         parts.append(f'<h3 class="es-group-title">{icon} {name}</h3>')
         if summary:
             parts.append(f'<p class="es-group-summary">{summary}</p>')
@@ -346,19 +363,19 @@ def _json_to_html(data: dict, date_str: str, email_count: int) -> str:
         if highlights:
             parts.append('<ul class="es-highlights">')
             for h in highlights:
-                parts.append(f'<li>{_esc(str(h))}</li>')
-            parts.append('</ul>')
-        parts.append('</div>')
+                parts.append(f"<li>{_esc(str(h))}</li>")
+            parts.append("</ul>")
+        parts.append("</div>")
 
     attention = data.get("attention", [])
     if attention:
         parts.append('<div class="es-attention">')
         parts.append('<h3 class="es-attention-title">\u26a0\ufe0f \u9700\u8981\u5173\u6ce8</h3>')
-        parts.append('<ul>')
+        parts.append("<ul>")
         for a in attention:
-            parts.append(f'<li>{_esc(str(a))}</li>')
-        parts.append('</ul>')
-        parts.append('</div>')
+            parts.append(f"<li>{_esc(str(a))}</li>")
+        parts.append("</ul>")
+        parts.append("</div>")
 
     overview = data.get("overview", "")
     if overview:
@@ -377,10 +394,14 @@ def generate_summary_llm(
 ) -> tuple[str, dict | None]:
     """Generate email briefing. Returns (html, items_or_None)."""
     from apps.llm_utils import llm_call
+
     raw = llm_call(
         messages=[{"role": "user", "content": prompt}],
-        model=model, api_key=api_key, api_base=api_base,
-        temperature=0.4, max_tokens=1024,
+        model=model,
+        api_key=api_key,
+        api_base=api_base,
+        temperature=0.4,
+        max_tokens=1024,
     )
     parsed = _extract_json(raw)
     if parsed:
@@ -399,17 +420,21 @@ def generate_summary_fallback(emails_data: list[dict], date_str: str) -> str:
     ]
     parts.append('<div class="es-group">')
     parts.append('<h3 class="es-group-title">\U0001f4cb \u90ae\u4ef6\u6982\u89c8</h3>')
-    parts.append(f'<p class="es-group-summary">\u4eca\u65e5\u5171\u6536\u5230 {len(emails_data)} \u5c01\u90ae\u4ef6\u3002</p>')
+    parts.append(
+        f'<p class="es-group-summary">\u4eca\u65e5\u5171\u6536\u5230 {len(emails_data)} \u5c01\u90ae\u4ef6\u3002</p>'
+    )
     parts.append('<ul class="es-highlights">')
     for e in emails_data[:8]:
-        parts.append(f'<li><strong>{_esc(e["subject"][:60])}</strong> — {_esc(e["from"][:40])}</li>')
+        parts.append(
+            f"<li><strong>{_esc(e['subject'][:60])}</strong> — {_esc(e['from'][:40])}</li>"
+        )
     if len(emails_data) > 8:
-        parts.append(f'<li>\u2026\u53e6\u6709 {len(emails_data) - 8} \u5c01</li>')
-    parts.append('</ul>')
-    parts.append('</div>')
+        parts.append(f"<li>\u2026\u53e6\u6709 {len(emails_data) - 8} \u5c01</li>")
+    parts.append("</ul>")
+    parts.append("</div>")
     parts.append(
         f'<div class="es-overview">\u5171 {len(emails_data)} \u5c01\u90ae\u4ef6\u3002'
-        '\u5982\u9700\u667a\u80fd\u5206\u7c7b\u548c\u6458\u8981\uff0c\u8bf7\u914d\u7f6e LLM \u6a21\u578b\u3002</div>'
+        "\u5982\u9700\u667a\u80fd\u5206\u7c7b\u548c\u6458\u8981\uff0c\u8bf7\u914d\u7f6e LLM \u6a21\u578b\u3002</div>"
     )
     return "\n".join(parts)
 
@@ -435,8 +460,10 @@ def run_email_summary(config: dict, model_config: dict | None = None) -> dict:
     try:
         _run_status["progress"] = "连接 IMAP…"
         conn = connect_imap(
-            config["imap_host"], config.get("imap_port", 993),
-            config["imap_user"], config["imap_password"],
+            config["imap_host"],
+            config.get("imap_port", 993),
+            config["imap_user"],
+            config["imap_password"],
             config.get("imap_ssl", True),
         )
 
@@ -459,9 +486,12 @@ def run_email_summary(config: dict, model_config: dict | None = None) -> dict:
         if has_llm:
             prompt = build_summary_prompt(emails_data, date_str)
             content, items_data = generate_summary_llm(
-                prompt, model_config["model"],
-                model_config["api_key"], model_config.get("api_base"),
-                date_str=date_str, email_count=len(emails_data),
+                prompt,
+                model_config["model"],
+                model_config["api_key"],
+                model_config.get("api_base"),
+                date_str=date_str,
+                email_count=len(emails_data),
             )
         else:
             content = generate_summary_fallback(emails_data, date_str)

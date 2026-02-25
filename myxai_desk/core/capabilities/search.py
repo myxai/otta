@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 
 from myxai_desk.core.storage.paths import USAGE_DIR, ensure_dir
@@ -43,7 +42,8 @@ class QuotaManager:
     def _save(self, data: dict) -> None:
         ensure_dir(USAGE_DIR)
         self._file.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
 
     def _today(self) -> str:
@@ -85,13 +85,13 @@ class SearchCapability:
     See ``governance.py`` for the post-execution governance hooks.
     """
 
-    def __init__(self, *, quota: QuotaManager | None = None,
-                 audit_ledger: Any = None):
+    def __init__(self, *, quota: QuotaManager | None = None, audit_ledger: Any = None):
         self.quota = quota or QuotaManager()
         self._audit = audit_ledger
 
-    async def search(self, query: str, *, engine: str = "auto",
-                     max_results: int = 10) -> list[dict]:
+    async def search(
+        self, query: str, *, engine: str = "auto", max_results: int = 10
+    ) -> list[dict]:
         """Execute a web search.  Returns list of ``{title, url, snippet}``."""
         if engine == "auto":
             for eng in ("brave", "baidu"):
@@ -109,6 +109,7 @@ class SearchCapability:
         # Delegate to the existing web_search module for actual API calls
         try:
             from apps.web_search import multi_engine_search
+
             results = await _run_search(query, engine, max_results)
         except ImportError:
             results = [{"error": "Search backend not available"}]
@@ -128,6 +129,7 @@ async def _run_search(query: str, engine: str, max_results: int) -> list[dict]:
     """Bridge to the legacy ``apps/web_search`` module."""
     try:
         from apps.web_search import multi_engine_search
+
         raw = multi_engine_search(query, engine=engine, max_results=max_results)
         if isinstance(raw, list):
             return raw

@@ -17,8 +17,7 @@ class MCPCapability:
         self._agent = agent
         self._audit = audit_ledger
 
-    async def call_tool(self, server: str, tool_name: str,
-                        arguments: dict | None = None) -> Any:
+    async def call_tool(self, server: str, tool_name: str, arguments: dict | None = None) -> Any:
         """Invoke an MCP tool via the nanobot agent's MCP stack."""
         action_id = _new_action_id()
 
@@ -42,7 +41,7 @@ class MCPCapability:
 
     def list_servers(self) -> list[str]:
         """Return names of connected MCP servers."""
-        if self._agent and hasattr(self._agent, '_mcp_stack'):
+        if self._agent and hasattr(self._agent, "_mcp_stack"):
             try:
                 return list(self._agent._mcp_stack._servers.keys())
             except Exception:

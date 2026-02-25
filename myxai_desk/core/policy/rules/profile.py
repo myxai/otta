@@ -8,8 +8,9 @@ if TYPE_CHECKING:
     from myxai_desk.core.policy.modes import ModePolicy
 
 
-def evaluate(op: str, args: dict, policy: ModePolicy,
-             app_source: str = "official") -> tuple[str, int, str]:
+def evaluate(
+    op: str, args: dict, policy: ModePolicy, app_source: str = "official"
+) -> tuple[str, int, str]:
     """Evaluate profile capability access.
 
     Third-party apps never get raw history; only summaries.

@@ -9,17 +9,22 @@ Usage (from app.py):
     mgr.run()                     # blocks until quit
 """
 
+import contextlib
 import locale
 import math
 import sys
 import threading
-from typing import Callable, Optional
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 _webview_available = False
 _pystray_available = False
 
 try:
     import webview
+
     _webview_available = True
 except ImportError:
     pass
@@ -27,6 +32,7 @@ except ImportError:
 try:
     import pystray
     from PIL import Image, ImageDraw, ImageFont
+
     _pystray_available = True
 except ImportError:
     pass
@@ -35,6 +41,7 @@ except ImportError:
 # --------------------------------------------------------------------------- #
 # Tray icon generation — render the 🌀 emoji onto a transparent icon
 # --------------------------------------------------------------------------- #
+
 
 def _make_tray_icon(size: int = 64) -> "Image.Image":
     """Draw a 🌀-style swirl icon programmatically."""
@@ -65,6 +72,7 @@ def _make_tray_icon(size: int = 64) -> "Image.Image":
 # DeskManager
 # --------------------------------------------------------------------------- #
 
+
 class DeskManager:
     """Coordinates the main webview window and the system tray icon."""
 
@@ -72,15 +80,15 @@ class DeskManager:
         self.port = port
         self.base_url = f"http://127.0.0.1:{port}"
 
-        self.main_window: Optional[object] = None
-        self._tray: Optional[object] = None
-        self._tray_thread: Optional[threading.Thread] = None
-        self._resume_thread: Optional[threading.Thread] = None
+        self.main_window: object | None = None
+        self._tray: object | None = None
+        self._tray_thread: threading.Thread | None = None
+        self._resume_thread: threading.Thread | None = None
         self._quitting = False
 
-        self._get_unread_count = None   # callable, injected from app.py
-        self._get_token_usage = None    # callable, injected from app.py
-        self._on_resume: Optional[Callable] = None  # callable, injected from app.py
+        self._get_unread_count = None  # callable, injected from app.py
+        self._get_token_usage = None  # callable, injected from app.py
+        self._on_resume: Callable | None = None  # callable, injected from app.py
         self.lang: str = self._detect_lang()  # "zh" or "en"
 
     # ---- i18n ------------------------------------------------------------- #
@@ -189,10 +197,8 @@ class DeskManager:
 
     def _stop_tray(self):
         if self._tray:
-            try:
+            with contextlib.suppress(Exception):
                 self._tray.stop()
-            except Exception:
-                pass
             self._tray = None
 
     def _on_tray_open(self, icon=None, item=None):
@@ -213,10 +219,8 @@ class DeskManager:
         w = self.main_window
         if not w:
             return
-        try:
+        with contextlib.suppress(Exception):
             w.evaluate_js(f"if(typeof switchPage==='function')switchPage('{page}');")
-        except Exception:
-            pass
 
     # ---- system resume listener (Windows) --------------------------------- #
 
@@ -230,7 +234,8 @@ class DeskManager:
         if sys.platform != "win32" or not self._on_resume:
             return
         self._resume_thread = threading.Thread(
-            target=self._resume_listener_win32, daemon=True,
+            target=self._resume_listener_win32,
+            daemon=True,
         )
         self._resume_thread.start()
 
@@ -250,12 +255,19 @@ class DeskManager:
             LRESULT = ctypes.c_ssize_t
 
             user32.DefWindowProcW.argtypes = [
-                wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM,
+                wt.HWND,
+                wt.UINT,
+                wt.WPARAM,
+                wt.LPARAM,
             ]
             user32.DefWindowProcW.restype = LRESULT
 
             WNDPROC = ctypes.WINFUNCTYPE(
-                LRESULT, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM,
+                LRESULT,
+                wt.HWND,
+                wt.UINT,
+                wt.WPARAM,
+                wt.LPARAM,
             )
 
             def wnd_proc(hwnd, msg, wparam, lparam):
@@ -264,7 +276,8 @@ class DeskManager:
                         print("[desk_manager] OS resume detected — running catch-up")
                         if self._on_resume:
                             threading.Thread(
-                                target=self._on_resume, daemon=True,
+                                target=self._on_resume,
+                                daemon=True,
                             ).start()
                 return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
@@ -305,9 +318,18 @@ class DeskManager:
 
             user32.CreateWindowExW.restype = wt.HWND
             hwnd = user32.CreateWindowExW(
-                0, class_name, "MyxAI Power Monitor",
-                0, 0, 0, 0, 0,
-                None, None, hinstance, None,
+                0,
+                class_name,
+                "MyxAI Power Monitor",
+                0,
+                0,
+                0,
+                0,
+                0,
+                None,
+                None,
+                hinstance,
+                None,
             )
             if not hwnd:
                 print("[desk_manager] Failed to create power monitor window")
@@ -377,10 +399,8 @@ class DeskManager:
             background_color="#1e1e2e",
         )
 
-        try:
+        with contextlib.suppress(Exception):
             self.main_window.events.closing += self.on_main_closing
-        except Exception:
-            pass
 
         self.start_tray()
         self.start_resume_listener()

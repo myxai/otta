@@ -17,14 +17,31 @@ if TYPE_CHECKING:
 # ── System directory protection (from safe_fs.py) ─────────────────
 
 _SYSTEM_DIRS_WIN = {
-    "windows", "program files", "program files (x86)", "programdata",
-    "system volume information", "$recycle.bin", "recovery",
-    "boot", "perflogs",
+    "windows",
+    "program files",
+    "program files (x86)",
+    "programdata",
+    "system volume information",
+    "$recycle.bin",
+    "recovery",
+    "boot",
+    "perflogs",
 }
 _SYSTEM_DIRS_UNIX = {
-    "/usr", "/etc", "/bin", "/sbin", "/lib", "/lib64",
-    "/boot", "/proc", "/sys", "/dev", "/var", "/root",
-    "/snap", "/opt",
+    "/usr",
+    "/etc",
+    "/bin",
+    "/sbin",
+    "/lib",
+    "/lib64",
+    "/boot",
+    "/proc",
+    "/sys",
+    "/dev",
+    "/var",
+    "/root",
+    "/snap",
+    "/opt",
 }
 
 
@@ -74,14 +91,12 @@ def _path_in_scope(target: Path, scope: list[Path]) -> bool:
     if not scope:
         return True  # empty scope == wildcard
     target = target.resolve()
-    return any(
-        target == s or s in target.parents or target == s
-        for s in scope
-    )
+    return any(target in (s, s) or s in target.parents for s in scope)
 
 
-def evaluate(op: str, args: dict, policy: ModePolicy,
-             workspace: str | None = None) -> tuple[str, int, str]:
+def evaluate(
+    op: str, args: dict, policy: ModePolicy, workspace: str | None = None
+) -> tuple[str, int, str]:
     """Evaluate a filesystem operation against current mode policy.
 
     Returns ``(action, risk_score, reason_code)``.

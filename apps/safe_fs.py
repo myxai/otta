@@ -24,6 +24,7 @@ try:
     from myxai_desk.core.storage.paths import TRASH_DIR, ensure_dir
 except ImportError:
     TRASH_DIR = Path.home() / ".nanobot" / "trash"
+
     def ensure_dir(p: Path) -> Path:
         p.mkdir(parents=True, exist_ok=True)
         return p
@@ -31,10 +32,12 @@ except ImportError:
 
 # ── Delegate to myxai_desk where possible ─────────────────────────
 
+
 def is_safe_path(path: str | Path) -> tuple[bool, str]:
     """Validate that a path is safe for archive/move operations."""
     try:
         from myxai_desk.core.policy.rules.fs import is_safe_path as _is_safe
+
         return _is_safe(path)
     except ImportError:
         pass
@@ -79,6 +82,7 @@ def safe_remove(path: Path | str) -> Path | None:
     shutil.move(str(p), str(dest))
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
             capability="fs.safe_remove",
             args={"path": str(p), "trash": str(dest)},

@@ -31,7 +31,7 @@ def _load_digest_interests(days: int = 7) -> dict | None:
             if kw_counts:
                 found = True
                 sorted_kws = sorted(kw_counts.items(), key=lambda x: x[1], reverse=True)
-                for kw, cnt in sorted_kws[:40]:
+                for kw, _cnt in sorted_kws[:40]:
                     result["work"].append(kw)
         except Exception:
             pass
@@ -63,17 +63,20 @@ def extract_topics(days: int = 7, store: EventStore | None = None) -> list[dict]
     """Extract interest topics — powered by the simplified persona model."""
     try:
         from myxai_desk.core.profile import persona_store
+
         recent = persona_store.load_recent()
         if recent.core_topics:
             topics = []
             for i, t in enumerate(recent.core_topics):
-                topics.append({
-                    "topic": t.get("topic", ""),
-                    "category": "work",
-                    "count": max(1, 10 - i * 3),
-                    "score": max(0.1, 1.0 - i * 0.2),
-                    "trend": t.get("trend", "稳定"),
-                })
+                topics.append(
+                    {
+                        "topic": t.get("topic", ""),
+                        "category": "work",
+                        "count": max(1, 10 - i * 3),
+                        "score": max(0.1, 1.0 - i * 0.2),
+                        "trend": t.get("trend", "稳定"),
+                    }
+                )
             return topics
     except Exception:
         pass
@@ -83,12 +86,14 @@ def extract_topics(days: int = 7, store: EventStore | None = None) -> list[dict]
         topics = []
         for cat in ("work", "study", "life"):
             for i, kw in enumerate(digest[cat]):
-                topics.append({
-                    "topic": kw,
-                    "category": cat,
-                    "count": max(1, 10 - i),
-                    "score": max(0.1, 1.0 - i * 0.1),
-                })
+                topics.append(
+                    {
+                        "topic": kw,
+                        "category": cat,
+                        "count": max(1, 10 - i),
+                        "score": max(0.1, 1.0 - i * 0.1),
+                    }
+                )
         return topics
 
     return []
@@ -108,7 +113,9 @@ def build_summary(days: int = 30, store: EventStore | None = None) -> dict:
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "source": "persona_engine",
                 "top_work_interests": [t["topic"] for t in topics if t["category"] == "work"][:10],
-                "top_study_interests": [t["topic"] for t in topics if t["category"] == "study"][:10],
+                "top_study_interests": [t["topic"] for t in topics if t["category"] == "study"][
+                    :10
+                ],
                 "top_life_interests": [t["topic"] for t in topics if t["category"] == "life"][:5],
                 "all_topics": topics[:30],
                 "prompt_summary": build_prompt(),
@@ -136,6 +143,7 @@ def build_summary(days: int = 30, store: EventStore | None = None) -> dict:
 
     ensure_dir(PROFILE_SUMMARY_FILE.parent)
     PROFILE_SUMMARY_FILE.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
     return summary

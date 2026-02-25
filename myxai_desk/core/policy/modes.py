@@ -18,14 +18,14 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from enum import Enum
 from typing import Literal
 
-from myxai_desk.core.storage.paths import SECURITY_MODE_FILE, POLICY_DIR, ensure_dir
-
+from myxai_desk.core.storage.paths import POLICY_DIR, SECURITY_MODE_FILE, ensure_dir
 
 # ── Mode enum ──────────────────────────────────────────────────────
+
 
 class SecurityMode(str, Enum):
     OBSERVER = "Observer"
@@ -58,6 +58,7 @@ def is_escalation(target: SecurityMode, baseline: SecurityMode) -> bool:
 
 
 # ── Per-mode policy table ──────────────────────────────────────────
+
 
 @dataclass
 class ModePolicy:
@@ -93,9 +94,26 @@ DEFAULT_POLICIES: dict[SecurityMode, ModePolicy] = {
     SecurityMode.ASSISTANT: ModePolicy(
         fs_write_scope=["$WORKSPACE", "$HOME/Documents", "$HOME/Desktop"],
         proc_allowed=True,
-        proc_whitelist=["git", "python", "node", "npm", "pip", "code", "ls",
-                        "dir", "cat", "type", "echo", "mkdir", "cp", "copy",
-                        "mv", "move", "ren", "rename"],
+        proc_whitelist=[
+            "git",
+            "python",
+            "node",
+            "npm",
+            "pip",
+            "code",
+            "ls",
+            "dir",
+            "cat",
+            "type",
+            "echo",
+            "mkdir",
+            "cp",
+            "copy",
+            "mv",
+            "move",
+            "ren",
+            "rename",
+        ],
         net_search_allowed=True,
         net_http_allowed=True,
         net_allowlist=["*"],
@@ -197,7 +215,8 @@ def _load_app_modes() -> dict:
 def _save_app_modes(data: dict) -> None:
     ensure_dir(POLICY_DIR)
     _APP_MODES_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
 
@@ -238,10 +257,9 @@ def get_effective_mode(app_id: str = "") -> SecurityMode:
     if app_id:
         app_mode = get_app_mode(app_id)
         if app_mode is not None:
-            if app_mode == SecurityMode.DEVELOPER:
-                if not is_dev_mode_valid():
-                    clear_app_mode(app_id)
-                    return get_current_mode()
+            if app_mode == SecurityMode.DEVELOPER and not is_dev_mode_valid():
+                clear_app_mode(app_id)
+                return get_current_mode()
             return app_mode
     global_mode = get_current_mode()
     if global_mode == SecurityMode.DEVELOPER and not is_dev_mode_valid():
@@ -256,6 +274,7 @@ def get_effective_policy(app_id: str = "") -> ModePolicy:
 
 
 # ── Escalation assessment ──────────────────────────────────────────
+
 
 def assess_escalation(app_id: str, target_mode: SecurityMode) -> dict:
     """Evaluate the risk of setting *target_mode* for *app_id*.
@@ -383,8 +402,9 @@ def _load_dev_config() -> DevModeConfig:
     if _DEV_MODE_FILE.exists():
         try:
             d = json.loads(_DEV_MODE_FILE.read_text(encoding="utf-8"))
-            return DevModeConfig(**{k: v for k, v in d.items()
-                                    if k in DevModeConfig.__dataclass_fields__})
+            return DevModeConfig(
+                **{k: v for k, v in d.items() if k in DevModeConfig.__dataclass_fields__}
+            )
         except (json.JSONDecodeError, OSError, TypeError):
             pass
     return DevModeConfig()
@@ -393,7 +413,8 @@ def _load_dev_config() -> DevModeConfig:
 def _save_dev_config(cfg: DevModeConfig) -> None:
     ensure_dir(POLICY_DIR)
     _DEV_MODE_FILE.write_text(
-        json.dumps(asdict(cfg), ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(asdict(cfg), ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
 
@@ -416,8 +437,10 @@ def enable_dev_mode(expiry_policy: str = "on_app_close") -> dict:
     Returns status dict for the API response.
     """
     if expiry_policy not in DEV_EXPIRY_POLICIES:
-        return {"error": f"无效的失效策略: {expiry_policy}",
-                "valid_policies": list(DEV_EXPIRY_POLICIES.keys())}
+        return {
+            "error": f"无效的失效策略: {expiry_policy}",
+            "valid_policies": list(DEV_EXPIRY_POLICIES.keys()),
+        }
 
     current = get_current_mode()
     prev = current.value if current != SecurityMode.DEVELOPER else "Assistant"

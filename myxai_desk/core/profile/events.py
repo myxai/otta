@@ -8,14 +8,16 @@ the user's interest graph, project context, and preferences.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
-from pathlib import Path
+from dataclasses import asdict, dataclass
+from typing import TYPE_CHECKING
 
 from myxai_desk.core.storage.paths import PROFILE_EVENTS_FILE, ensure_dir
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ── Privacy-first browser event ──────────────────────────────────
+
 
 @dataclass
 class BrowserVisited:
@@ -32,6 +34,7 @@ class BrowserVisited:
 
 
 # ── Chat event with structural signals ───────────────────────────
+
 
 @dataclass
 class ChatMessage:
@@ -64,6 +67,7 @@ class SearchPerformed:
 
 # ── Privacy-first file event ─────────────────────────────────────
 
+
 @dataclass
 class FileTouched:
     project_prefix: str
@@ -75,6 +79,7 @@ class FileTouched:
 
 
 # ── Event store ────────────────────────────────────────────────────
+
 
 class EventStore:
     """Append-only JSONL store for profile events."""

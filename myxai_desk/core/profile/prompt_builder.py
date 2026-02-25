@@ -52,7 +52,5 @@ def get_recent_prompt() -> str:
     if recent.is_empty() or not recent.prompt_text:
         return ""
     return "\n".join(
-        f"[R] {line.strip()}"
-        for line in recent.prompt_text.splitlines()
-        if line.strip()
+        f"[R] {line.strip()}" for line in recent.prompt_text.splitlines() if line.strip()
     )

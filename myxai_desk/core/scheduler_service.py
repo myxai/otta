@@ -16,7 +16,7 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 try:
     from croniter import croniter
@@ -24,6 +24,9 @@ except ImportError:
     croniter = None  # type: ignore[assignment,misc]
 
 from myxai_desk.core.storage import sqlite as db
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 log = logging.getLogger("scheduler")
 
@@ -41,6 +44,7 @@ CATCHUP_DEFAULTS: dict[str, Any] = {
 @dataclass
 class DueSlot:
     """Represents one missed schedule period that should be compensated."""
+
     task_id: str
     scheduled_for: datetime
     idempotency_key: str
@@ -49,6 +53,7 @@ class DueSlot:
 @dataclass
 class TaskDescriptor:
     """Unified view of a scheduled task regardless of source (official / custom)."""
+
     task_id: str
     schedule: dict
     cron_expr: str
@@ -73,7 +78,9 @@ def _ensure_task_runs_table() -> None:
     with _TABLE_LOCK:
         if _TABLE_INIT:
             return
-        db.ensure_table("task_runs", """
+        db.ensure_table(
+            "task_runs",
+            """
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             task_id TEXT NOT NULL,
             idempotency_key TEXT NOT NULL,
@@ -85,7 +92,8 @@ def _ensure_task_runs_table() -> None:
             error TEXT DEFAULT '',
             artifacts TEXT DEFAULT '{}',
             UNIQUE(idempotency_key)
-        """)
+        """,
+        )
         _TABLE_INIT = True
 
 
@@ -99,8 +107,9 @@ def has_successful_run(idempotency_key: str) -> bool:
     return len(rows) > 0
 
 
-def record_run_start(task_id: str, idempotency_key: str,
-                     scheduled_for: str, trigger: str) -> int | None:
+def record_run_start(
+    task_id: str, idempotency_key: str, scheduled_for: str, trigger: str
+) -> int | None:
     """Insert a 'running' record. Returns None if the key already exists."""
     _ensure_task_runs_table()
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -118,8 +127,9 @@ def record_run_start(task_id: str, idempotency_key: str,
         return None
 
 
-def record_run_finish(idempotency_key: str, *, success: bool,
-                      error: str = "", artifacts: str = "{}") -> None:
+def record_run_finish(
+    idempotency_key: str, *, success: bool, error: str = "", artifacts: str = "{}"
+) -> None:
     _ensure_task_runs_table()
     now_iso = datetime.now(timezone.utc).isoformat()
     status = "success" if success else "failed"
@@ -185,6 +195,7 @@ def cleanup_stale_running() -> int:
 
 # ── Idempotency key generation ─────────────────────────────────────────
 
+
 def make_idempotency_key(task_id: str, due: datetime, mode: str) -> str:
     if mode == "daily":
         return f"{task_id}:{due.strftime('%Y-%m-%d')}"
@@ -198,6 +209,7 @@ def make_idempotency_key(task_id: str, due: datetime, mode: str) -> str:
 
 
 # ── Due-slot computation ───────────────────────────────────────────────
+
 
 def _schedule_to_cron(schedule: dict) -> str:
     """Convert a custom-app schedule dict to a cron expression."""
@@ -219,8 +231,7 @@ def _schedule_to_cron(schedule: dict) -> str:
     return ""
 
 
-def compute_due_slots(task: TaskDescriptor,
-                      now: datetime | None = None) -> list[DueSlot]:
+def compute_due_slots(task: TaskDescriptor, now: datetime | None = None) -> list[DueSlot]:
     """Return the list of due slots that should be compensated for *task*.
 
     The algorithm:
@@ -241,8 +252,7 @@ def compute_due_slots(task: TaskDescriptor,
     return _compute_cron_slots(task, now)
 
 
-def _compute_exact_match(task: TaskDescriptor,
-                         now: datetime | None = None) -> list[DueSlot]:
+def _compute_exact_match(task: TaskDescriptor, now: datetime | None = None) -> list[DueSlot]:
     """NONE policy — only trigger on exact minute match (legacy behaviour)."""
     now = now or datetime.now()
     current_hm = now.strftime("%H:%M")
@@ -273,8 +283,7 @@ def _compute_exact_match(task: TaskDescriptor,
     return [DueSlot(task_id=task.task_id, scheduled_for=now, idempotency_key=key)]
 
 
-def _compute_cron_slots(task: TaskDescriptor,
-                        now: datetime) -> list[DueSlot]:
+def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
     """Compute missed cron-based due slots within catchup_window."""
     if croniter is None:
         log.warning("croniter not installed — falling back to exact match")
@@ -312,11 +321,13 @@ def _compute_cron_slots(task: TaskDescriptor,
             break
         key = make_idempotency_key(task.task_id, nxt, mode)
         if not has_successful_run(key):
-            slots.append(DueSlot(
-                task_id=task.task_id,
-                scheduled_for=nxt,
-                idempotency_key=key,
-            ))
+            slots.append(
+                DueSlot(
+                    task_id=task.task_id,
+                    scheduled_for=nxt,
+                    idempotency_key=key,
+                )
+            )
 
     if not slots:
         return []
@@ -324,11 +335,10 @@ def _compute_cron_slots(task: TaskDescriptor,
     if task.catchup_policy == "LATEST_ONLY":
         return slots[-1:]
     # ALL_MISSED — cap to max_catchup_runs
-    return slots[-task.max_catchup_runs:]
+    return slots[-task.max_catchup_runs :]
 
 
-def _compute_interval_slots(task: TaskDescriptor,
-                             now: datetime) -> list[DueSlot]:
+def _compute_interval_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
     """Compute missed slots for interval-based schedules."""
     sched = task.schedule
     interval_days = max(1, sched.get("interval_days", 1))
@@ -356,21 +366,24 @@ def _compute_interval_slots(task: TaskDescriptor,
         if cursor >= window_start:
             key = make_idempotency_key(task.task_id, cursor, mode)
             if not has_successful_run(key):
-                slots.append(DueSlot(
-                    task_id=task.task_id,
-                    scheduled_for=cursor,
-                    idempotency_key=key,
-                ))
+                slots.append(
+                    DueSlot(
+                        task_id=task.task_id,
+                        scheduled_for=cursor,
+                        idempotency_key=key,
+                    )
+                )
         cursor += timedelta(days=interval_days)
 
     if not slots:
         return []
     if task.catchup_policy == "LATEST_ONLY":
         return slots[-1:]
-    return slots[-task.max_catchup_runs:]
+    return slots[-task.max_catchup_runs :]
 
 
 # ── SchedulerService ───────────────────────────────────────────────────
+
 
 class SchedulerService:
     """Central service that checks all tasks for due slots and dispatches
@@ -389,8 +402,9 @@ class SchedulerService:
 
     # ── registration ───────────────────────────────────────────────────
 
-    def register_executor(self, kind: str,
-                          fn: Callable[[TaskDescriptor, DueSlot, str], None]) -> None:
+    def register_executor(
+        self, kind: str, fn: Callable[[TaskDescriptor, DueSlot, str], None]
+    ) -> None:
         """Register a callback that knows how to execute a task of *kind*.
 
         Signature: fn(task_descriptor, due_slot, trigger) -> None
@@ -443,8 +457,7 @@ class SchedulerService:
                 self._task_locks[task_id] = threading.Lock()
             return self._task_locks[task_id]
 
-    def _dispatch(self, task: TaskDescriptor, slot: DueSlot,
-                  trigger: str) -> None:
+    def _dispatch(self, task: TaskDescriptor, slot: DueSlot, trigger: str) -> None:
         kind = task.extra.get("kind", "custom")
         executor = self._executors.get(kind)
         if not executor:
@@ -463,11 +476,16 @@ class SchedulerService:
                     return
                 try:
                     rid = record_run_start(
-                        task.task_id, slot.idempotency_key,
-                        slot.scheduled_for.isoformat(), trigger,
+                        task.task_id,
+                        slot.idempotency_key,
+                        slot.scheduled_for.isoformat(),
+                        trigger,
                     )
                     if rid is None:
-                        log.debug("[scheduler] idempotency check: %s already recorded", slot.idempotency_key)
+                        log.debug(
+                            "[scheduler] idempotency check: %s already recorded",
+                            slot.idempotency_key,
+                        )
                         return
                     try:
                         executor(task, slot, trigger)

@@ -13,21 +13,21 @@ if TYPE_CHECKING:
     from myxai_desk.core.policy.modes import ModePolicy
 
 DANGEROUS_CMD_RE = re.compile(
-    r'\b('
-    r'rm\s|rm$|rmdir\s|rmdir$'
-    r'|del\s|del$|erase\s|erase$'
-    r'|remove-item\s|remove-item$'
-    r'|shutil\.rmtree|os\.remove|os\.unlink|\.unlink\s*\('
-    r'|unlink\s|unlink$'
-    r'|rd\s|rd$|rd\s+/s'
-    r'|format\s+[a-z]:'
-    r'|empty.?trash|empty.?recycle|clear.?recycl'
-    r'|清空回收站|清空垃圾箱'
-    r'|mkfs\.|dd\s+if='
-    r'|reg\s+delete|regedit'
-    r'|net\s+stop|sc\s+delete|systemctl\s+stop'
-    r'|chmod\s+000|icacls.*deny'
-    r')\b',
+    r"\b("
+    r"rm\s|rm$|rmdir\s|rmdir$"
+    r"|del\s|del$|erase\s|erase$"
+    r"|remove-item\s|remove-item$"
+    r"|shutil\.rmtree|os\.remove|os\.unlink|\.unlink\s*\("
+    r"|unlink\s|unlink$"
+    r"|rd\s|rd$|rd\s+/s"
+    r"|format\s+[a-z]:"
+    r"|empty.?trash|empty.?recycle|clear.?recycl"
+    r"|清空回收站|清空垃圾箱"
+    r"|mkfs\.|dd\s+if="
+    r"|reg\s+delete|regedit"
+    r"|net\s+stop|sc\s+delete|systemctl\s+stop"
+    r"|chmod\s+000|icacls.*deny"
+    r")\b",
     re.IGNORECASE,
 )
 

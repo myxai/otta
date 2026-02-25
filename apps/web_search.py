@@ -13,15 +13,13 @@ daily_digest's direct import but are NOT used by the agent tool.
 import html as _html
 import json
 import re
-import time
 import threading
-import urllib.parse
+import time
 from datetime import date
 from pathlib import Path
 from typing import Any
 
 import httpx
-
 from nanobot.agent.tools.base import Tool
 
 _UA = (
@@ -91,8 +89,7 @@ class QuotaManager:
                 pass
         if _SEARCH_HISTORY_FILE.exists():
             try:
-                self._history = json.loads(
-                    _SEARCH_HISTORY_FILE.read_text(encoding="utf-8"))
+                self._history = json.loads(_SEARCH_HISTORY_FILE.read_text(encoding="utf-8"))
             except Exception:
                 self._history = {}
         self._loaded = True
@@ -100,10 +97,17 @@ class QuotaManager:
     def _persist(self):
         try:
             _USAGE_DIR.mkdir(parents=True, exist_ok=True)
-            _SEARCH_FILE.write_text(json.dumps({
-                "date": self._date,
-                "counts": self._counts,
-            }, ensure_ascii=False, indent=2), encoding="utf-8")
+            _SEARCH_FILE.write_text(
+                json.dumps(
+                    {
+                        "date": self._date,
+                        "counts": self._counts,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
         except Exception:
             pass
 
@@ -111,8 +115,8 @@ class QuotaManager:
         try:
             _USAGE_DIR.mkdir(parents=True, exist_ok=True)
             _SEARCH_HISTORY_FILE.write_text(
-                json.dumps(self._history, ensure_ascii=False, indent=2),
-                encoding="utf-8")
+                json.dumps(self._history, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
         except Exception:
             pass
 
@@ -171,6 +175,7 @@ class QuotaManager:
 
     def get_history(self, days: int = 30) -> list[dict]:
         from datetime import timedelta
+
         with self._lock:
             self._reset_if_new_day()
             today_total = sum(self._counts.values())
@@ -189,6 +194,7 @@ quota = QuotaManager()
 
 
 # ── API-based engines ──────────────────────────────────────────────
+
 
 def _brave_search(query: str, api_key: str, count: int = 8) -> list[dict]:
     """Brave Search API."""
@@ -250,17 +256,20 @@ def _baidu_api_search(query: str, api_key: str, count: int = 8) -> list[dict]:
         url = ref.get("url", "").strip()
         desc = ref.get("snippet", "") or ref.get("content", "")
         if title and url:
-            results.append({
-                "title": title,
-                "url": url,
-                "description": _strip_tags(desc)[:400],
-            })
+            results.append(
+                {
+                    "title": title,
+                    "url": url,
+                    "description": _strip_tags(desc)[:400],
+                }
+            )
     if results:
         print(f"[web_search] baidu_api returned {len(results)} results")
     return results
 
 
 # ── Multi-engine orchestrator (API-only) ───────────────────────────
+
 
 def multi_engine_search(
     query: str,
@@ -284,8 +293,10 @@ def multi_engine_search(
         if not quota.can_use(name):
             usage = quota.get_usage()
             eng_info = usage["engines"].get(name, {})
-            print(f"[web_search] {name} daily quota exhausted "
-                  f"({eng_info.get('used', '?')}/{eng_info.get('limit', '?')})")
+            print(
+                f"[web_search] {name} daily quota exhausted "
+                f"({eng_info.get('used', '?')}/{eng_info.get('limit', '?')})"
+            )
             return
         if name == "brave" and brave_api_key:
             engines.append(("brave", lambda q, n: _brave_search(q, brave_api_key, n)))
@@ -325,6 +336,7 @@ def multi_engine_search(
 
 # ── Legacy HTML-scrape helpers (used by daily_digest only) ─────────
 
+
 def _so_search(query: str, count: int = 8) -> list[dict]:
     """360 Search (so.com) HTML scrape — reliable for Chinese queries."""
     resp = httpx.get(
@@ -345,7 +357,7 @@ def _so_search(query: str, count: int = 8) -> list[dict]:
         end = block.find("</li>")
         chunk = block[:end] if end > 0 else block[:3000]
 
-        link_m = re.search(r'<a\s([^>]+)>([\s\S]*?)</a>', chunk)
+        link_m = re.search(r"<a\s([^>]+)>([\s\S]*?)</a>", chunk)
         if not link_m:
             continue
 
@@ -400,6 +412,7 @@ def legacy_html_search(
 
 # ── Enhanced WebSearchTool ─────────────────────────────────────────
 
+
 class EnhancedWebSearchTool(Tool):
     """Web search via Brave Search API and/or Baidu qianfan API.
 
@@ -427,9 +440,12 @@ class EnhancedWebSearchTool(Tool):
         "required": ["query"],
     }
 
-    def __init__(self, brave_api_key: str | None = None,
-                 baidu_api_key: str | None = None,
-                 max_results: int = 5):
+    def __init__(
+        self,
+        brave_api_key: str | None = None,
+        baidu_api_key: str | None = None,
+        max_results: int = 5,
+    ):
         self.brave_api_key = brave_api_key
         self.baidu_api_key = baidu_api_key
         self.max_results = max_results

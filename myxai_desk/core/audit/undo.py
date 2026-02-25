@@ -10,13 +10,11 @@ from __future__ import annotations
 import json
 import shutil
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from threading import Lock
-from typing import Any, Callable
 
 from myxai_desk.core.storage.paths import AUDIT_DIR, ensure_dir
-
 
 _UNDO_FILE = AUDIT_DIR / "undo_log.json"
 
@@ -56,11 +54,13 @@ class UndoRegistry:
         # Keep only the last 500 actions
         data = data[-500:]
         _UNDO_FILE.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+            json.dumps(data, ensure_ascii=False, indent=2),
+            encoding="utf-8",
         )
 
-    def register(self, action_id: str, capability: str, op: str,
-                 data: dict, *, cooldown_seconds: int = 0) -> None:
+    def register(
+        self, action_id: str, capability: str, op: str, data: dict, *, cooldown_seconds: int = 0
+    ) -> None:
         """Register a reversible action."""
         with self._lock:
             now = time.time()
@@ -109,6 +109,7 @@ class UndoRegistry:
             elif not data.get("existed"):
                 if path.exists():
                     from myxai_desk.core.capabilities.fs import _trash_dest
+
                     dest = _trash_dest(path)
                     shutil.move(str(path), str(dest))
                     return f"Moved newly-created file to trash: {dest}"
@@ -127,6 +128,7 @@ class UndoRegistry:
             created = Path(data["created"])
             if created.exists():
                 from myxai_desk.core.capabilities.fs import _trash_dest
+
                 dest = _trash_dest(created)
                 shutil.move(str(created), str(dest))
                 return f"Removed copy to trash: {dest}"
@@ -143,12 +145,13 @@ class UndoRegistry:
 
         return f"No undo handler for {cap}.{op}"
 
-    def list_actions(self, *, limit: int = 50,
-                     undoable_only: bool = False) -> list[dict]:
+    def list_actions(self, *, limit: int = 50, undoable_only: bool = False) -> list[dict]:
         """Return recent actions, newest first."""
         with self._lock:
             actions = sorted(
-                self._actions.values(), key=lambda a: a.ts, reverse=True,
+                self._actions.values(),
+                key=lambda a: a.ts,
+                reverse=True,
             )
             if undoable_only:
                 actions = [a for a in actions if not a.undone]
@@ -159,3 +162,12 @@ class UndoRegistry:
         if not action:
             return False
         return time.time() < action.cooldown_until
+
+
+# Global registry instance
+_registry = UndoRegistry()
+
+
+def get_undo_registry() -> UndoRegistry:
+    """Get the global undo registry."""
+    return _registry

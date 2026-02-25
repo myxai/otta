@@ -8,6 +8,7 @@ retention.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import re
 import shutil
@@ -35,12 +36,24 @@ EDGE_HISTORY_PATHS = [
 # ── Noise filters ─────────────────────────────────────────────────
 
 BLOCKED_DOMAIN_FRAGMENTS = [
-    "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-    "signin", "passport", "sso.",
-    "alipay.com", "pay.", "bank.",
-    "mail.google.com", "outlook.live.com", "mail.qq.com", "mail.163.com",
-    "web.whatsapp.com", "web.telegram.org",
-    "localhost", "127.0.0.1", "192.168.",
+    "accounts.google.com",
+    "login.microsoftonline.com",
+    "login.live.com",
+    "signin",
+    "passport",
+    "sso.",
+    "alipay.com",
+    "pay.",
+    "bank.",
+    "mail.google.com",
+    "outlook.live.com",
+    "mail.qq.com",
+    "mail.163.com",
+    "web.whatsapp.com",
+    "web.telegram.org",
+    "localhost",
+    "127.0.0.1",
+    "192.168.",
 ]
 
 BLOCKED_URL_PATTERNS = [
@@ -56,35 +69,108 @@ BLOCKED_URL_PATTERNS = [
 # ── Domain → category mapping ────────────────────────────────────
 
 _CATEGORY_MAP: dict[str, str] = {}
-for _d in ("github.com", "gitlab.com", "bitbucket.org", "stackoverflow.com",
-           "dev.to", "hashnode.dev", "npmjs.com", "pypi.org"):
+for _d in (
+    "github.com",
+    "gitlab.com",
+    "bitbucket.org",
+    "stackoverflow.com",
+    "dev.to",
+    "hashnode.dev",
+    "npmjs.com",
+    "pypi.org",
+):
     _CATEGORY_MAP[_d] = "开发"
 for _d in ("arxiv.org", "scholar.google.com", "paperswithcode.com"):
     _CATEGORY_MAP[_d] = "研究"
-for _d in ("docs.python.org", "docs.microsoft.com", "learn.microsoft.com",
-           "developer.mozilla.org"):
+for _d in ("docs.python.org", "docs.microsoft.com", "learn.microsoft.com", "developer.mozilla.org"):
     _CATEGORY_MAP[_d] = "文档"
 for _d in ("news.ycombinator.com", "techcrunch.com", "36kr.com"):
     _CATEGORY_MAP[_d] = "新闻"
-for _d in ("zhihu.com", "juejin.cn", "csdn.net", "cnblogs.com", "medium.com",
-           "towardsdatascience.com"):
+for _d in (
+    "zhihu.com",
+    "juejin.cn",
+    "csdn.net",
+    "cnblogs.com",
+    "medium.com",
+    "towardsdatascience.com",
+):
     _CATEGORY_MAP[_d] = "社区"
 for _d in ("youtube.com", "bilibili.com"):
     _CATEGORY_MAP[_d] = "视频"
 
-_AI_KEYWORDS = {"ai", "llm", "gpt", "agent", "transformer", "openai",
-                "langchain", "大模型", "人工智能", "机器学习"}
+_AI_KEYWORDS = {
+    "ai",
+    "llm",
+    "gpt",
+    "agent",
+    "transformer",
+    "openai",
+    "langchain",
+    "大模型",
+    "人工智能",
+    "机器学习",
+}
 
 # ── Stopwords for keyword extraction ─────────────────────────────
 
 _STOPWORDS = {
-    "the", "and", "for", "are", "but", "not", "you", "all", "can",
-    "was", "one", "has", "from", "with", "this", "that", "have",
-    "will", "your", "what", "when", "make", "like", "just",
-    "的", "了", "在", "是", "我", "有", "和", "就", "不", "人", "都",
-    "一", "上", "也", "很", "到", "说", "要", "去", "你", "会",
-    "home", "page", "index", "null", "undefined", "error",
-    "com", "org", "net", "http", "https", "www",
+    "the",
+    "and",
+    "for",
+    "are",
+    "but",
+    "not",
+    "you",
+    "all",
+    "can",
+    "was",
+    "one",
+    "has",
+    "from",
+    "with",
+    "this",
+    "that",
+    "have",
+    "will",
+    "your",
+    "what",
+    "when",
+    "make",
+    "like",
+    "just",
+    "的",
+    "了",
+    "在",
+    "是",
+    "我",
+    "有",
+    "和",
+    "就",
+    "不",
+    "人",
+    "都",
+    "一",
+    "上",
+    "也",
+    "很",
+    "到",
+    "说",
+    "要",
+    "去",
+    "你",
+    "会",
+    "home",
+    "page",
+    "index",
+    "null",
+    "undefined",
+    "error",
+    "com",
+    "org",
+    "net",
+    "http",
+    "https",
+    "www",
 }
 
 
@@ -100,7 +186,7 @@ def _is_blocked(url: str, domain: str) -> bool:
 
 
 def _extract_keywords(title: str) -> list[str]:
-    words = re.findall(r'[\w\u4e00-\u9fff]{2,}', title.lower())
+    words = re.findall(r"[\w\u4e00-\u9fff]{2,}", title.lower())
     return [w for w in words if w not in _STOPWORDS][:8]
 
 
@@ -128,6 +214,7 @@ def _categorise(domain: str, title: str) -> str:
 
 # ── Core reader ───────────────────────────────────────────────────
 
+
 def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
     """Read Chrome/Edge history from the last *hours*."""
     targets: list[Path] = []
@@ -141,8 +228,7 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     cutoff_chrome = int(
-        (cutoff - datetime(1601, 1, 1, tzinfo=timezone.utc)).total_seconds()
-        * 1_000_000
+        (cutoff - datetime(1601, 1, 1, tzinfo=timezone.utc)).total_seconds() * 1_000_000
     )
 
     records: list[dict] = []
@@ -171,25 +257,27 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
                     continue
                 if len(title.strip()) < 3:
                     continue
-                dt = (_chrome_ts_to_dt(last_visit_time)
-                      if last_visit_time
-                      else datetime.now(timezone.utc))
-                records.append({
-                    "url": url,
-                    "title": title.strip(),
-                    "domain": domain,
-                    "visit_count": visit_count or 1,
-                    "ts": dt.isoformat(),
-                    "dt": dt,
-                })
+                dt = (
+                    _chrome_ts_to_dt(last_visit_time)
+                    if last_visit_time
+                    else datetime.now(timezone.utc)
+                )
+                records.append(
+                    {
+                        "url": url,
+                        "title": title.strip(),
+                        "domain": domain,
+                        "visit_count": visit_count or 1,
+                        "ts": dt.isoformat(),
+                        "dt": dt,
+                    }
+                )
             conn.close()
         except Exception as exc:
             print(f"[browser_collector] read error ({hist_path}): {exc}")
         finally:
-            try:
+            with contextlib.suppress(OSError):
                 os.unlink(tmp_name)
-            except OSError:
-                pass
 
     return records
 
@@ -199,23 +287,25 @@ def collect_browser_events(
     browser: str = "auto",
 ) -> list[dict]:
     """Read browser history and return as event dicts (no persistence).
-    
+
     Returns list of browser_visited event dicts for in-memory analysis only.
     """
     records = read_browser_history(hours=hours, browser=browser)
     events: list[dict] = []
     for r in records:
         dt = r.get("dt", datetime.now(timezone.utc))
-        events.append({
-            "event_type": "browser_visited",
-            "domain": r["domain"],
-            "title_keywords": _extract_keywords(r["title"]),
-            "timestamp_bucket": _timestamp_bucket(dt),
-            "dwell_time_bucket": _dwell_bucket(r.get("visit_count", 1)),
-            "category_tag": _categorise(r["domain"], r["title"]),
-            "ts": r["ts"],
-            "visit_count": r.get("visit_count", 1),
-        })
+        events.append(
+            {
+                "event_type": "browser_visited",
+                "domain": r["domain"],
+                "title_keywords": _extract_keywords(r["title"]),
+                "timestamp_bucket": _timestamp_bucket(dt),
+                "dwell_time_bucket": _dwell_bucket(r.get("visit_count", 1)),
+                "category_tag": _categorise(r["domain"], r["title"]),
+                "ts": r["ts"],
+                "visit_count": r.get("visit_count", 1),
+            }
+        )
     return events
 
 

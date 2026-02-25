@@ -9,11 +9,9 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from pathlib import Path
 from threading import Lock
 
 from myxai_desk.core.storage.paths import USAGE_DIR, ensure_dir
-
 
 _BUDGET_FILE = USAGE_DIR / "app_budgets.json"
 _lock = Lock()
@@ -36,7 +34,8 @@ def _load() -> dict:
 def _save(data: dict) -> None:
     ensure_dir(USAGE_DIR)
     _BUDGET_FILE.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
 
@@ -52,8 +51,7 @@ def get_app_usage(app_id: str) -> dict:
     }
 
 
-def check_budget(app_id: str, tokens_limit: int = 0,
-                 search_limit: int = 0) -> tuple[bool, str]:
+def check_budget(app_id: str, tokens_limit: int = 0, search_limit: int = 0) -> tuple[bool, str]:
     """Check if *app_id* is within budget.
 
     Returns ``(ok, reason)``.  If ``ok`` is False, ``reason`` explains why.

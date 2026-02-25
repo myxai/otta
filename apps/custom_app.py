@@ -7,8 +7,10 @@ Execution is 100% delegated to the nanobot agent (same path as chat).
 import json
 import re
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 _LOCAL_TZ = timezone(timedelta(hours=8))  # CST
+import contextlib
 from pathlib import Path
 
 _BASE_DIR = Path.home() / ".nanobot" / "apps" / "custom"
@@ -40,25 +42,31 @@ def _schedule_to_cron(schedule: dict) -> str:
 # ── Constants ──────────────────────────────────────────────────────────
 
 OUTPUT_FORMATS = {
-    "report":       {"label_zh": "HTML报告", "label_en": "HTML Report",
-                     "suffix": "，请以结构化HTML报告格式输出，包含标题、分节和数据来源"},
-    "notification": {"label_zh": "通知",     "label_en": "Notification",
-                     "suffix": "，请简要输出核心结论，适合通知推送"},
-    "text":         {"label_zh": "纯文本",   "label_en": "Plain Text",
-                     "suffix": ""},
+    "report": {
+        "label_zh": "HTML报告",
+        "label_en": "HTML Report",
+        "suffix": "，请以结构化HTML报告格式输出，包含标题、分节和数据来源",
+    },
+    "notification": {
+        "label_zh": "通知",
+        "label_en": "Notification",
+        "suffix": "，请简要输出核心结论，适合通知推送",
+    },
+    "text": {"label_zh": "纯文本", "label_en": "Plain Text", "suffix": ""},
 }
 
 # Schedule modes
 SCHEDULE_MODES = {
-    "daily":    {"label_zh": "每天",       "label_en": "Daily"},
-    "weekly":   {"label_zh": "每周",       "label_en": "Weekly"},
-    "monthly":  {"label_zh": "每月",       "label_en": "Monthly"},
-    "interval": {"label_zh": "间隔(天)",   "label_en": "Interval (days)"},
+    "daily": {"label_zh": "每天", "label_en": "Daily"},
+    "weekly": {"label_zh": "每周", "label_en": "Weekly"},
+    "monthly": {"label_zh": "每月", "label_en": "Monthly"},
+    "interval": {"label_zh": "间隔(天)", "label_en": "Interval (days)"},
 }
 
 WEEKDAYS_ZH = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
 # ── Persistence helpers ─────────────────────────────────────────────
+
 
 def _ensure_dirs(app_id: str | None = None):
     _BASE_DIR.mkdir(parents=True, exist_ok=True)
@@ -76,7 +84,8 @@ def _reports_dir(app_id: str) -> Path:
 
 def _save(app: dict):
     _app_file(app["id"]).write_text(
-        json.dumps(app, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(app, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
 
 
@@ -91,7 +100,7 @@ _DEFAULT_SCHEDULE = {
     "interval_days": 1,
     "last_triggered": None,
     # catch-up scheduling
-    "catchup_policy": "LATEST_ONLY",   # NONE / LATEST_ONLY / ALL_MISSED
+    "catchup_policy": "LATEST_ONLY",  # NONE / LATEST_ONLY / ALL_MISSED
     "catchup_window_hours": 24,
     "max_catchup_runs": 1,
 }
@@ -105,13 +114,17 @@ _DEFAULT_SUMMARY = {
 }
 
 
-def create_app(name: str, prompt_template: str, icon: str = "🤖",
-               output_format: str = "text",
-               schedule: dict | None = None,
-               summary: dict | None = None,
-               security_mode: str | None = None,
-               inject_profile: bool = False,
-               **_extra) -> dict:
+def create_app(
+    name: str,
+    prompt_template: str,
+    icon: str = "🤖",
+    output_format: str = "text",
+    schedule: dict | None = None,
+    summary: dict | None = None,
+    security_mode: str | None = None,
+    inject_profile: bool = False,
+    **_extra,
+) -> dict:
     _ensure_dirs()
     app_id = "capp_" + uuid.uuid4().hex[:10]
     app = {
@@ -132,6 +145,7 @@ def create_app(name: str, prompt_template: str, icon: str = "🤖",
     if security_mode:
         try:
             from myxai_desk.core.policy.modes import SecurityMode, set_app_mode
+
             set_app_mode(app_id, SecurityMode(security_mode))
         except Exception:
             pass
@@ -142,9 +156,18 @@ def update_app(app_id: str, **kwargs) -> dict | None:
     app = get_app(app_id)
     if not app:
         return None
-    allowed = ("name", "icon",
-               "prompt_template", "output_format", "schedule", "summary",
-               "param_values", "param_groups", "security_mode", "inject_profile")
+    allowed = (
+        "name",
+        "icon",
+        "prompt_template",
+        "output_format",
+        "schedule",
+        "summary",
+        "param_values",
+        "param_groups",
+        "security_mode",
+        "inject_profile",
+    )
     for key in allowed:
         if key in kwargs:
             if key == "schedule":
@@ -153,7 +176,11 @@ def update_app(app_id: str, **kwargs) -> dict | None:
                 cur = app.get("summary") or dict(_DEFAULT_SUMMARY)
                 incoming = kwargs[key]
                 if "schedule" in incoming:
-                    incoming["schedule"] = {**_DEFAULT_SCHEDULE, **cur.get("schedule", {}), **incoming["schedule"]}
+                    incoming["schedule"] = {
+                        **_DEFAULT_SCHEDULE,
+                        **cur.get("schedule", {}),
+                        **incoming["schedule"],
+                    }
                 app["summary"] = {**cur, **incoming}
             else:
                 app[key] = kwargs[key]
@@ -162,7 +189,8 @@ def update_app(app_id: str, **kwargs) -> dict | None:
     if "security_mode" in kwargs:
         sm = kwargs["security_mode"]
         try:
-            from myxai_desk.core.policy.modes import SecurityMode, set_app_mode, clear_app_mode
+            from myxai_desk.core.policy.modes import SecurityMode, clear_app_mode, set_app_mode
+
             if sm:
                 set_app_mode(app_id, SecurityMode(sm))
             else:
@@ -175,6 +203,7 @@ def update_app(app_id: str, **kwargs) -> dict | None:
 
 def delete_app(app_id: str) -> bool:
     from apps.safe_fs import safe_remove
+
     fp = _app_file(app_id)
     if not fp.exists():
         return False
@@ -189,10 +218,8 @@ def list_apps() -> list[dict]:
     _ensure_dirs()
     apps = []
     for fp in _BASE_DIR.glob("capp_*.json"):
-        try:
+        with contextlib.suppress(Exception):
             apps.append(json.loads(fp.read_text(encoding="utf-8")))
-        except Exception:
-            pass
     apps.sort(key=lambda a: a.get("created_at", ""), reverse=True)
     return apps
 
@@ -217,6 +244,7 @@ def set_last_run(app_id: str, ts: str | None = None):
 
 # ── Template helpers ────────────────────────────────────────────────
 
+
 def extract_parameters(template: str) -> list[dict]:
     seen: set[str] = set()
     params: list[dict] = []
@@ -232,6 +260,7 @@ def extract_parameters(template: str) -> list[dict]:
 def fill_template(template: str, param_values: dict) -> str:
     def _repl(m):
         return str(param_values.get(m.group(1), m.group(0)))
+
     return _PARAM_RE.sub(_repl, template)
 
 
@@ -247,6 +276,7 @@ def build_message(app: dict, param_values: dict) -> str:
 
 
 # ── Schedule helpers ────────────────────────────────────────────────
+
 
 def should_trigger(schedule: dict, now: datetime | None = None) -> bool:
     """Check if a schedule should trigger at *now*.
@@ -300,12 +330,15 @@ def build_task_descriptor(app: dict, schedule_key: str = "schedule"):
     Returns None if the schedule is not enabled or misconfigured.
     """
     try:
-        from myxai_desk.core.scheduler_service import TaskDescriptor, CATCHUP_DEFAULTS
+        from myxai_desk.core.scheduler_service import CATCHUP_DEFAULTS, TaskDescriptor
     except ImportError:
         return None
 
-    sched = (app.get(schedule_key) if schedule_key == "schedule"
-             else app.get("summary", {}).get("schedule"))
+    sched = (
+        app.get(schedule_key)
+        if schedule_key == "schedule"
+        else app.get("summary", {}).get("schedule")
+    )
     if not sched or not sched.get("enabled"):
         return None
 
@@ -318,10 +351,15 @@ def build_task_descriptor(app: dict, schedule_key: str = "schedule"):
         created_at=app.get("created_at", ""),
         last_success_at=sched.get("last_triggered"),
         catchup_policy=sched.get("catchup_policy", CATCHUP_DEFAULTS["catchup_policy"]),
-        catchup_window_hours=sched.get("catchup_window_hours", CATCHUP_DEFAULTS["catchup_window_hours"]),
+        catchup_window_hours=sched.get(
+            "catchup_window_hours", CATCHUP_DEFAULTS["catchup_window_hours"]
+        ),
         max_catchup_runs=sched.get("max_catchup_runs", CATCHUP_DEFAULTS["max_catchup_runs"]),
-        extra={"kind": "custom" if schedule_key == "schedule" else "custom_summary",
-               "app": app, "schedule_key": schedule_key},
+        extra={
+            "kind": "custom" if schedule_key == "schedule" else "custom_summary",
+            "app": app,
+            "schedule_key": schedule_key,
+        },
     )
 
 
@@ -330,7 +368,11 @@ def mark_triggered(app_id: str, schedule_key: str = "schedule"):
     app = get_app(app_id)
     if not app:
         return
-    sched = app.get(schedule_key) if schedule_key == "schedule" else app.get("summary", {}).get("schedule")
+    sched = (
+        app.get(schedule_key)
+        if schedule_key == "schedule"
+        else app.get("summary", {}).get("schedule")
+    )
     if sched:
         sched["last_triggered"] = datetime.now(_LOCAL_TZ).isoformat()
     if schedule_key == "schedule":
@@ -343,6 +385,7 @@ def mark_triggered(app_id: str, schedule_key: str = "schedule"):
 
 
 # ── Reports ─────────────────────────────────────────────────────────
+
 
 def _params_slug(params_used: dict) -> str:
     """Build a short filesystem-safe slug from param values."""
@@ -363,8 +406,7 @@ def _report_key(date_str: str, report_type: str, params_used: dict | None = None
     return f"{date_str}_{report_type}"
 
 
-def save_report(app_id: str, content: str, params_used: dict,
-                report_type: str = "run") -> dict:
+def save_report(app_id: str, content: str, params_used: dict, report_type: str = "run") -> dict:
     """Save a report. Key includes param values so each group gets its own file.
 
     Any existing read mark for this key is cleared so the refreshed report
@@ -383,7 +425,8 @@ def save_report(app_id: str, content: str, params_used: dict,
         "generated_at": now.isoformat(),
     }
     (_reports_dir(app_id) / f"{key}.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(report, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
     # Clear read mark so a regenerated report appears as unread
     app = get_app(app_id)
@@ -410,14 +453,16 @@ def list_reports(app_id: str, report_type: str | None = None) -> list[dict]:
             if report_type and rtype != report_type:
                 continue
             key = meta.get("key", fp.stem)
-            reports.append({
-                "date": meta.get("date", ""),
-                "key": key,
-                "type": rtype,
-                "generated_at": meta.get("generated_at", ""),
-                "params_used": meta.get("params_used", {}),
-                "read": key in read_set,
-            })
+            reports.append(
+                {
+                    "date": meta.get("date", ""),
+                    "key": key,
+                    "type": rtype,
+                    "generated_at": meta.get("generated_at", ""),
+                    "params_used": meta.get("params_used", {}),
+                    "read": key in read_set,
+                }
+            )
         except Exception:
             pass
     return reports
@@ -436,6 +481,7 @@ def get_report(app_id: str, key: str) -> dict | None:
 def delete_report(app_id: str, key: str) -> bool:
     """Move a single report file to trash."""
     from apps.safe_fs import safe_remove
+
     fp = _reports_dir(app_id) / f"{key}.json"
     if not fp.exists():
         return False
@@ -477,6 +523,7 @@ def all_unread_counts() -> dict[str, int]:
 
 
 # ── Summary ─────────────────────────────────────────────────────────
+
 
 def build_summary_prompt(app: dict, max_reports: int = 30) -> str | None:
     """Build a summary prompt from historical reports within configured range.

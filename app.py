@@ -9,9 +9,6 @@ import os
 os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 
 # Import the new package so its subsystems are initialised on startup.
-import myxai_desk  # noqa: F401
-from myxai_desk.core.storage import paths as _paths  # noqa: F401
-
 import asyncio
 import json
 import queue
@@ -20,7 +17,6 @@ import subprocess
 import sys
 import threading
 import time
-import traceback as _tb
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,6 +28,9 @@ from flask import (
     send_from_directory,
     stream_with_context,
 )
+
+import myxai_desk  # noqa: F401
+from myxai_desk.core.storage import paths as _paths  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # nanobot availability
@@ -119,10 +118,11 @@ def _ensure_loop():
 # nanobot bridge
 # ---------------------------------------------------------------------------
 
+
 def _make_provider(config):
+    from nanobot.providers.custom_provider import CustomProvider
     from nanobot.providers.litellm_provider import LiteLLMProvider
     from nanobot.providers.openai_codex_provider import OpenAICodexProvider
-    from nanobot.providers.custom_provider import CustomProvider
 
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
@@ -156,12 +156,14 @@ def _reset_agent():
     with _agent_lock:
         old = _agent
         _agent = None
-    if old and hasattr(old, '_mcp_stack') and old._mcp_stack is not None:
+    if old and hasattr(old, "_mcp_stack") and old._mcp_stack is not None:
+
         async def _close():
             try:
                 await old._mcp_stack.aclose()
             except Exception:
                 pass
+
         _ensure_loop()
         asyncio.run_coroutine_threadsafe(_close(), _async_loop)
     with _mcp_log_lock:
@@ -171,7 +173,7 @@ def _reset_agent():
 def _push_notification(title: str, content: str, level: str = "info"):
     """Push a notification to the frontend queue."""
     entry = {
-        "id": f"n-{int(time.time()*1000)}",
+        "id": f"n-{int(time.time() * 1000)}",
         "ts": datetime.now(timezone.utc).isoformat(),
         "title": title,
         "content": content,
@@ -184,6 +186,7 @@ def _push_notification(title: str, content: str, level: str = "info"):
             _notifications[:] = _notifications[-50:]
 
 
+import contextlib
 import re as _re
 
 _EXEC_TRIGGER = _re.compile(
@@ -197,13 +200,8 @@ _FAKE_EXEC = _re.compile(
     r"Executed tools|Created job|Removed job",
 )
 
-_EXEC_NUDGE = (
-    "请通过工具调用来完成这个操作。"
-)
-_EXEC_FALLBACK = (
-    "抱歉，本次操作未能通过工具执行。请尝试重新描述您的需求，"
-    "或新建一个对话重试。"
-)
+_EXEC_NUDGE = "请通过工具调用来完成这个操作。"
+_EXEC_FALLBACK = "抱歉，本次操作未能通过工具执行。请尝试重新描述您的需求，或新建一个对话重试。"
 
 
 def _is_exec_mode(user_msg: str) -> bool:
@@ -237,18 +235,42 @@ def _compress_history(messages: list[dict], keep_recent: int = 4) -> list[dict]:
             summaries.append(f"- {role}: {text}")
 
     if summaries:
-        summary_text = (
-            "[Earlier]\n" + "\n".join(summaries[-4:])
-        )
+        summary_text = "[Earlier]\n" + "\n".join(summaries[-4:])
         return [{"role": "assistant", "content": summary_text}] + recent
     return recent
 
 
 def _tool_to_capability(tool_name: str, arguments: dict) -> tuple[str, str]:
-    """Map a nanobot tool name to a (capability, operation) pair for policy."""
+    """Map a nanobot tool name to a (capability, operation) pair for policy.
+
+    Uses ToolRegistry metadata when available, falls back to string matching.
+    """
+    # Try metadata first (new way)
+    try:
+        from myxai_desk.core.capabilities.metadata import get_tool_registry
+
+        registry = get_tool_registry()
+        metadata = registry.get(tool_name)
+
+        if metadata:
+            return metadata.capability.value, metadata.operation.value
+    except Exception:
+        pass  # Fall back to string matching
+
+    # Fallback: string matching (legacy, gradually being replaced)
     tn = tool_name.lower()
-    if any(k in tn for k in ("file", "read_file", "write_file", "list_dir",
-                              "create_file", "move_file", "copy_file")):
+    if any(
+        k in tn
+        for k in (
+            "file",
+            "read_file",
+            "write_file",
+            "list_dir",
+            "create_file",
+            "move_file",
+            "copy_file",
+        )
+    ):
         if "read" in tn or "list" in tn:
             return "fs", "read"
         if "write" in tn or "create" in tn:
@@ -261,8 +283,10 @@ def _tool_to_capability(tool_name: str, arguments: dict) -> tuple[str, str]:
             return "fs", "remove"
         return "fs", tn
 
-    if any(k in tn for k in ("exec", "run", "shell", "command", "bash",
-                              "powershell", "terminal", "subprocess")):
+    if any(
+        k in tn
+        for k in ("exec", "run", "shell", "command", "bash", "powershell", "terminal", "subprocess")
+    ):
         return "proc", "execute"
 
     if any(k in tn for k in ("search", "web_search", "brave", "baidu")):
@@ -315,6 +339,7 @@ def _try_execute_pending() -> str | None:
     """
     try:
         from myxai_desk.core.orchestrator.planner import get_plan_manager
+
         pm = get_plan_manager()
         pending = pm.list_pending()
         if not pending:
@@ -330,8 +355,10 @@ def _try_execute_pending() -> str | None:
         )
         result = future.result(timeout=120)
         from myxai_desk.core.capabilities.governance import (
-            post_execution_audit, post_execution_undo,
+            post_execution_audit,
+            post_execution_undo,
         )
+
         post_execution_audit(pa.capability, pa.op, pa.tool_args, result, None)
         post_execution_undo(pa.capability, pa.op, pa.tool_args, result)
         print(f"[policy] Confirmed via chat → executed {pa.tool_name}")
@@ -369,7 +396,8 @@ _TRIGGER_MCP = _re.compile(
 
 
 def _filter_tool_defs_for_message(
-    user_msg: str, all_defs: list[dict],
+    user_msg: str,
+    all_defs: list[dict],
 ) -> list[dict]:
     """Select only relevant tools based on user intent to minimize tokens."""
     needed = set(_TOOLS_FS)
@@ -384,7 +412,8 @@ def _filter_tool_defs_for_message(
     include_mcp = bool(_TRIGGER_MCP.search(user_msg))
 
     return [
-        d for d in all_defs
+        d
+        for d in all_defs
         if d.get("function", {}).get("name", "") in needed
         or (include_mcp and d.get("function", {}).get("name", "").startswith("mcp_"))
     ]
@@ -393,6 +422,7 @@ def _filter_tool_defs_for_message(
 def _patch_agent_tool_history(agent):
     """Monkey-patch the agent's _process_message for execution governance."""
     import types as _types
+
     from nanobot.bus.events import OutboundMessage
 
     _orig_build_system_prompt = agent.context.build_system_prompt
@@ -400,7 +430,8 @@ def _patch_agent_tool_history(agent):
     def _enhanced_system_prompt(skill_names=None):
         base = _orig_build_system_prompt(skill_names)
 
-        from myxai_desk.core.policy.modes import get_current_mode, SecurityMode
+        from myxai_desk.core.policy.modes import SecurityMode, get_current_mode
+
         mode = get_current_mode()
 
         style_hint = (
@@ -417,9 +448,8 @@ def _patch_agent_tool_history(agent):
             mode_hint = (
                 f"\n[Mode:{mode.value}] "
                 "All ops authorized. Call tools directly, no confirmation needed. "
-                "File deletion: use exec with `del \"path\"` (Win) or `rm \"path\"` (Linux). "
-                "NEVER use PowerShell COM or complex scripts for basic file ops."
-                + style_hint
+                'File deletion: use exec with `del "path"` (Win) or `rm "path"` (Linux). '
+                "NEVER use PowerShell COM or complex scripts for basic file ops." + style_hint
             )
         else:
             mode_hint = (
@@ -431,6 +461,7 @@ def _patch_agent_tool_history(agent):
         persona_block = ""
         try:
             from myxai_desk.core.capabilities.profile import Profile
+
             profile = Profile()
             settings = profile.get_collection_settings()
             if settings.get("persona_in_digest", False):
@@ -460,20 +491,30 @@ def _patch_agent_tool_history(agent):
             self.sessions.save(session)
             self.sessions.invalidate(session.key)
             import asyncio as _aio
+
             from nanobot.session.manager import Session
+
             async def _consolidate():
                 temp = Session(key=session.key)
                 temp.messages = messages_to_archive
                 await self._consolidate_memory(temp, archive_all=True)
+
             _aio.create_task(_consolidate())
-            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="New session started. Memory consolidation in progress.")
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="New session started. Memory consolidation in progress.",
+            )
         if cmd == "/help":
-            return OutboundMessage(channel=msg.channel, chat_id=msg.chat_id,
-                                  content="\U0001f408 nanobot commands:\n/new \u2014 Start a new conversation\n/help \u2014 Show available commands")
+            return OutboundMessage(
+                channel=msg.channel,
+                chat_id=msg.chat_id,
+                content="\U0001f408 nanobot commands:\n/new \u2014 Start a new conversation\n/help \u2014 Show available commands",
+            )
 
         if len(session.messages) > self.memory_window:
             import asyncio as _aio
+
             _aio.create_task(self._consolidate_memory(session))
 
         self._set_tool_context(msg.channel, msg.chat_id)
@@ -483,10 +524,7 @@ def _patch_agent_tool_history(agent):
 
         _keep = 2 if exec_mode else 4
         raw_history = session.get_history(max_messages=self.memory_window)
-        clean_history = [
-            m for m in raw_history
-            if m["role"] != "tool" and "tool_calls" not in m
-        ]
+        clean_history = [m for m in raw_history if m["role"] != "tool" and "tool_calls" not in m]
         clean_history = _compress_history(clean_history, keep_recent=_keep)
         initial_messages = self.context.build_messages(
             history=clean_history,
@@ -497,10 +535,14 @@ def _patch_agent_tool_history(agent):
         )
 
         async def _bus_progress(content):
-            await self.bus.publish_outbound(OutboundMessage(
-                channel=msg.channel, chat_id=msg.chat_id, content=content,
-                metadata=msg.metadata or {},
-            ))
+            await self.bus.publish_outbound(
+                OutboundMessage(
+                    channel=msg.channel,
+                    chat_id=msg.chat_id,
+                    content=content,
+                    metadata=msg.metadata or {},
+                )
+            )
 
         # --- Run the agent loop with EXEC governance ---
         messages = list(initial_messages)
@@ -511,13 +553,17 @@ def _patch_agent_tool_history(agent):
         _turn_events: list[dict] = []
         progress = on_progress or _bus_progress
         nudge_count = 0
-        from myxai_desk.core.policy.modes import get_current_mode as _gcm, SecurityMode as _SM
+        from myxai_desk.core.policy.modes import SecurityMode as _SM
+        from myxai_desk.core.policy.modes import get_current_mode as _gcm
+
         max_nudges = 0 if _gcm() in (_SM.OPERATOR, _SM.DEVELOPER) else 1
 
         all_tool_defs = self.tools.get_definitions()
         tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
-        print(f"[agent] exec_mode={exec_mode}, tools={len(tool_defs)}/{len(all_tool_defs)}, "
-              f"history={n_initial}, model={self.model}")
+        print(
+            f"[agent] exec_mode={exec_mode}, tools={len(tool_defs)}/{len(all_tool_defs)}, "
+            f"history={n_initial}, model={self.model}"
+        )
 
         _turn_input = 0
         _turn_output = 0
@@ -541,6 +587,7 @@ def _patch_agent_tool_history(agent):
                     _turn_input += _pi
                     _turn_output += _co
                     from apps.llm_utils import record_tokens
+
                     record_tokens(prompt_tokens=_pi, completion_tokens=_co)
 
                 if response.has_tool_calls:
@@ -549,13 +596,17 @@ def _patch_agent_tool_history(agent):
                         await progress(clean or self._tool_hint(response.tool_calls))
 
                     tc_dicts = [
-                        {"id": tc.id, "type": "function",
-                         "function": {"name": tc.name,
-                                      "arguments": _json.dumps(tc.arguments)}}
+                        {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.name, "arguments": _json.dumps(tc.arguments)},
+                        }
                         for tc in response.tool_calls
                     ]
                     messages = self.context.add_assistant_message(
-                        messages, response.content, tc_dicts,
+                        messages,
+                        response.content,
+                        tc_dicts,
                         reasoning_content=response.reasoning_content,
                     )
                     for tc in response.tool_calls:
@@ -566,32 +617,45 @@ def _patch_agent_tool_history(agent):
 
                         # ── Phase 1: Policy gate (pre-execution) ──
                         from myxai_desk.core.policy.engine import decide as _policy_decide
+
                         _cap, _op = _tool_to_capability(tc.name, tc.arguments)
                         _decision = _policy_decide(
-                            capability=_cap, op=_op, args=tc.arguments,
-                            context={"workspace": getattr(self, 'workspace', None)},
+                            capability=_cap,
+                            op=_op,
+                            args=tc.arguments,
+                            context={"workspace": getattr(self, "workspace", None)},
                         )
                         if _decision.action == "DENY":
                             _suggest = _suggest_mode_for_deny(_decision.reason_code)
                             _upgrade_hint = (
                                 f"\n请提示用户将安全模式切换到「{_suggest}」或更高级别即可执行此操作。"
-                                if _suggest else ""
+                                if _suggest
+                                else ""
                             )
                             result = (
                                 f"[BLOCKED] {_decision.explain}{_upgrade_hint}\n"
-                                f"(当前模式={_decision.evidence.get('mode','')}, "
+                                f"(当前模式={_decision.evidence.get('mode', '')}, "
                                 f"code={_decision.reason_code})"
                             )
-                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "DENY", "code": _decision.reason_code})
+                            _turn_events.append(
+                                {
+                                    "tool": tc.name,
+                                    "cap": _cap,
+                                    "action": "DENY",
+                                    "code": _decision.reason_code,
+                                }
+                            )
                             print(f"[policy] DENIED: {_decision.reason_code}")
 
                         elif _decision.action == "REQUIRE_CONFIRM":
                             from myxai_desk.core.orchestrator.planner import get_plan_manager
+
                             _pm = get_plan_manager()
                             _pending_id = _pm.store_pending(
                                 tool_name=tc.name,
                                 tool_args=tc.arguments,
-                                capability=_cap, op=_op,
+                                capability=_cap,
+                                op=_op,
                                 risk=_decision.risk,
                                 explain=_decision.explain,
                                 evidence=_decision.evidence,
@@ -606,42 +670,71 @@ def _patch_agent_tool_history(agent):
                                 f"请在对话中向用户说明要执行的操作内容和风险，"
                                 f"并询问用户是否确认执行。用户回复「确认」后将自动执行。"
                             )
-                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "CONFIRM", "risk": _decision.risk})
+                            _turn_events.append(
+                                {
+                                    "tool": tc.name,
+                                    "cap": _cap,
+                                    "action": "CONFIRM",
+                                    "risk": _decision.risk,
+                                }
+                            )
                             print(f"[policy] REQUIRE_CONFIRM → pending {_pending_id}")
 
                         elif _decision.action == "REQUIRE_SANDBOX":
                             from myxai_desk.core.runtime.sandbox import Sandbox as _Sandbox
-                            _sbx = _Sandbox(app_id="agent", workspace=getattr(self, 'workspace', None))
+
+                            _sbx = _Sandbox(
+                                app_id="agent", workspace=getattr(self, "workspace", None)
+                            )
                             _path_arg = tc.arguments.get("path", tc.arguments.get("file_path", ""))
                             if _path_arg and not _sbx.is_path_allowed(_path_arg):
                                 result = (
                                     f"[SANDBOX] 路径 {_path_arg} 不在沙箱工作区内，操作被拒绝。\n"
                                     f"(risk={_decision.risk}, code={_decision.reason_code})"
                                 )
-                                _turn_events.append({"tool": tc.name, "cap": _cap, "action": "SANDBOX_DENY"})
+                                _turn_events.append(
+                                    {"tool": tc.name, "cap": _cap, "action": "SANDBOX_DENY"}
+                                )
                                 print(f"[policy] SANDBOX blocked path: {_path_arg}")
                             else:
                                 result = await self.tools.execute(tc.name, tc.arguments)
                                 from myxai_desk.core.capabilities.governance import (
-                                    post_execution_audit, post_execution_undo,
+                                    post_execution_audit,
+                                    post_execution_undo,
                                 )
+
                                 post_execution_audit(_cap, _op, tc.arguments, result, _decision)
                                 post_execution_undo(_cap, _op, tc.arguments, result)
-                                _turn_events.append({"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True})
-                                print(f"[policy] SANDBOX: passed, executed")
+                                _turn_events.append(
+                                    {"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True}
+                                )
+                                print("[policy] SANDBOX: passed, executed")
 
                         elif _decision.action == "REQUIRE_COOLDOWN":
                             result = await self.tools.execute(tc.name, tc.arguments)
                             _cooldown_secs = _decision.ui.get("cooldown_seconds", 5)
                             from myxai_desk.core.capabilities.governance import (
-                                post_execution_audit, post_execution_undo,
+                                post_execution_audit,
+                                post_execution_undo,
                             )
+
                             post_execution_audit(_cap, _op, tc.arguments, result, _decision)
                             post_execution_undo(
-                                _cap, _op, tc.arguments, result,
+                                _cap,
+                                _op,
+                                tc.arguments,
+                                result,
                                 cooldown_seconds=_cooldown_secs,
                             )
-                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True, "cooldown": _cooldown_secs})
+                            _turn_events.append(
+                                {
+                                    "tool": tc.name,
+                                    "cap": _cap,
+                                    "action": "EXEC",
+                                    "ok": True,
+                                    "cooldown": _cooldown_secs,
+                                }
+                            )
                             print(f"[policy] COOLDOWN: executed with {_cooldown_secs}s cooldown")
 
                         else:
@@ -650,27 +743,39 @@ def _patch_agent_tool_history(agent):
 
                             # ── Phase 3: Post-execution governance ──
                             from myxai_desk.core.capabilities.governance import (
-                                post_execution_audit, post_execution_undo,
+                                post_execution_audit,
+                                post_execution_undo,
                             )
+
                             post_execution_audit(
-                                _cap, _op, tc.arguments, result, _decision,
+                                _cap,
+                                _op,
+                                tc.arguments,
+                                result,
+                                _decision,
                             )
                             post_execution_undo(
-                                _cap, _op, tc.arguments, result,
+                                _cap,
+                                _op,
+                                tc.arguments,
+                                result,
                             )
-                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True})
+                            _turn_events.append(
+                                {"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True}
+                            )
 
                         print(f"[agent] result: {str(result)[:100]}")
                         messages = self.context.add_tool_result(
-                            messages, tc.id, tc.name, result,
+                            messages,
+                            tc.id,
+                            tc.name,
+                            result,
                         )
                 else:
                     text = self._strip_think(response.content)
-                    if (exec_mode
-                            and nudge_count < max_nudges
-                            and _is_fake_execution(text)):
+                    if exec_mode and nudge_count < max_nudges and _is_fake_execution(text):
                         nudge_count += 1
-                        print(f"[agent] nudge: fake exec detected, retrying")
+                        print("[agent] nudge: fake exec detected, retrying")
                         messages.append({"role": "assistant", "content": text})
                         messages.append({"role": "user", "content": _EXEC_NUDGE})
                         continue
@@ -689,14 +794,17 @@ def _patch_agent_tool_history(agent):
             final_content = _EXEC_FALLBACK
 
         from apps.llm_utils import record_task_usage
+
         record_task_usage("chat", _turn_input, _turn_output, _turn_search)
 
         session.add_message("user", msg.content)
-        session.add_message("assistant", final_content,
-                            tools_used=tools_used if tools_used else None)
+        session.add_message(
+            "assistant", final_content, tools_used=tools_used if tools_used else None
+        )
 
         self.sessions.save(session)
 
+        # Write to legacy global dict (backward compatibility)
         with _last_tools_lock:
             _last_tools_used[key] = list(tools_used)
 
@@ -707,13 +815,33 @@ def _patch_agent_tool_history(agent):
                 "search": _turn_search,
             }
 
+        # NEW: Also write to ContextStore (gradual migration)
+        try:
+            from myxai_desk.core.integration import migrate_legacy_dict_to_context
+
+            migrate_legacy_dict_to_context(
+                key,
+                tools_used=list(tools_used),
+                usage={
+                    "input": _turn_input,
+                    "output": _turn_output,
+                    "search": _turn_search,
+                },
+            )
+        except Exception:
+            pass  # Don't break if migration fails
+
         # ── Turn-level audit: minimal key events + fingerprint + ref ──
         if _turn_events:
             try:
                 import hashlib as _hl
-                _events_json = json.dumps(_turn_events, sort_keys=True, ensure_ascii=False, default=str)
+
+                _events_json = json.dumps(
+                    _turn_events, sort_keys=True, ensure_ascii=False, default=str
+                )
                 _fingerprint = _hl.sha256(_events_json.encode("utf-8")).hexdigest()[:16]
                 from myxai_desk.core.audit.ledger import AuditLedger
+
                 _audit_hash = AuditLedger().append_entry(
                     capability="chat.turn",
                     args={"session": key, "events": _turn_events, "fingerprint": _fingerprint},
@@ -727,12 +855,15 @@ def _patch_agent_tool_history(agent):
                         "audit_hash": _audit_hash,
                         "session_id": key,
                     }
-                print(f"[audit] chat.turn fp={_fingerprint} events={len(_turn_events)} hash={_audit_hash[:12]}…")
+                print(
+                    f"[audit] chat.turn fp={_fingerprint} events={len(_turn_events)} hash={_audit_hash[:12]}…"
+                )
             except Exception as _ae:
                 print(f"[audit] turn audit failed: {_ae}")
 
         return OutboundMessage(
-            channel=msg.channel, chat_id=msg.chat_id,
+            channel=msg.channel,
+            chat_id=msg.chat_id,
             content=final_content,
         )
 
@@ -745,11 +876,11 @@ def _get_or_create_agent():
         if _agent is not None:
             return _agent
 
-        from nanobot.config.loader import load_config, get_data_dir
-        from nanobot.bus.queue import MessageBus
-        from nanobot.agent.loop import AgentLoop
-        from nanobot.cron.service import CronService
         from loguru import logger
+        from nanobot.agent.loop import AgentLoop
+        from nanobot.bus.queue import MessageBus
+        from nanobot.config.loader import get_data_dir, load_config
+        from nanobot.cron.service import CronService
 
         logger.disable("nanobot")
 
@@ -782,20 +913,23 @@ def _get_or_create_agent():
         _patch_agent_tool_history(_agent)
 
         try:
-            from apps.web_search import EnhancedWebSearchTool, quota as _quota
             from nanobot.config.loader import get_config_path as _gcp
+
+            from apps.web_search import EnhancedWebSearchTool
+            from apps.web_search import quota as _quota
+
             _raw_cfg = {}
-            try:
+            with contextlib.suppress(Exception):
                 _raw_cfg = json.loads(_gcp().read_text(encoding="utf-8"))
-            except Exception:
-                pass
             _search_cfg = _raw_cfg.get("tools", {}).get("web", {}).get("search", {})
             _baidu_key = _search_cfg.get("baiduApiKey") or None
             _brave_key = config.tools.web.search.api_key or None
-            _agent.tools.register(EnhancedWebSearchTool(
-                brave_api_key=_brave_key,
-                baidu_api_key=_baidu_key,
-            ))
+            _agent.tools.register(
+                EnhancedWebSearchTool(
+                    brave_api_key=_brave_key,
+                    baidu_api_key=_baidu_key,
+                )
+            )
             _quota.set_quota_only(_search_cfg.get("quotaOnly", True))
             limits = {}
             if _search_cfg.get("baiduDailyLimit"):
@@ -804,20 +938,22 @@ def _get_or_create_agent():
                 limits["brave"] = int(_search_cfg["braveDailyLimit"])
             if limits:
                 _quota.set_limits(limits)
-            _active = [n for n in ["Baidu" if _baidu_key else None,
-                                   "Brave" if _brave_key else None] if n]
+            _active = [
+                n for n in ["Baidu" if _baidu_key else None, "Brave" if _brave_key else None] if n
+            ]
             print(f"[agent] web_search: API engines = {_active or ['none (no keys)']}")
         except Exception as _ws_err:
             print(f"[agent] failed to replace web_search: {_ws_err}")
 
         # Wrap exec tool: intercept deletion commands → safe_remove (recoverable)
         _exec_tool = _agent.tools._tools.get("exec")
-        if _exec_tool and hasattr(_exec_tool, 'execute'):
+        if _exec_tool and hasattr(_exec_tool, "execute"):
             import re as _wrap_re
+
             _orig_exec_execute = _exec_tool.execute
             _DEL_INTENT = _wrap_re.compile(
-                r'\b(?:del|erase|rm|rmdir|rd|remove-item|remove|delete|'
-                r'unlink|trash|recycle|\.Delete\b)',
+                r"\b(?:del|erase|rm|rmdir|rd|remove-item|remove|delete|"
+                r"unlink|trash|recycle|\.Delete\b)",
                 _wrap_re.IGNORECASE,
             )
             _PATH_QUOTED = _wrap_re.compile(r"""['"]([^'"]{3,})['"]\s*""")
@@ -827,8 +963,13 @@ def _get_or_create_agent():
                 paths = _PATH_QUOTED.findall(cmd)
                 if not paths:
                     paths = _PATH_DRIVE.findall(cmd)
-                return [p for p in paths if '.' in p.split('\\')[-1] or '.' in p.split('/')[-1]
-                        or p.endswith(('\\', '/'))]
+                return [
+                    p
+                    for p in paths
+                    if "." in p.split("\\")[-1]
+                    or "." in p.split("/")[-1]
+                    or p.endswith(("\\", "/"))
+                ]
 
             async def _safe_exec_wrapper(**kwargs):
                 command = kwargs.get("command", "")
@@ -836,6 +977,7 @@ def _get_or_create_agent():
                     paths = _extract_paths(command)
                     if paths:
                         from apps.safe_fs import safe_remove
+
                         results = []
                         for p in paths:
                             dest = safe_remove(p)
@@ -848,8 +990,6 @@ def _get_or_create_agent():
 
             _exec_tool.execute = _safe_exec_wrapper
             print("[agent] exec tool wrapped: deletion commands → safe_remove (trash)")
-
-        agent_ref = _agent
 
         async def _on_cron_job(job):
             """Cron callback: directly push notification without LLM processing.
@@ -874,9 +1014,11 @@ def _get_or_create_agent():
         def _traced_add_job(*args, **kwargs):
             print(f"[cron] add_job called: args={args}, kwargs_keys={list(kwargs.keys())}")
             job = _orig_add_job(*args, **kwargs)
-            print(f"[cron] add_job result: id={job.id}, schedule={job.schedule.kind}, "
-                  f"at_ms={job.schedule.at_ms}, next_run={job.state.next_run_at_ms}, "
-                  f"delete_after={job.delete_after_run}")
+            print(
+                f"[cron] add_job result: id={job.id}, schedule={job.schedule.kind}, "
+                f"at_ms={job.schedule.at_ms}, next_run={job.state.next_run_at_ms}, "
+                f"delete_after={job.delete_after_run}"
+            )
             return job
 
         cron.add_job = _traced_add_job
@@ -891,9 +1033,13 @@ def _get_or_create_agent():
             _orig_arm_timer()
 
         async def _traced_execute_job(job):
-            print(f"[cron] executing job '{job.name}' ({job.id}), delete_after={job.delete_after_run}")
+            print(
+                f"[cron] executing job '{job.name}' ({job.id}), delete_after={job.delete_after_run}"
+            )
             await _orig_execute_job(job)
-            print(f"[cron] job '{job.name}' done, status={job.state.last_status}, error={job.state.last_error}")
+            print(
+                f"[cron] job '{job.name}' done, status={job.state.last_status}, error={job.state.last_error}"
+            )
 
         cron._arm_timer = _traced_arm_timer
         cron._execute_job = _traced_execute_job
@@ -903,7 +1049,9 @@ def _get_or_create_agent():
 
         _ensure_loop()
         asyncio.run_coroutine_threadsafe(cron.start(), _async_loop)
-        print(f"[cron] service initialized, store={cron.store_path}, jobs={len(cron._store.jobs if cron._store else [])}")
+        print(
+            f"[cron] service initialized, store={cron.store_path}, jobs={len(cron._store.jobs if cron._store else [])}"
+        )
 
         return _agent
 
@@ -925,15 +1073,14 @@ async def _connect_mcp_safe(agent, progress_cb=None):
         _mcp_record("*", "warn", "Flag says connected but 0 MCP tools — retrying")
         agent._mcp_connected = False
         if agent._mcp_stack is not None:
-            try:
+            with contextlib.suppress(Exception):
                 await agent._mcp_stack.aclose()
-            except Exception:
-                pass
             agent._mcp_stack = None
 
     agent._mcp_connected = True
 
     from contextlib import AsyncExitStack
+
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
@@ -954,7 +1101,9 @@ async def _connect_mcp_safe(agent, progress_cb=None):
                 cmd, args = _win_fix_cmd(cfg.command, list(cfg.args))
                 _mcp_record(name, "info", f"Starting: {cmd} {' '.join(args)}")
                 params = StdioServerParameters(
-                    command=cmd, args=args, env=cfg.env or None,
+                    command=cmd,
+                    args=args,
+                    env=cfg.env or None,
                 )
                 read, write = await asyncio.wait_for(
                     stack.enter_async_context(stdio_client(params)),
@@ -963,6 +1112,7 @@ async def _connect_mcp_safe(agent, progress_cb=None):
             elif cfg.url:
                 _mcp_record(name, "info", f"Connecting HTTP: {cfg.url}")
                 from mcp.client.streamable_http import streamable_http_client
+
                 read, write, _ = await asyncio.wait_for(
                     stack.enter_async_context(streamable_http_client(cfg.url)),
                     timeout=30,
@@ -976,6 +1126,7 @@ async def _connect_mcp_safe(agent, progress_cb=None):
 
             tools = await session.list_tools()
             from nanobot.agent.tools.mcp import MCPToolWrapper
+
             for tool_def in tools.tools:
                 wrapper = MCPToolWrapper(session, name, tool_def)
                 agent.tools.register(wrapper)
@@ -1060,8 +1211,11 @@ def _filter_tools_by_policy(
 
         try:
             d = decide(
-                app_id=app_id, source=source,
-                capability=cap, op=op, args={},
+                app_id=app_id,
+                source=source,
+                capability=cap,
+                op=op,
+                args={},
             )
             if d.action in ("ALLOW", "REQUIRE_COOLDOWN", "REQUIRE_SANDBOX"):
                 allowed[name] = tool
@@ -1091,6 +1245,7 @@ def _build_safety_prompt(app_id: str, available_tools: dict) -> str:
 # ---------------------------------------------------------------------------
 # Agent execution helper (for custom apps, scheduled tasks, etc.)
 # ---------------------------------------------------------------------------
+
 
 def _run_agent_with_prompt(
     prompt: str,
@@ -1122,13 +1277,13 @@ def _run_agent_with_prompt(
                     progress_cb(content)
 
             response = await agent.process_direct(
-                prompt, session_key=session_key, on_progress=_progress,
+                prompt,
+                session_key=session_key,
+                on_progress=_progress,
             )
             result_holder["content"] = response or ""
             with _last_tools_lock:
-                result_holder["tools_used"] = list(
-                    _last_tools_used.pop(session_key, [])
-                )
+                result_holder["tools_used"] = list(_last_tools_used.pop(session_key, []))
             with _last_usage_lock:
                 result_holder["usage"] = _last_usage.pop(session_key, {})
         except Exception as exc:
@@ -1153,6 +1308,7 @@ def _run_agent_with_prompt(
 # Routes — static
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/")
 def index():
     return send_from_directory("frontend", "index.html")
@@ -1162,6 +1318,7 @@ def index():
 # Routes — system check
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/check")
 def api_check():
     config_exists = False
@@ -1169,21 +1326,25 @@ def api_check():
     if NANOBOT_AVAILABLE:
         try:
             from nanobot.config.loader import get_config_path
+
             cp = get_config_path()
             config_path = str(cp)
             config_exists = cp.exists()
         except Exception:
             pass
-    return jsonify({
-        "nanobot_installed": NANOBOT_AVAILABLE,
-        "config_exists": config_exists,
-        "config_path": config_path,
-    })
+    return jsonify(
+        {
+            "nanobot_installed": NANOBOT_AVAILABLE,
+            "config_exists": config_exists,
+            "config_path": config_path,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Routes — onboard
 # ---------------------------------------------------------------------------
+
 
 @flask_app.route("/api/onboard", methods=["POST"])
 def api_onboard():
@@ -1199,7 +1360,9 @@ def api_onboard():
             save_config(Config())
         workspace = get_workspace_path()
         workspace.mkdir(parents=True, exist_ok=True)
-        return jsonify({"success": True, "config_path": str(config_path), "workspace": str(workspace)})
+        return jsonify(
+            {"success": True, "config_path": str(config_path), "workspace": str(workspace)}
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1208,16 +1371,18 @@ def api_onboard():
 # Routes — config
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/config")
 def api_get_config():
     if not NANOBOT_AVAILABLE:
         return jsonify({"error": "nanobot 未安装"}), 400
     try:
         from nanobot.config.loader import get_config_path
+
         cp = get_config_path()
         if not cp.exists():
             return jsonify({"error": "配置文件不存在，请先初始化"}), 404
-        with open(cp, "r", encoding="utf-8") as f:
+        with open(cp, encoding="utf-8") as f:
             cfg = json.load(f)
         return jsonify(cfg)
     except Exception as e:
@@ -1230,6 +1395,7 @@ def api_save_config():
         return jsonify({"error": "nanobot 未安装"}), 400
     try:
         from nanobot.config.loader import get_config_path
+
         cp = get_config_path()
         data = request.json
         with open(cp, "w", encoding="utf-8") as f:
@@ -1244,10 +1410,12 @@ def api_save_config():
 # Security / Profile / Marketplace / Plan / Audit API
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/security/mode")
 def api_security_mode_get():
     """Return current security mode and its policy summary."""
     from myxai_desk.core.policy.modes import get_current_mode, mode_policy_as_dict
+
     return jsonify(mode_policy_as_dict(get_current_mode()))
 
 
@@ -1255,23 +1423,29 @@ def api_security_mode_get():
 def api_security_mode_set():
     """Switch global security mode (levels 1-3 only; Dev requires system config)."""
     from myxai_desk.core.policy.modes import (
-        SecurityMode, set_current_mode, mode_policy_as_dict,
-        USER_SELECTABLE_MODES, is_dev_mode_valid,
+        USER_SELECTABLE_MODES,
+        SecurityMode,
+        is_dev_mode_valid,
+        mode_policy_as_dict,
+        set_current_mode,
     )
+
     data = request.json or {}
     mode_str = data.get("mode", "")
     try:
         mode = SecurityMode(mode_str)
     except ValueError:
-        return jsonify({"error": f"Invalid mode: {mode_str}",
-                        "valid": [m.value for m in SecurityMode]}), 400
+        return jsonify(
+            {"error": f"Invalid mode: {mode_str}", "valid": [m.value for m in SecurityMode]}
+        ), 400
 
-    if mode == SecurityMode.DEVELOPER:
-        if not is_dev_mode_valid():
-            return jsonify({
+    if mode == SecurityMode.DEVELOPER and not is_dev_mode_valid():
+        return jsonify(
+            {
                 "error": "Developer 模式只能通过系统配置开启，且需要设置失效策略",
                 "hint": "请使用 /api/security/dev/enable 端点",
-            }), 403
+            }
+        ), 403
 
     if mode not in USER_SELECTABLE_MODES and mode != SecurityMode.DEVELOPER:
         return jsonify({"error": f"模式 {mode_str} 不可直接选择"}), 400
@@ -1280,9 +1454,11 @@ def api_security_mode_set():
     print(f"[security] Global mode switched to {mode.value}")
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
             capability="security.mode.switch",
-            args={"mode": mode.value}, action_id="",
+            args={"mode": mode.value},
+            action_id="",
             result_summary=f"global → {mode.value}",
         )
     except Exception:
@@ -1294,9 +1470,12 @@ def api_security_mode_set():
 def api_security_modes_list():
     """Return all available modes and their policies."""
     from myxai_desk.core.policy.modes import (
-        SecurityMode, mode_policy_as_dict, USER_SELECTABLE_MODES,
-        is_dev_mode_valid, get_dev_mode_status,
+        USER_SELECTABLE_MODES,
+        SecurityMode,
+        get_dev_mode_status,
+        mode_policy_as_dict,
     )
+
     result = []
     for m in SecurityMode:
         d = mode_policy_as_dict(m)
@@ -1309,40 +1488,53 @@ def api_security_modes_list():
 
 # ── Per-App Mode ──────────────────────────────────────────────────
 
+
 @flask_app.route("/api/security/app/<app_id>/mode", methods=["GET"])
 def api_app_mode_get(app_id):
     """Return the per-app mode override (or null if using global)."""
     from myxai_desk.core.policy.modes import (
-        get_app_mode, get_current_mode, get_effective_mode,
+        get_app_mode,
+        get_current_mode,
+        get_effective_mode,
     )
+
     app_mode = get_app_mode(app_id)
-    return jsonify({
-        "app_id": app_id,
-        "app_mode": app_mode.value if app_mode else None,
-        "global_mode": get_current_mode().value,
-        "effective_mode": get_effective_mode(app_id).value,
-    })
+    return jsonify(
+        {
+            "app_id": app_id,
+            "app_mode": app_mode.value if app_mode else None,
+            "global_mode": get_current_mode().value,
+            "effective_mode": get_effective_mode(app_id).value,
+        }
+    )
 
 
 @flask_app.route("/api/security/app/<app_id>/mode", methods=["POST"])
 def api_app_mode_set(app_id):
     """Set a per-app mode override. Requires confirmation if escalating."""
     from myxai_desk.core.policy.modes import (
-        SecurityMode, set_app_mode, clear_app_mode,
-        get_current_mode, assess_escalation, get_effective_mode,
-        USER_SELECTABLE_MODES, is_dev_mode_valid,
+        USER_SELECTABLE_MODES,
+        SecurityMode,
+        assess_escalation,
+        clear_app_mode,
+        get_effective_mode,
+        is_dev_mode_valid,
+        set_app_mode,
     )
+
     data = request.json or {}
     mode_str = data.get("mode", "")
     confirmed = data.get("confirmed", False)
 
     if not mode_str or mode_str == "inherit":
         clear_app_mode(app_id)
-        return jsonify({
-            "app_id": app_id,
-            "app_mode": None,
-            "effective_mode": get_effective_mode(app_id).value,
-        })
+        return jsonify(
+            {
+                "app_id": app_id,
+                "app_mode": None,
+                "effective_mode": get_effective_mode(app_id).value,
+            }
+        )
 
     try:
         target = SecurityMode(mode_str)
@@ -1350,10 +1542,12 @@ def api_app_mode_set(app_id):
         return jsonify({"error": f"无效的模式: {mode_str}"}), 400
 
     if target == SecurityMode.DEVELOPER and not is_dev_mode_valid():
-        return jsonify({
-            "error": "Developer 模式未通过系统配置开启",
-            "hint": "请先通过 /api/security/dev/enable 启用 Developer 模式",
-        }), 403
+        return jsonify(
+            {
+                "error": "Developer 模式未通过系统配置开启",
+                "hint": "请先通过 /api/security/dev/enable 启用 Developer 模式",
+            }
+        ), 403
 
     if target not in USER_SELECTABLE_MODES and target != SecurityMode.DEVELOPER:
         return jsonify({"error": f"模式 {mode_str} 不可选择"}), 400
@@ -1361,34 +1555,40 @@ def api_app_mode_set(app_id):
     assessment = assess_escalation(app_id, target)
 
     if assessment["escalation"] and not confirmed:
-        return jsonify({
-            "requires_confirm": True,
-            "assessment": assessment,
-        }), 200
+        return jsonify(
+            {
+                "requires_confirm": True,
+                "assessment": assessment,
+            }
+        ), 200
 
     set_app_mode(app_id, target)
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
             capability="security.app_mode.set",
-            args={"app_id": app_id, "mode": target.value,
-                  "escalation": assessment["escalation"]},
-            action_id="", result_summary=f"{app_id} → {target.value}",
+            args={"app_id": app_id, "mode": target.value, "escalation": assessment["escalation"]},
+            action_id="",
+            result_summary=f"{app_id} → {target.value}",
         )
     except Exception:
         pass
-    return jsonify({
-        "app_id": app_id,
-        "app_mode": target.value,
-        "effective_mode": get_effective_mode(app_id).value,
-        "assessment": assessment,
-    })
+    return jsonify(
+        {
+            "app_id": app_id,
+            "app_mode": target.value,
+            "effective_mode": get_effective_mode(app_id).value,
+            "assessment": assessment,
+        }
+    )
 
 
 @flask_app.route("/api/security/app/_preview/mode", methods=["POST"])
 def api_app_mode_preview():
     """Preview escalation assessment without persisting anything."""
     from myxai_desk.core.policy.modes import SecurityMode, assess_escalation
+
     data = request.json or {}
     mode_str = data.get("mode", "")
     try:
@@ -1401,38 +1601,47 @@ def api_app_mode_preview():
 
 # ── Developer Mode System Config ──────────────────────────────────
 
+
 @flask_app.route("/api/security/dev/status")
 def api_dev_mode_status():
-    from myxai_desk.core.policy.modes import get_dev_mode_status, DEV_EXPIRY_POLICIES
-    return jsonify({
-        **get_dev_mode_status(),
-        "available_policies": DEV_EXPIRY_POLICIES,
-    })
+    from myxai_desk.core.policy.modes import DEV_EXPIRY_POLICIES, get_dev_mode_status
+
+    return jsonify(
+        {
+            **get_dev_mode_status(),
+            "available_policies": DEV_EXPIRY_POLICIES,
+        }
+    )
 
 
 @flask_app.route("/api/security/dev/enable", methods=["POST"])
 def api_dev_mode_enable():
     """Enable Developer mode with a mandatory expiry policy."""
     from myxai_desk.core.policy.modes import enable_dev_mode
+
     data = request.json or {}
     expiry_policy = data.get("expiry_policy", "")
     if not expiry_policy:
-        return jsonify({
-            "error": "必须选择失效策略",
-            "available_policies": {
-                "on_app_close": "关闭应用后失效",
-                "duration_1h": "1 小时后失效",
-                "duration_24h": "24 小时后失效",
-            },
-        }), 400
+        return jsonify(
+            {
+                "error": "必须选择失效策略",
+                "available_policies": {
+                    "on_app_close": "关闭应用后失效",
+                    "duration_1h": "1 小时后失效",
+                    "duration_24h": "24 小时后失效",
+                },
+            }
+        ), 400
     result = enable_dev_mode(expiry_policy)
     if "error" in result:
         return jsonify(result), 400
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
             capability="security.dev_mode.enable",
-            args={"expiry_policy": expiry_policy}, action_id="",
+            args={"expiry_policy": expiry_policy},
+            action_id="",
             result_summary=f"dev enabled, policy={expiry_policy}",
         )
     except Exception:
@@ -1444,11 +1653,15 @@ def api_dev_mode_enable():
 def api_dev_mode_disable():
     """Disable Developer mode and revert to Operator."""
     from myxai_desk.core.policy.modes import disable_dev_mode
+
     result = disable_dev_mode()
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="security.dev_mode.disable", args={}, action_id="",
+            capability="security.dev_mode.disable",
+            args={},
+            action_id="",
             result_summary=f"dev disabled, reverted to {result.get('reverted_to', '')}",
         )
     except Exception:
@@ -1460,10 +1673,12 @@ def api_dev_mode_disable():
 # Profile API
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/profile/summary")
 def api_profile_summary():
     """Return the user's profile summary."""
     from myxai_desk.core.capabilities.profile import Profile
+
     p = Profile()
     return jsonify(p.get_summary())
 
@@ -1472,6 +1687,7 @@ def api_profile_summary():
 def api_profile_topics():
     """Return extracted interest topics."""
     from myxai_desk.core.capabilities.profile import Profile
+
     days = request.args.get("days", 30, type=int)
     p = Profile()
     return jsonify(p.get_topics(days=days))
@@ -1481,6 +1697,7 @@ def api_profile_topics():
 def api_profile_preferences():
     """Return user preferences."""
     from myxai_desk.core.capabilities.profile import Profile
+
     return jsonify(Profile().get_preferences())
 
 
@@ -1488,6 +1705,7 @@ def api_profile_preferences():
 def api_profile_preferences_update():
     """Update user preferences."""
     from myxai_desk.core.capabilities.profile import Profile
+
     p = Profile()
     action_id = p.update_preferences(request.json or {})
     return jsonify({"success": True, "action_id": action_id})
@@ -1497,6 +1715,7 @@ def api_profile_preferences_update():
 def api_profile_collection():
     """Return data collection settings."""
     from myxai_desk.core.capabilities.profile import Profile
+
     return jsonify(Profile().get_collection_settings())
 
 
@@ -1504,6 +1723,7 @@ def api_profile_collection():
 def api_profile_collection_update():
     """Update data collection settings."""
     from myxai_desk.core.capabilities.profile import Profile
+
     p = Profile()
     settings = request.json or {}
     action_id = p.update_collection_settings(settings)
@@ -1514,6 +1734,7 @@ def api_profile_collection_update():
 def api_profile_export():
     """Export all profile data."""
     from myxai_desk.core.capabilities.profile import Profile
+
     return jsonify(Profile().export_all())
 
 
@@ -1521,6 +1742,7 @@ def api_profile_export():
 def api_profile_clear():
     """Clear all profile data."""
     from myxai_desk.core.capabilities.profile import Profile
+
     action_id = Profile().clear_all()
     return jsonify({"success": True, "action_id": action_id})
 
@@ -1529,6 +1751,7 @@ def api_profile_clear():
 def api_profile_refresh():
     """Force refresh the profile summary."""
     from myxai_desk.core.capabilities.profile import Profile
+
     summary = Profile().refresh_summary()
     return jsonify(summary)
 
@@ -1537,10 +1760,12 @@ def api_profile_refresh():
 # Persona Engine API (simplified: stable + recent)
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/profile/persona")
 def api_persona_get():
     """Return stable + recent persona data."""
     from myxai_desk.core.capabilities.profile import Profile
+
     return jsonify(Profile().get_persona())
 
 
@@ -1548,6 +1773,7 @@ def api_persona_get():
 def api_persona_prompt():
     """Generate persona-enhanced prompt for LLM injection."""
     from myxai_desk.core.capabilities.profile import Profile
+
     task_context = request.args.get("task_context", "")
     prompt = Profile().get_persona_prompt(task_context)
     return jsonify({"prompt": prompt})
@@ -1557,6 +1783,7 @@ def api_persona_prompt():
 def api_persona_edit(part):
     """Manually edit stable or recent persona fields."""
     from myxai_desk.core.capabilities.profile import Profile
+
     patch = request.get_json(force=True) or {}
     if part == "stable":
         result = Profile().edit_persona_stable(patch)
@@ -1571,6 +1798,7 @@ def api_persona_edit(part):
 def api_persona_update():
     """Trigger a full persona update cycle."""
     from myxai_desk.core.capabilities.profile import Profile
+
     model_cfg = _get_model_config()
     result = Profile().run_persona_update(
         model=model_cfg.get("model", ""),
@@ -1584,10 +1812,12 @@ def api_persona_update():
 # Plan Confirmation API
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/plan/pending")
 def api_plan_pending():
     """Return pending actions waiting for user confirmation."""
     from myxai_desk.core.orchestrator.planner import get_plan_manager
+
     pm = get_plan_manager()
     return jsonify(pm.list_pending())
 
@@ -1596,6 +1826,7 @@ def api_plan_pending():
 def api_plan_confirm(action_id):
     """Confirm a pending action. Executes the tool call and returns the result."""
     from myxai_desk.core.orchestrator.planner import get_plan_manager
+
     pm = get_plan_manager()
     pa = pm.confirm_pending(action_id)
     if not pa:
@@ -1610,8 +1841,10 @@ def api_plan_confirm(action_id):
         )
         result = future.result(timeout=60)
         from myxai_desk.core.capabilities.governance import (
-            post_execution_audit, post_execution_undo,
+            post_execution_audit,
+            post_execution_undo,
         )
+
         post_execution_audit(pa.capability, pa.op, pa.tool_args, result, None)
         post_execution_undo(pa.capability, pa.op, pa.tool_args, result)
         return jsonify({"success": True, "result": str(result)[:500]})
@@ -1623,6 +1856,7 @@ def api_plan_confirm(action_id):
 def api_plan_reject(action_id):
     """Reject a pending action."""
     from myxai_desk.core.orchestrator.planner import get_plan_manager
+
     pm = get_plan_manager()
     if pm.reject_pending(action_id):
         return jsonify({"success": True})
@@ -1633,10 +1867,12 @@ def api_plan_reject(action_id):
 # Audit & Undo API
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/audit/recent")
 def api_audit_recent():
     """Return recent audit entries."""
     from myxai_desk.core.audit.ledger import AuditLedger
+
     n = request.args.get("n", 50, type=int)
     ledger = AuditLedger()
     return jsonify(ledger.recent(n))
@@ -1646,6 +1882,7 @@ def api_audit_recent():
 def api_audit_verify():
     """Verify the integrity of the audit chain."""
     from myxai_desk.core.audit.ledger import AuditLedger
+
     ledger = AuditLedger()
     ok, count, error = ledger.verify_chain()
     return jsonify({"valid": ok, "entries_checked": count, "error": error})
@@ -1655,18 +1892,23 @@ def api_audit_verify():
 def api_audit_export():
     """Export the full audit chain."""
     from myxai_desk.core.audit.ledger import AuditLedger
+
     fmt = request.args.get("format", "json")
     ledger = AuditLedger()
     data = ledger.export(format=fmt)
-    return Response(data, mimetype="application/json",
-                    headers={"Content-Disposition": "attachment; filename=audit_chain.json"})
+    return Response(
+        data,
+        mimetype="application/json",
+        headers={"Content-Disposition": "attachment; filename=audit_chain.json"},
+    )
 
 
 @flask_app.route("/api/undo/actions")
 def api_undo_actions():
     """Return recent undoable actions."""
-    from myxai_desk.core.audit.undo import UndoRegistry
-    registry = UndoRegistry()
+    from myxai_desk.core.audit.undo import get_undo_registry
+
+    registry = get_undo_registry()
     undoable = request.args.get("undoable", "false").lower() == "true"
     return jsonify(registry.list_actions(undoable_only=undoable))
 
@@ -1674,8 +1916,9 @@ def api_undo_actions():
 @flask_app.route("/api/undo/<action_id>", methods=["POST"])
 def api_undo_action(action_id):
     """Undo a specific action."""
-    from myxai_desk.core.audit.undo import UndoRegistry
-    registry = UndoRegistry()
+    from myxai_desk.core.audit.undo import get_undo_registry
+
+    registry = get_undo_registry()
     result = registry.undo(action_id)
     status = 200 if result.get("success") else 400
     return jsonify(result), status
@@ -1686,6 +1929,7 @@ def api_search_usage():
     """Return today's search API usage stats, with key availability."""
     try:
         from apps.web_search import quota
+
         data = quota.get_usage()
         mcfg = _get_model_config()
         key_map = {
@@ -1702,6 +1946,7 @@ def api_search_usage():
 @flask_app.route("/api/token/usage")
 def api_token_usage():
     from apps.llm_utils import get_token_usage
+
     return jsonify(get_token_usage())
 
 
@@ -1709,6 +1954,7 @@ def api_token_usage():
 def api_token_history():
     days = request.args.get("days", 30, type=int)
     from apps.llm_utils import get_token_history
+
     history = get_token_history(min(days, 90))
     total = sum(d["tokens"] for d in history)
     return jsonify({"days": len(history), "total": total, "history": history})
@@ -1718,6 +1964,7 @@ def api_token_history():
 def api_usage_categories():
     days = request.args.get("days", 7, type=int)
     from apps.llm_utils import get_category_usage
+
     return jsonify(get_category_usage(min(days, 90)))
 
 
@@ -1725,6 +1972,7 @@ def api_usage_categories():
 def api_search_history():
     days = request.args.get("days", 30, type=int)
     from apps.web_search import quota
+
     history = quota.get_history(min(days, 90))
     total = sum(d["calls"] for d in history)
     return jsonify({"days": len(history), "total": total, "history": history})
@@ -1734,12 +1982,13 @@ def api_search_history():
 # Routes — status
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/status")
 def api_status():
     if not NANOBOT_AVAILABLE:
         return jsonify({"error": "nanobot 未安装"}), 400
     try:
-        from nanobot.config.loader import load_config, get_config_path
+        from nanobot.config.loader import get_config_path, load_config
         from nanobot.providers.registry import PROVIDERS
 
         cp = get_config_path()
@@ -1751,31 +2000,45 @@ def api_status():
             p = getattr(config.providers, spec.name, None)
             if p is None:
                 continue
-            providers.append({
-                "name": spec.name,
-                "label": getattr(spec, "display_name", spec.name),
-                "configured": bool(p.api_key) or getattr(spec, "is_oauth", False),
-            })
+            providers.append(
+                {
+                    "name": spec.name,
+                    "label": getattr(spec, "display_name", spec.name),
+                    "configured": bool(p.api_key) or getattr(spec, "is_oauth", False),
+                }
+            )
 
         channels = []
-        for name in ("telegram", "discord", "whatsapp", "feishu", "mochat", "dingtalk", "email", "slack", "qq"):
+        for name in (
+            "telegram",
+            "discord",
+            "whatsapp",
+            "feishu",
+            "mochat",
+            "dingtalk",
+            "email",
+            "slack",
+            "qq",
+        ):
             ch = getattr(config.channels, name, None)
             if ch:
                 channels.append({"name": name, "enabled": ch.enabled})
 
         mcp_status = []
         for name, srv in config.tools.mcp_servers.items():
-            mcp_status.append({
-                "name": name,
-                "type": "http" if srv.url else "stdio",
-                "detail": srv.url or (srv.command + " " + " ".join(srv.args)),
-            })
+            mcp_status.append(
+                {
+                    "name": name,
+                    "type": "http" if srv.url else "stdio",
+                    "detail": srv.url or (srv.command + " " + " ".join(srv.args)),
+                }
+            )
 
         mcp_connected = False
         mcp_tool_count = 0
         mcp_tool_names = []
         if _agent is not None:
-            mcp_connected = getattr(_agent, '_mcp_connected', False)
+            mcp_connected = getattr(_agent, "_mcp_connected", False)
             mcp_tool_names = [n for n in _agent.tools._tools if n.startswith("mcp_")]
             mcp_tool_count = len(mcp_tool_names)
 
@@ -1784,20 +2047,22 @@ def api_status():
 
         _display_model = config.agents.defaults.model
 
-        return jsonify({
-            "config_path": str(cp),
-            "config_exists": cp.exists(),
-            "workspace": str(workspace),
-            "workspace_exists": workspace.exists(),
-            "model": _display_model,
-            "providers": providers,
-            "channels": channels,
-            "mcp_servers": mcp_status,
-            "mcp_connected": mcp_connected,
-            "mcp_tool_count": mcp_tool_count,
-            "mcp_tool_names": mcp_tool_names,
-            "mcp_log": mcp_log_copy,
-        })
+        return jsonify(
+            {
+                "config_path": str(cp),
+                "config_exists": cp.exists(),
+                "workspace": str(workspace),
+                "workspace_exists": workspace.exists(),
+                "model": _display_model,
+                "providers": providers,
+                "channels": channels,
+                "mcp_servers": mcp_status,
+                "mcp_connected": mcp_connected,
+                "mcp_tool_count": mcp_tool_count,
+                "mcp_tool_names": mcp_tool_names,
+                "mcp_log": mcp_log_copy,
+            }
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -1805,6 +2070,7 @@ def api_status():
 # ---------------------------------------------------------------------------
 # Routes — agent tools info
 # ---------------------------------------------------------------------------
+
 
 @flask_app.route("/api/tools")
 def api_tools():
@@ -1815,18 +2081,21 @@ def api_tools():
         return jsonify({"connected": False, "tools": [], "message": "Agent not yet created"})
     tool_names = list(_agent.tools._tools.keys())
     mcp_tools = [n for n in tool_names if n.startswith("mcp_")]
-    return jsonify({
-        "connected": _agent._mcp_connected,
-        "total": len(tool_names),
-        "mcp_count": len(mcp_tools),
-        "mcp_tools": mcp_tools,
-        "all_tools": tool_names,
-    })
+    return jsonify(
+        {
+            "connected": _agent._mcp_connected,
+            "total": len(tool_names),
+            "mcp_count": len(mcp_tools),
+            "mcp_tools": mcp_tools,
+            "all_tools": tool_names,
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Routes — MCP diagnostics
 # ---------------------------------------------------------------------------
+
 
 @flask_app.route("/api/mcp/test", methods=["POST"])
 def api_mcp_test():
@@ -1835,6 +2104,7 @@ def api_mcp_test():
         return jsonify({"error": "nanobot 未安装"}), 400
 
     from nanobot.config.loader import load_config
+
     config = load_config()
     servers = config.tools.mcp_servers
     if not servers:
@@ -1844,6 +2114,7 @@ def api_mcp_test():
 
     async def _test():
         from contextlib import AsyncExitStack
+
         from mcp import ClientSession, StdioServerParameters
         from mcp.client.stdio import stdio_client
 
@@ -1860,7 +2131,9 @@ def api_mcp_test():
                     stack = AsyncExitStack()
                     await stack.__aenter__()
                     params = StdioServerParameters(
-                        command=cmd, args=args, env=cfg.env or None,
+                        command=cmd,
+                        args=args,
+                        env=cfg.env or None,
                     )
                     read, write = await asyncio.wait_for(
                         stack.enter_async_context(stdio_client(params)),
@@ -1870,6 +2143,7 @@ def api_mcp_test():
                     stack = AsyncExitStack()
                     await stack.__aenter__()
                     from mcp.client.streamable_http import streamable_http_client
+
                     read, write, _ = await asyncio.wait_for(
                         stack.enter_async_context(streamable_http_client(cfg.url)),
                         timeout=30,
@@ -1885,10 +2159,8 @@ def api_mcp_test():
                 entry["status"] = "ok"
                 entry["tools"] = [t.name for t in tools.tools]
                 entry["message"] = f"{len(tools.tools)} tools available"
-                try:
+                with contextlib.suppress(Exception):
                     await stack.aclose()
-                except Exception:
-                    pass
             except asyncio.TimeoutError:
                 entry["message"] = "Connection timed out (90s)"
             except Exception as e:
@@ -1915,17 +2187,15 @@ def api_mcp_reconnect():
 
     agent = _agent
     if agent._mcp_stack is not None:
+
         async def _close_old():
-            try:
+            with contextlib.suppress(Exception):
                 await agent._mcp_stack.aclose()
-            except Exception:
-                pass
+
         _ensure_loop()
         f = asyncio.run_coroutine_threadsafe(_close_old(), _async_loop)
-        try:
+        with contextlib.suppress(Exception):
             f.result(timeout=10)
-        except Exception:
-            pass
         agent._mcp_stack = None
 
     agent._mcp_connected = False
@@ -1949,12 +2219,14 @@ def api_mcp_reconnect():
     mcp_tools = [n for n in agent.tools._tools if n.startswith("mcp_")]
     with _mcp_log_lock:
         log_copy = list(_mcp_log)
-    return jsonify({
-        "success": True,
-        "mcp_tool_count": len(mcp_tools),
-        "mcp_tools": mcp_tools,
-        "mcp_log": log_copy,
-    })
+    return jsonify(
+        {
+            "success": True,
+            "mcp_tool_count": len(mcp_tools),
+            "mcp_tools": mcp_tools,
+            "mcp_log": log_copy,
+        }
+    )
 
 
 @flask_app.route("/api/mcp/log")
@@ -1967,6 +2239,7 @@ def api_mcp_log():
 # ---------------------------------------------------------------------------
 # Routes — notifications (cron reminders, etc.)
 # ---------------------------------------------------------------------------
+
 
 @flask_app.route("/api/notifications")
 def api_notifications():
@@ -1988,13 +2261,16 @@ def api_notifications_all():
 # Routes — chat (SSE streaming)
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/chat", methods=["POST"])
 def api_chat():
     if not NANOBOT_AVAILABLE:
         return jsonify({"error": "nanobot 未安装"}), 400
 
     message = (request.json or {}).get("message", "").strip()
-    session_id = (request.json or {}).get("session_id", f"desktop:{_session_epoch}_{_session_counter}")
+    session_id = (request.json or {}).get(
+        "session_id", f"desktop:{_session_epoch}_{_session_counter}"
+    )
     if not message:
         return jsonify({"error": "消息不能为空"}), 400
 
@@ -2010,12 +2286,25 @@ def api_chat():
 
     q: queue.Queue[str] = queue.Queue()
 
+    # Generate request_id for tracking
+    import uuid
+
+    request_id = f"req_{uuid.uuid4().hex[:12]}"
+
     async def _process():
         try:
             agent = _get_or_create_agent()
 
             async def on_progress(content):
-                q.put(json.dumps({"type": "progress", "content": content}, ensure_ascii=False))
+                q.put(
+                    json.dumps(
+                        {"type": "progress", "content": content, "request_id": request_id},
+                        ensure_ascii=False,
+                    )
+                )
+
+            # Send initial event with request_id
+            q.put(json.dumps({"type": "start", "request_id": request_id}, ensure_ascii=False))
 
             need_mcp = bool(agent._mcp_servers)
             has_mcp_tools = any(n.startswith("mcp_") for n in agent.tools._tools)
@@ -2026,19 +2315,27 @@ def api_chat():
             if need_mcp and not has_mcp_tools_after:
                 errors = [e for e in _mcp_log if e["level"] == "error"]
                 hint = errors[-1]["message"] if errors else "unknown"
-                q.put(json.dumps({
-                    "type": "progress",
-                    "content": f"⚠️ MCP 工具连接失败: {hint}",
-                }, ensure_ascii=False))
+                q.put(
+                    json.dumps(
+                        {
+                            "type": "progress",
+                            "content": f"⚠️ MCP 工具连接失败: {hint}",
+                            "request_id": request_id,
+                        },
+                        ensure_ascii=False,
+                    )
+                )
 
             response = await agent.process_direct(
-                message, session_key=session_id, on_progress=on_progress,
+                message,
+                session_key=session_id,
+                on_progress=on_progress,
             )
             with _last_usage_lock:
                 _usage_data = _last_usage.pop(session_id, {})
             with _last_turn_audit_lock:
                 _audit_data = _last_turn_audit.pop(session_id, None)
-            _done_payload = {"type": "done", "content": response or ""}
+            _done_payload = {"type": "done", "content": response or "", "request_id": request_id}
             if _usage_data:
                 _done_payload["usage"] = _usage_data
             if _audit_data:
@@ -2065,7 +2362,7 @@ def api_chat():
                 if parsed.get("type") in ("done", "error"):
                     break
             except queue.Empty:
-                yield f'data: {json.dumps({"type": "error", "content": "请求超时"})}\n\n'
+                yield f"data: {json.dumps({'type': 'error', 'content': '请求超时'})}\n\n"
                 break
 
     return Response(
@@ -2115,12 +2412,14 @@ def api_history_list():
     data = _load_all_history()
     sessions = []
     for sid, sess in data.items():
-        sessions.append({
-            "id": sid,
-            "title": sess.get("title", ""),
-            "updated_at": sess.get("updated_at", ""),
-            "message_count": len(sess.get("messages", [])),
-        })
+        sessions.append(
+            {
+                "id": sid,
+                "title": sess.get("title", ""),
+                "updated_at": sess.get("updated_at", ""),
+                "message_count": len(sess.get("messages", [])),
+            }
+        )
     sessions.sort(key=lambda s: s.get("updated_at", ""), reverse=True)
     return jsonify(sessions)
 
@@ -2204,9 +2503,7 @@ def _load_apps_prefs() -> dict:
 
 def _save_apps_prefs(data: dict):
     _APPS_DIR.mkdir(parents=True, exist_ok=True)
-    _APPS_PREFS.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    _APPS_PREFS.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _inc_run_count(app_id: str):
@@ -2268,6 +2565,7 @@ _DEFAULT_EMAIL_CONFIG = {
     "schedule_time": "08:00",
 }
 
+
 def _load_apps_registry() -> dict:
     _APPS_DIR.mkdir(parents=True, exist_ok=True)
     if _APPS_REGISTRY.exists():
@@ -2280,9 +2578,7 @@ def _load_apps_registry() -> dict:
 
 def _save_apps_registry(data: dict):
     _APPS_DIR.mkdir(parents=True, exist_ok=True)
-    _APPS_REGISTRY.write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    _APPS_REGISTRY.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def _get_model_config() -> dict:
@@ -2290,7 +2586,8 @@ def _get_model_config() -> dict:
     if not NANOBOT_AVAILABLE:
         return {}
     try:
-        from nanobot.config.loader import load_config, get_config_path
+        from nanobot.config.loader import get_config_path, load_config
+
         config = load_config()
         model = config.agents.defaults.model
         p = config.get_provider(model)
@@ -2298,8 +2595,9 @@ def _get_model_config() -> dict:
         baidu_key = None
         try:
             raw = json.loads(get_config_path().read_text(encoding="utf-8"))
-            baidu_key = (raw.get("tools", {}).get("web", {})
-                         .get("search", {}).get("baiduApiKey") or None)
+            baidu_key = (
+                raw.get("tools", {}).get("web", {}).get("search", {}).get("baiduApiKey") or None
+            )
         except Exception:
             pass
         return {
@@ -2332,8 +2630,10 @@ def api_apps_list():
         entry["run_count"] = p.get("run_count", 0)
         entry["created_at"] = installed.get("installed_at", "") if installed else ""
         result.append(entry)
-    from apps.custom_app import list_apps as _list_custom
     import re as _re
+
+    from apps.custom_app import list_apps as _list_custom
+
     for capp in _list_custom():
         _tpl = capp.get("prompt_template", "")
         _pg = capp.get("param_groups") or []
@@ -2344,35 +2644,38 @@ def api_apps_list():
             _tpl,
         )[:60]
         if len(_pg) > 1:
-            _desc += f" (+{len(_pg)-1})"
+            _desc += f" (+{len(_pg) - 1})"
         _desc += "…"
         p = prefs.get(capp["id"], {})
-        result.append({
-            "id": capp["id"],
-            "name": capp["name"],
-            "name_en": capp["name"],
-            "icon": capp.get("icon", "🤖"),
-            "description": _desc,
-            "description_en": _desc,
-            "version": "1.0.0",
-            "author": "custom",
-            "category": "custom",
-            "type": "custom",
-            "installed": True,
-            "enabled": capp.get("schedule", {}).get("enabled", False),
-            "config": {},
-            "last_run": capp.get("last_run"),
-            "favorite": p.get("favorite", False),
-            "run_count": p.get("run_count", 0),
-            "created_at": capp.get("created_at", ""),
-            "security_mode": capp.get("security_mode", ""),
-        })
+        result.append(
+            {
+                "id": capp["id"],
+                "name": capp["name"],
+                "name_en": capp["name"],
+                "icon": capp.get("icon", "🤖"),
+                "description": _desc,
+                "description_en": _desc,
+                "version": "1.0.0",
+                "author": "custom",
+                "category": "custom",
+                "type": "custom",
+                "installed": True,
+                "enabled": capp.get("schedule", {}).get("enabled", False),
+                "config": {},
+                "last_run": capp.get("last_run"),
+                "favorite": p.get("favorite", False),
+                "run_count": p.get("run_count", 0),
+                "created_at": capp.get("created_at", ""),
+                "security_mode": capp.get("security_mode", ""),
+            }
+        )
     return jsonify(result)
 
 
 @flask_app.route("/api/apps/<app_id>/install", methods=["POST"])
 def api_app_install(app_id):
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run(app_id, capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
@@ -2394,9 +2697,12 @@ def api_app_install(app_id):
     _save_apps_registry(registry)
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="app.install", args={"app_id": app_id},
-            action_id="", result_summary="installed",
+            capability="app.install",
+            args={"app_id": app_id},
+            action_id="",
+            result_summary="installed",
         )
     except Exception:
         pass
@@ -2406,6 +2712,7 @@ def api_app_install(app_id):
 @flask_app.route("/api/apps/<app_id>/uninstall", methods=["POST"])
 def api_app_uninstall(app_id):
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run(app_id, capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
@@ -2417,9 +2724,12 @@ def api_app_uninstall(app_id):
     _save_apps_registry(registry)
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="app.uninstall", args={"app_id": app_id},
-            action_id="", result_summary="uninstalled",
+            capability="app.uninstall",
+            args={"app_id": app_id},
+            action_id="",
+            result_summary="uninstalled",
         )
     except Exception:
         pass
@@ -2429,6 +2739,7 @@ def api_app_uninstall(app_id):
 @flask_app.route("/api/apps/<app_id>/enable", methods=["POST"])
 def api_app_enable(app_id):
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run(app_id, capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
@@ -2440,9 +2751,12 @@ def api_app_enable(app_id):
     _save_apps_registry(registry)
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="app.enable", args={"app_id": app_id},
-            action_id="", result_summary="enabled",
+            capability="app.enable",
+            args={"app_id": app_id},
+            action_id="",
+            result_summary="enabled",
         )
     except Exception:
         pass
@@ -2452,6 +2766,7 @@ def api_app_enable(app_id):
 @flask_app.route("/api/apps/<app_id>/disable", methods=["POST"])
 def api_app_disable(app_id):
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run(app_id, capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
@@ -2463,9 +2778,12 @@ def api_app_disable(app_id):
     _save_apps_registry(registry)
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="app.disable", args={"app_id": app_id},
-            action_id="", result_summary="disabled",
+            capability="app.disable",
+            args={"app_id": app_id},
+            action_id="",
+            result_summary="disabled",
         )
     except Exception:
         pass
@@ -2503,6 +2821,7 @@ def api_app_get_config(app_id):
 @flask_app.route("/api/apps/<app_id>/config", methods=["POST"])
 def api_app_save_config(app_id):
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run(app_id, capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
@@ -2515,9 +2834,12 @@ def api_app_save_config(app_id):
     _save_apps_registry(registry)
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="app.config.save", args={"app_id": app_id},
-            action_id="", result_summary="config_updated",
+            capability="app.config.save",
+            args={"app_id": app_id},
+            action_id="",
+            result_summary="config_updated",
         )
     except Exception:
         pass
@@ -2528,6 +2850,7 @@ def api_app_save_config(app_id):
 def api_digest_run():
     """Start a daily digest run in the background."""
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run("daily_digest")
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
@@ -2544,6 +2867,7 @@ def api_digest_run():
     def _run():
         try:
             from apps.daily_digest import run_daily_digest
+
             app_config = registry["daily_digest"].get("config", {})
             model_cfg = _get_model_config()
             merged = {**app_config, **model_cfg}
@@ -2572,17 +2896,21 @@ def api_digest_run():
                 )
 
             from myxai_desk.core.runtime.app_governance import finish_app_run
+
             finish_app_run("daily_digest", success=(result["status"] == "ok"))
 
             with _digest_task_lock:
-                _digest_task_status.update({
-                    "status": "done" if result["status"] == "ok" else "error",
-                    "result": result,
-                })
+                _digest_task_status.update(
+                    {
+                        "status": "done" if result["status"] == "ok" else "error",
+                        "result": result,
+                    }
+                )
         except Exception as exc:
             print(f"[daily_digest] run error: {exc}")
             try:
                 from myxai_desk.core.runtime.app_governance import finish_app_run
+
                 finish_app_run("daily_digest", success=False, error=str(exc))
             except Exception:
                 pass
@@ -2602,12 +2930,14 @@ def api_digest_status():
 @flask_app.route("/api/apps/daily_digest/reports")
 def api_digest_reports():
     from apps.daily_digest import list_reports
+
     return jsonify(list_reports())
 
 
 @flask_app.route("/api/apps/daily_digest/report/<date_str>")
 def api_digest_report(date_str):
     from apps.daily_digest import load_report
+
     report = load_report(date_str)
     if not report:
         return jsonify({"error": "报告不存在"}), 404
@@ -2617,6 +2947,7 @@ def api_digest_report(date_str):
 @flask_app.route("/api/apps/daily_digest/browsers")
 def api_digest_browsers():
     from apps.daily_digest import find_browser_history_paths
+
     return jsonify(find_browser_history_paths())
 
 
@@ -2631,10 +2962,14 @@ def api_digest_preview():
         return jsonify({"error": "每日私享未安装"}), 400
 
     from apps.daily_digest import (
-        read_browser_history, filter_history,
-        extract_keywords, classify_interests,
-        llm_analyze_interests, read_chat_history,
+        classify_interests,
+        extract_keywords,
+        filter_history,
+        llm_analyze_interests,
+        read_browser_history,
+        read_chat_history,
     )
+
     app_config = registry["daily_digest"].get("config", {})
     browser = app_config.get("browser", "auto")
     hours = app_config.get("history_hours", 24)
@@ -2654,7 +2989,10 @@ def api_digest_preview():
 
     if model and api_key:
         llm_result = llm_analyze_interests(
-            filtered, model, api_key, api_base,
+            filtered,
+            model,
+            api_key,
+            api_base,
             chat_sessions=chat_sessions,
         )
         if llm_result:
@@ -2663,20 +3001,19 @@ def api_digest_preview():
                 cat: [{"keyword": kw, "count": 0} for kw in entry["interests"]]
                 for cat, entry in llm_result.items()
             }
-            queries = {
-                cat: entry["queries"]
-                for cat, entry in llm_result.items()
-            }
-            return jsonify({
-                "raw_count": len(raw),
-                "filtered_count": len(filtered),
-                "chat_sessions": len(chat_sessions),
-                "chat_messages": chat_msg_count,
-                "keyword_count": sum(len(v) for v in interests.values()),
-                "interests": interests,
-                "queries": queries,
-                "method": analysis_method,
-            })
+            queries = {cat: entry["queries"] for cat, entry in llm_result.items()}
+            return jsonify(
+                {
+                    "raw_count": len(raw),
+                    "filtered_count": len(filtered),
+                    "chat_sessions": len(chat_sessions),
+                    "chat_messages": chat_msg_count,
+                    "keyword_count": sum(len(v) for v in interests.values()),
+                    "interests": interests,
+                    "queries": queries,
+                    "method": analysis_method,
+                }
+            )
 
     keywords = extract_keywords(filtered)
     categories = classify_interests(keywords)
@@ -2684,15 +3021,17 @@ def api_digest_preview():
         cat: [{"keyword": i["keyword"], "count": i["count"]} for i in items[:10]]
         for cat, items in categories.items()
     }
-    return jsonify({
-        "raw_count": len(raw),
-        "filtered_count": len(filtered),
-        "chat_sessions": len(chat_sessions),
-        "chat_messages": chat_msg_count,
-        "keyword_count": len(keywords),
-        "interests": interests,
-        "method": analysis_method,
-    })
+    return jsonify(
+        {
+            "raw_count": len(raw),
+            "filtered_count": len(filtered),
+            "chat_sessions": len(chat_sessions),
+            "chat_messages": chat_msg_count,
+            "keyword_count": len(keywords),
+            "interests": interests,
+            "method": analysis_method,
+        }
+    )
 
 
 @flask_app.route("/api/apps/daily_digest/explore", methods=["POST"])
@@ -2707,11 +3046,13 @@ def api_digest_explore():
     interests = None
     if date_str:
         from apps.daily_digest import load_report
+
         report = load_report(date_str)
         if report:
             interests = report.get("interests")
 
     from apps.daily_digest import build_explore_prompt
+
     prompt = build_explore_prompt(item, interests=interests)
     return jsonify({"prompt": prompt})
 
@@ -2720,9 +3061,11 @@ def api_digest_explore():
 # Routes — Unified Reports
 # ---------------------------------------------------------------------------
 
+
 def _html_to_summary(html: str, max_len: int = 60) -> str:
     """Extract plain-text summary from HTML content."""
     import re as _re
+
     text = _re.sub(r"<[^>]+>", " ", html)
     text = _re.sub(r"\s+", " ", text).strip()
     for prefix in ("📅", "📧", "🎯"):
@@ -2730,7 +3073,7 @@ def _html_to_summary(html: str, max_len: int = 60) -> str:
     text = _re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", text).strip()
     for skip in ("每日私享", "每日资讯", "Daily"):
         if text.startswith(skip):
-            text = text[len(skip):].strip()
+            text = text[len(skip) :].strip()
     return text[:max_len] if text else ""
 
 
@@ -2741,7 +3084,9 @@ def api_all_reports():
 
     # Daily Digest
     try:
-        from apps.daily_digest import list_reports as digest_list, load_report as digest_load
+        from apps.daily_digest import list_reports as digest_list
+        from apps.daily_digest import load_report as digest_load
+
         for r in digest_list(limit=60):
             date = r.get("date", "")
             summary = ""
@@ -2751,23 +3096,27 @@ def api_all_reports():
                     summary = _html_to_summary(rpt["content"])
             except Exception:
                 pass
-            result.append({
-                "app_id": "daily_digest",
-                "app_name": "每日私享",
-                "app_icon": "🎯",
-                "date": date,
-                "generated_at": r.get("generated_at", ""),
-                "key": date,
-                "type": "digest",
-                "read": r.get("read", False),
-                "summary": summary,
-            })
+            result.append(
+                {
+                    "app_id": "daily_digest",
+                    "app_name": "每日私享",
+                    "app_icon": "🎯",
+                    "date": date,
+                    "generated_at": r.get("generated_at", ""),
+                    "key": date,
+                    "type": "digest",
+                    "read": r.get("read", False),
+                    "summary": summary,
+                }
+            )
     except Exception:
         pass
 
     # Email Summary
     try:
-        from apps.email_summary import list_reports as email_list, get_report as email_get
+        from apps.email_summary import get_report as email_get
+        from apps.email_summary import list_reports as email_list
+
         for r in email_list():
             date = r.get("date", "")
             summary = ""
@@ -2781,26 +3130,34 @@ def api_all_reports():
                         summary = _html_to_summary(rpt["content"])
                 except Exception:
                     pass
-            result.append({
-                "app_id": "email_summary",
-                "app_name": "邮件简报",
-                "app_icon": "📧",
-                "date": date,
-                "generated_at": r.get("generated_at", ""),
-                "key": date,
-                "type": "email",
-                "read": r.get("read", False),
-                "summary": summary,
-            })
+            result.append(
+                {
+                    "app_id": "email_summary",
+                    "app_name": "邮件简报",
+                    "app_icon": "📧",
+                    "date": date,
+                    "generated_at": r.get("generated_at", ""),
+                    "key": date,
+                    "type": "email",
+                    "read": r.get("read", False),
+                    "summary": summary,
+                }
+            )
     except Exception:
         pass
 
     # Custom Apps
     try:
         from apps.custom_app import (
-            list_apps as _list_custom, list_reports as custom_list,
             get_report as custom_get,
         )
+        from apps.custom_app import (
+            list_apps as _list_custom,
+        )
+        from apps.custom_app import (
+            list_reports as custom_list,
+        )
+
         for app in _list_custom():
             app_id = app["id"]
             app_name = app.get("name", app_id)
@@ -2814,17 +3171,19 @@ def api_all_reports():
                         summary = _html_to_summary(rpt["content"])
                 except Exception:
                     pass
-                result.append({
-                    "app_id": app_id,
-                    "app_name": app_name,
-                    "app_icon": app_icon,
-                    "date": r.get("date", ""),
-                    "generated_at": r.get("generated_at", ""),
-                    "key": key,
-                    "type": r.get("type", "run"),
-                    "read": r.get("read", True),
-                    "summary": summary,
-                })
+                result.append(
+                    {
+                        "app_id": app_id,
+                        "app_name": app_name,
+                        "app_icon": app_icon,
+                        "date": r.get("date", ""),
+                        "generated_at": r.get("generated_at", ""),
+                        "key": key,
+                        "type": r.get("type", "run"),
+                        "read": r.get("read", True),
+                        "summary": summary,
+                    }
+                )
     except Exception:
         pass
 
@@ -2838,16 +3197,19 @@ def api_reports_unread_count():
     total = 0
     try:
         from apps.custom_app import all_unread_counts
+
         total += sum(all_unread_counts().values())
     except Exception:
         pass
     try:
         from apps.daily_digest import list_reports as _dl
+
         total += sum(1 for r in _dl(limit=60) if not r.get("read"))
     except Exception:
         pass
     try:
         from apps.email_summary import list_reports as _el
+
         total += sum(1 for r in _el() if not r.get("read"))
     except Exception:
         pass
@@ -2858,7 +3220,10 @@ def api_reports_unread_count():
 def api_mark_all_reports_read():
     # Custom apps
     try:
-        from apps.custom_app import list_apps as _list_custom, list_reports as custom_list, mark_report_read
+        from apps.custom_app import list_apps as _list_custom
+        from apps.custom_app import list_reports as custom_list
+        from apps.custom_app import mark_report_read
+
         for app in _list_custom():
             for r in custom_list(app["id"]):
                 if not r.get("read"):
@@ -2867,7 +3232,9 @@ def api_mark_all_reports_read():
         pass
     # Daily Digest
     try:
-        from apps.daily_digest import list_reports as digest_list, mark_report_read as digest_mark
+        from apps.daily_digest import list_reports as digest_list
+        from apps.daily_digest import mark_report_read as digest_mark
+
         for r in digest_list(limit=200):
             if not r.get("read"):
                 digest_mark(r.get("date", ""))
@@ -2875,7 +3242,9 @@ def api_mark_all_reports_read():
         pass
     # Email Summary
     try:
-        from apps.email_summary import list_reports as email_list, mark_report_read as email_mark
+        from apps.email_summary import list_reports as email_list
+        from apps.email_summary import mark_report_read as email_mark
+
         for r in email_list():
             if not r.get("read"):
                 email_mark(r.get("date", ""))
@@ -2889,12 +3258,15 @@ def api_delete_report(app_id, key):
     ok = False
     if app_id == "daily_digest":
         from apps.daily_digest import delete_report
+
         ok = delete_report(key)
     elif app_id == "email_summary":
         from apps.email_summary import delete_report
+
         ok = delete_report(key)
     else:
         from apps.custom_app import delete_report
+
         ok = delete_report(app_id, key)
     if ok:
         return jsonify({"ok": True})
@@ -2905,14 +3277,18 @@ def api_delete_report(app_id, key):
 def api_report_content(app_id, key):
     """Fetch a single report's full content for inline display."""
     if app_id == "daily_digest":
-        from apps.daily_digest import load_report, mark_report_read as digest_mark
+        from apps.daily_digest import load_report
+        from apps.daily_digest import mark_report_read as digest_mark
+
         report = load_report(key)
         if not report:
             return jsonify({"error": "not found"}), 404
         digest_mark(key)
         return jsonify(report)
     elif app_id == "email_summary":
-        from apps.email_summary import get_report, mark_report_read as email_mark
+        from apps.email_summary import get_report
+        from apps.email_summary import mark_report_read as email_mark
+
         report = get_report(key)
         if not report:
             return jsonify({"error": "not found"}), 404
@@ -2920,6 +3296,7 @@ def api_report_content(app_id, key):
         return jsonify(report)
     else:
         from apps.custom_app import get_report, mark_report_read
+
         report = get_report(app_id, key)
         if not report:
             return jsonify({"error": "not found"}), 404
@@ -2931,9 +3308,11 @@ def api_report_content(app_id, key):
 # Routes — Email Summary
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/apps/email_summary/run", methods=["POST"])
 def api_email_run():
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run("email_summary")
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
@@ -2942,6 +3321,7 @@ def api_email_run():
     if "email_summary" not in registry:
         return jsonify({"error": "邮件简报应用未安装"}), 400
     from apps.email_summary import run_email_summary
+
     app_config = registry["email_summary"].get("config", {})
     if not app_config.get("imap_host") or not app_config.get("imap_user"):
         return jsonify({"error": "请先配置 IMAP 邮箱信息"}), 400
@@ -2967,18 +3347,21 @@ def api_email_run():
 @flask_app.route("/api/apps/email_summary/status")
 def api_email_status():
     from apps.email_summary import get_status
+
     return jsonify(get_status())
 
 
 @flask_app.route("/api/apps/email_summary/reports")
 def api_email_reports():
     from apps.email_summary import list_reports
+
     return jsonify(list_reports())
 
 
 @flask_app.route("/api/apps/email_summary/report/<date_str>")
 def api_email_report(date_str):
     from apps.email_summary import get_report
+
     report = get_report(date_str)
     if not report:
         return jsonify({"error": "报告不存在"}), 404
@@ -2991,6 +3374,7 @@ def api_email_test():
     if "email_summary" not in registry:
         return jsonify({"error": "邮件简报应用未安装"}), 400
     from apps.email_summary import test_connection
+
     app_config = registry["email_summary"].get("config", {})
     return jsonify(test_connection(app_config))
 
@@ -2998,6 +3382,7 @@ def api_email_test():
 @flask_app.route("/api/apps/email_summary/presets")
 def api_email_presets():
     from apps.email_summary import IMAP_PRESETS
+
     return jsonify(IMAP_PRESETS)
 
 
@@ -3005,17 +3390,19 @@ def api_email_presets():
 # Routes — Custom Apps
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/apps/custom", methods=["GET"])
 def api_custom_list():
     from apps.custom_app import list_apps
+
     return jsonify(list_apps())
 
 
 @flask_app.route("/api/apps/custom", methods=["POST"])
 def api_custom_create():
     from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("custom_app_mgmt", source="user",
-                            capabilities=["fs.write"])
+
+    decision = gate_app_run("custom_app_mgmt", source="user", capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
 
@@ -3025,6 +3412,7 @@ def api_custom_create():
     if not name or not prompt_template:
         return jsonify({"error": "名称和任务描述不能为空"}), 400
     from apps.custom_app import create_app
+
     app = create_app(
         name=name,
         prompt_template=prompt_template,
@@ -3036,9 +3424,12 @@ def api_custom_create():
     )
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="app.custom.create", args={"name": name},
-            action_id="", result_summary=f"created {app.get('id', '')}",
+            capability="app.custom.create",
+            args={"name": name},
+            action_id="",
+            result_summary=f"created {app.get('id', '')}",
         )
     except Exception:
         pass
@@ -3048,21 +3439,26 @@ def api_custom_create():
 @flask_app.route("/api/apps/custom/meta", methods=["GET"])
 def api_custom_meta():
     from apps.custom_app import OUTPUT_FORMATS, SCHEDULE_MODES
-    return jsonify({
-        "output_formats": OUTPUT_FORMATS,
-        "schedule_modes": SCHEDULE_MODES,
-    })
+
+    return jsonify(
+        {
+            "output_formats": OUTPUT_FORMATS,
+            "schedule_modes": SCHEDULE_MODES,
+        }
+    )
 
 
 @flask_app.route("/api/apps/custom/unread")
 def api_custom_unread():
     from apps.custom_app import all_unread_counts
+
     return jsonify(all_unread_counts())
 
 
 @flask_app.route("/api/apps/custom/<app_id>", methods=["GET"])
 def api_custom_get(app_id):
     from apps.custom_app import get_app
+
     app = get_app(app_id)
     if not app:
         return jsonify({"error": "应用不存在"}), 404
@@ -3072,21 +3468,25 @@ def api_custom_get(app_id):
 @flask_app.route("/api/apps/custom/<app_id>", methods=["PUT"])
 def api_custom_update(app_id):
     from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("custom_app_mgmt", source="user",
-                            capabilities=["fs.write"])
+
+    decision = gate_app_run("custom_app_mgmt", source="user", capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
 
     body = request.json or {}
     from apps.custom_app import update_app
+
     app = update_app(app_id, **body)
     if not app:
         return jsonify({"error": "应用不存在"}), 404
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         AuditLedger().append_entry(
-            capability="app.custom.update", args={"app_id": app_id},
-            action_id="", result_summary="updated",
+            capability="app.custom.update",
+            args={"app_id": app_id},
+            action_id="",
+            result_summary="updated",
         )
     except Exception:
         pass
@@ -3096,18 +3496,22 @@ def api_custom_update(app_id):
 @flask_app.route("/api/apps/custom/<app_id>", methods=["DELETE"])
 def api_custom_delete(app_id):
     from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("custom_app_mgmt", source="user",
-                            capabilities=["fs.write"])
+
+    decision = gate_app_run("custom_app_mgmt", source="user", capabilities=["fs.write"])
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
 
     from apps.custom_app import delete_app
+
     if delete_app(app_id):
         try:
             from myxai_desk.core.audit.ledger import AuditLedger
+
             AuditLedger().append_entry(
-                capability="app.custom.delete", args={"app_id": app_id},
-                action_id="", result_summary="deleted",
+                capability="app.custom.delete",
+                args={"app_id": app_id},
+                action_id="",
+                result_summary="deleted",
             )
         except Exception:
             pass
@@ -3119,11 +3523,12 @@ def api_custom_delete(app_id):
 def api_custom_run(app_id):
     """Run a custom app — SSE stream. Supports multiple param groups."""
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     decision = gate_app_run(app_id, source="user")
     if not decision["allowed"]:
         return jsonify({"error": decision["reason"]}), 403
 
-    from apps.custom_app import get_app, build_message, save_report, set_last_run
+    from apps.custom_app import build_message, get_app, save_report, set_last_run
 
     if not NANOBOT_AVAILABLE:
         return jsonify({"error": "nanobot 未安装"}), 400
@@ -3150,8 +3555,7 @@ def api_custom_run(app_id):
             agent = _get_or_create_agent()
 
             async def on_progress(content):
-                q.put(json.dumps({"type": "progress", "content": content},
-                                 ensure_ascii=False))
+                q.put(json.dumps({"type": "progress", "content": content}, ensure_ascii=False))
 
             need_mcp = bool(agent._mcp_servers)
             has_mcp = any(n.startswith("mcp_") for n in agent.tools._tools)
@@ -3160,7 +3564,9 @@ def api_custom_run(app_id):
 
             original_tools = dict(agent.tools._tools)
             safe_tools = _filter_tools_by_policy(
-                original_tools, app_id=app_id, source="user",
+                original_tools,
+                app_id=app_id,
+                source="user",
                 app_permissions=app.get("permissions", []),
             )
             agent.tools._tools = safe_tools
@@ -3173,9 +3579,12 @@ def api_custom_run(app_id):
                 for idx, pv in enumerate(param_groups):
                     label = ", ".join(str(v) for v in pv.values()) if pv else ""
                     if total > 1:
-                        q.put(json.dumps({"type": "progress",
-                                          "content": f"[{idx+1}/{total}] {label}"},
-                                         ensure_ascii=False))
+                        q.put(
+                            json.dumps(
+                                {"type": "progress", "content": f"[{idx + 1}/{total}] {label}"},
+                                ensure_ascii=False,
+                            )
+                        )
 
                     message = build_message(app, pv)
                     _CAPP_SAFETY = _build_safety_prompt(app_id, safe_tools)
@@ -3183,7 +3592,8 @@ def api_custom_run(app_id):
                     session_key = f"capp_{_uuid.uuid4().hex[:12]}"
 
                     response = await agent.process_direct(
-                        message, session_key=session_key,
+                        message,
+                        session_key=session_key,
                         on_progress=on_progress,
                     )
 
@@ -3193,24 +3603,28 @@ def api_custom_run(app_id):
                     _app_turn_output += _run_usage.get("output", 0)
                     _app_turn_search += _run_usage.get("search", 0)
 
-                    save_report(app_id, content=response or "",
-                                params_used=pv)
+                    save_report(app_id, content=response or "", params_used=pv)
 
                     if total > 1:
-                        q.put(json.dumps({"type": "progress",
-                                          "content": f"✅ [{idx+1}/{total}] {label}"},
-                                         ensure_ascii=False))
+                        q.put(
+                            json.dumps(
+                                {"type": "progress", "content": f"✅ [{idx + 1}/{total}] {label}"},
+                                ensure_ascii=False,
+                            )
+                        )
             finally:
                 agent.tools._tools = original_tools
 
             _app_cat = f"app_{app.get('name', app_id)}"
             from apps.llm_utils import record_task_usage
+
             record_task_usage(_app_cat, _app_turn_input, _app_turn_output, _app_turn_search)
 
             set_last_run(app_id)
             _inc_run_count(app_id)
             try:
                 from myxai_desk.core.runtime.app_governance import finish_app_run
+
                 finish_app_run(app_id, success=True)
             except Exception:
                 pass
@@ -3223,10 +3637,9 @@ def api_custom_run(app_id):
                 }
             q.put(json.dumps(_done_payload, ensure_ascii=False))
         except Exception as exc:
-            if 'original_tools' in dir():
+            if "original_tools" in dir():
                 agent.tools._tools = original_tools
-            q.put(json.dumps({"type": "error", "content": str(exc)},
-                             ensure_ascii=False))
+            q.put(json.dumps({"type": "error", "content": str(exc)}, ensure_ascii=False))
 
     _ensure_loop()
     asyncio.run_coroutine_threadsafe(_process(), _async_loop)
@@ -3240,7 +3653,7 @@ def api_custom_run(app_id):
                 if parsed.get("type") in ("done", "error"):
                     break
             except queue.Empty:
-                yield f'data: {json.dumps({"type":"error","content":"请求超时"})}\n\n'
+                yield f"data: {json.dumps({'type': 'error', 'content': '请求超时'})}\n\n"
                 break
 
     return Response(
@@ -3253,12 +3666,14 @@ def api_custom_run(app_id):
 @flask_app.route("/api/apps/custom/<app_id>/reports")
 def api_custom_reports(app_id):
     from apps.custom_app import list_reports
+
     return jsonify(list_reports(app_id))
 
 
 @flask_app.route("/api/apps/custom/<app_id>/report/<path:key>")
 def api_custom_report(app_id, key):
     from apps.custom_app import get_report, mark_report_read
+
     report = get_report(app_id, key)
     if not report:
         return jsonify({"error": "报告不存在"}), 404
@@ -3269,6 +3684,7 @@ def api_custom_report(app_id, key):
 @flask_app.route("/api/apps/custom/<app_id>/report/<path:key>", methods=["DELETE"])
 def api_custom_report_delete(app_id, key):
     from apps.custom_app import delete_report
+
     if delete_report(app_id, key):
         return jsonify({"success": True})
     return jsonify({"error": "报告不存在"}), 404
@@ -3277,7 +3693,7 @@ def api_custom_report_delete(app_id, key):
 @flask_app.route("/api/apps/custom/<app_id>/summary", methods=["POST"])
 def api_custom_summary(app_id):
     """Generate a summary from historical reports — direct LLM call, SSE stream."""
-    from apps.custom_app import get_app, build_summary_prompt, save_report, mark_triggered
+    from apps.custom_app import build_summary_prompt, get_app, mark_triggered, save_report
 
     app = get_app(app_id)
     if not app:
@@ -3295,15 +3711,31 @@ def api_custom_summary(app_id):
 
     def _run():
         try:
-            q.put(json.dumps({"type": "progress",
-                              "content": "正在调用 LLM 生成总结…"},
-                             ensure_ascii=False))
-            import os, litellm
+            q.put(
+                json.dumps(
+                    {"type": "progress", "content": "正在调用 LLM 生成总结…"}, ensure_ascii=False
+                )
+            )
+            import os
+
+            import litellm
+
             os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 
-            _KNOWN = ("openai/", "azure/", "anthropic/", "cohere/",
-                      "huggingface/", "ollama/", "deepseek/", "groq/",
-                      "together_ai/", "openrouter/", "gemini/", "mistral/")
+            _KNOWN = (
+                "openai/",
+                "azure/",
+                "anthropic/",
+                "cohere/",
+                "huggingface/",
+                "ollama/",
+                "deepseek/",
+                "groq/",
+                "together_ai/",
+                "openrouter/",
+                "gemini/",
+                "mistral/",
+            )
             model = mcfg["model"]
             if not any(model.startswith(p) for p in _KNOWN) and mcfg.get("api_base"):
                 model = f"openai/{model}"
@@ -3323,13 +3755,14 @@ def api_custom_summary(app_id):
                 _sum_pi = getattr(_usage, "prompt_tokens", 0)
                 _sum_co = getattr(_usage, "completion_tokens", 0)
                 from apps.llm_utils import record_tokens
+
                 record_tokens(prompt_tokens=_sum_pi, completion_tokens=_sum_co)
             from apps.llm_utils import record_task_usage
+
             record_task_usage(f"app_{app.get('name', app_id)}", _sum_pi, _sum_co, 0)
             content = resp.choices[0].message.content or ""
 
-            save_report(app_id, content=content, params_used={},
-                        report_type="summary")
+            save_report(app_id, content=content, params_used={}, report_type="summary")
             mark_triggered(app_id, "summary")
 
             _done_payload = {"type": "done", "content": content}
@@ -3337,8 +3770,7 @@ def api_custom_summary(app_id):
                 _done_payload["usage"] = {"input": _sum_pi, "output": _sum_co, "search": 0}
             q.put(json.dumps(_done_payload, ensure_ascii=False))
         except Exception as exc:
-            q.put(json.dumps({"type": "error", "content": str(exc)},
-                             ensure_ascii=False))
+            q.put(json.dumps({"type": "error", "content": str(exc)}, ensure_ascii=False))
 
     threading.Thread(target=_run, daemon=True).start()
 
@@ -3351,7 +3783,7 @@ def api_custom_summary(app_id):
                 if parsed.get("type") in ("done", "error"):
                     break
             except queue.Empty:
-                yield f'data: {json.dumps({"type":"error","content":"请求超时"})}\n\n'
+                yield f"data: {json.dumps({'type': 'error', 'content': '请求超时'})}\n\n"
                 break
 
     return Response(
@@ -3368,10 +3800,13 @@ def api_custom_summary(app_id):
 _app_scheduler_timer = None
 
 from myxai_desk.core.scheduler_service import (
-    scheduler_service as _scheduler_svc,
-    TaskDescriptor as _TaskDescriptor,
     DueSlot as _DueSlot,
-    CATCHUP_DEFAULTS as _CATCHUP_DEFAULTS,
+)
+from myxai_desk.core.scheduler_service import (
+    TaskDescriptor as _TaskDescriptor,
+)
+from myxai_desk.core.scheduler_service import (
+    scheduler_service as _scheduler_svc,
 )
 
 
@@ -3392,17 +3827,19 @@ def _load_official_tasks() -> list["_TaskDescriptor"]:
             hh, mm = schedule_time.split(":")[:2]
             cron_expr = f"{mm} {hh} * * *"
             catchup_cfg = config.get("catchup", {})
-            descriptors.append(_TaskDescriptor(
-                task_id="daily_digest",
-                schedule={"enabled": True, "mode": "daily", "time": schedule_time},
-                cron_expr=cron_expr,
-                created_at=app.get("installed_at", "2024-01-01T00:00:00"),
-                last_success_at=app.get("last_run"),
-                catchup_policy=catchup_cfg.get("catchup_policy", "LATEST_ONLY"),
-                catchup_window_hours=catchup_cfg.get("catchup_window_hours", 24),
-                max_catchup_runs=catchup_cfg.get("max_catchup_runs", 1),
-                extra={"kind": "daily_digest", "config": config, "registry_app": app},
-            ))
+            descriptors.append(
+                _TaskDescriptor(
+                    task_id="daily_digest",
+                    schedule={"enabled": True, "mode": "daily", "time": schedule_time},
+                    cron_expr=cron_expr,
+                    created_at=app.get("installed_at", "2024-01-01T00:00:00"),
+                    last_success_at=app.get("last_run"),
+                    catchup_policy=catchup_cfg.get("catchup_policy", "LATEST_ONLY"),
+                    catchup_window_hours=catchup_cfg.get("catchup_window_hours", 24),
+                    max_catchup_runs=catchup_cfg.get("max_catchup_runs", 1),
+                    extra={"kind": "daily_digest", "config": config, "registry_app": app},
+                )
+            )
 
         elif app_id == "email_summary":
             schedule_time = config.get("schedule_time")
@@ -3413,24 +3850,28 @@ def _load_official_tasks() -> list["_TaskDescriptor"]:
             hh, mm = schedule_time.split(":")[:2]
             cron_expr = f"{mm} {hh} * * *"
             catchup_cfg = config.get("catchup", {})
-            descriptors.append(_TaskDescriptor(
-                task_id="email_summary",
-                schedule={"enabled": True, "mode": "daily", "time": schedule_time},
-                cron_expr=cron_expr,
-                created_at=app.get("installed_at", "2024-01-01T00:00:00"),
-                last_success_at=app.get("last_run"),
-                catchup_policy=catchup_cfg.get("catchup_policy", "LATEST_ONLY"),
-                catchup_window_hours=catchup_cfg.get("catchup_window_hours", 24),
-                max_catchup_runs=catchup_cfg.get("max_catchup_runs", 1),
-                extra={"kind": "email_summary", "config": config, "registry_app": app},
-            ))
+            descriptors.append(
+                _TaskDescriptor(
+                    task_id="email_summary",
+                    schedule={"enabled": True, "mode": "daily", "time": schedule_time},
+                    cron_expr=cron_expr,
+                    created_at=app.get("installed_at", "2024-01-01T00:00:00"),
+                    last_success_at=app.get("last_run"),
+                    catchup_policy=catchup_cfg.get("catchup_policy", "LATEST_ONLY"),
+                    catchup_window_hours=catchup_cfg.get("catchup_window_hours", 24),
+                    max_catchup_runs=catchup_cfg.get("max_catchup_runs", 1),
+                    extra={"kind": "email_summary", "config": config, "registry_app": app},
+                )
+            )
 
     return descriptors
 
 
 def _load_custom_tasks() -> list["_TaskDescriptor"]:
     """Build TaskDescriptors for custom (prompt) apps."""
-    from apps.custom_app import list_apps as _list_custom, build_task_descriptor
+    from apps.custom_app import build_task_descriptor
+    from apps.custom_app import list_apps as _list_custom
+
     descriptors: list[_TaskDescriptor] = []
     for capp in _list_custom():
         td = build_task_descriptor(capp, "schedule")
@@ -3444,6 +3885,7 @@ def _load_custom_tasks() -> list["_TaskDescriptor"]:
 
 # ── Executor callbacks for each app kind ──────────────────────────────
 
+
 def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
     config = task.extra["config"]
     with _digest_task_lock:
@@ -3451,6 +3893,7 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
             return
 
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     _gate = gate_app_run("daily_digest")
     if not _gate["allowed"]:
         print(f"[scheduler] daily_digest blocked: {_gate['reason']}")
@@ -3459,7 +3902,8 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
     sched_for = slot.scheduled_for.strftime("%Y-%m-%d %H:%M")
     print(f"[scheduler] triggering daily_digest (scheduled_for={sched_for}, trigger={trigger})")
     from apps.daily_digest import run_daily_digest
-    from apps.llm_utils import snapshot_today_tokens, record_task_usage
+    from apps.llm_utils import record_task_usage, snapshot_today_tokens
+
     model_cfg = _get_model_config()
     merged = {**config, **model_cfg}
     _snap_before = snapshot_today_tokens()
@@ -3468,8 +3912,7 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
     _d_in = _snap_after["input"] - _snap_before["input"]
     _d_out = _snap_after["output"] - _snap_before["output"]
     _d_search = result.get("stats", {}).get("search_results", 0)
-    record_task_usage("app_每日私享", _d_in, _d_out,
-                      min(_d_search, 1) if _d_search else 0)
+    record_task_usage("app_每日私享", _d_in, _d_out, min(_d_search, 1) if _d_search else 0)
     if result["status"] == "ok":
         today = slot.scheduled_for.strftime("%Y-%m-%d")
         registry = _load_apps_registry()
@@ -3495,6 +3938,7 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
 def _exec_email_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
     config = task.extra["config"]
     from myxai_desk.core.runtime.app_governance import gate_app_run
+
     _gate = gate_app_run("email_summary")
     if not _gate["allowed"]:
         print(f"[scheduler] email_summary blocked: {_gate['reason']}")
@@ -3503,7 +3947,8 @@ def _exec_email_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str)
     sched_for = slot.scheduled_for.strftime("%Y-%m-%d %H:%M")
     print(f"[scheduler] triggering email_summary (scheduled_for={sched_for}, trigger={trigger})")
     from apps.email_summary import run_email_summary
-    from apps.llm_utils import snapshot_today_tokens, record_task_usage
+    from apps.llm_utils import record_task_usage, snapshot_today_tokens
+
     model_cfg = _get_model_config()
     _snap_before = snapshot_today_tokens()
     result = run_email_summary(config, model_config=model_cfg)
@@ -3533,9 +3978,12 @@ def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) ->
     capp = task.extra["app"]
     capp_id = capp["id"]
     from apps.custom_app import (
-        build_message, save_report, set_last_run, mark_triggered,
+        build_message,
+        mark_triggered,
+        save_report,
+        set_last_run,
     )
-    from myxai_desk.core.runtime.app_governance import gate_app_run, finish_app_run
+    from myxai_desk.core.runtime.app_governance import finish_app_run, gate_app_run
 
     _gate = gate_app_run(capp_id, source="user")
     if not _gate["allowed"]:
@@ -3543,7 +3991,9 @@ def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) ->
         return
 
     sched_for = slot.scheduled_for.strftime("%Y-%m-%d %H:%M")
-    print(f"[scheduler] triggering custom app '{capp['name']}' (scheduled_for={sched_for}, trigger={trigger})")
+    print(
+        f"[scheduler] triggering custom app '{capp['name']}' (scheduled_for={sched_for}, trigger={trigger})"
+    )
     try:
         defaults = {p["name"]: p.get("default", "") for p in capp.get("parameters", [])}
         groups = capp.get("param_groups")
@@ -3555,6 +4005,7 @@ def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) ->
         for pv in groups:
             message = build_message(capp, pv)
             import uuid as _uuid_sched
+
             session_key = f"capp_{_uuid_sched.uuid4().hex[:12]}"
             result = _run_agent_with_prompt(message, session_key=session_key)
             _ru = result.get("usage", {})
@@ -3564,6 +4015,7 @@ def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) ->
             save_report(capp_id, content=result["content"], params_used=pv)
         _sched_cat = f"app_{capp.get('name', capp_id)}"
         from apps.llm_utils import record_task_usage as _rec_task
+
         _rec_task(_sched_cat, _sched_in, _sched_out, _sched_search)
         set_last_run(capp_id)
         _inc_run_count(capp_id)
@@ -3586,21 +4038,37 @@ def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) ->
 def _exec_custom_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
     capp = task.extra["app"]
     capp_id = capp["id"]
-    from apps.custom_app import build_summary_prompt, save_report, mark_triggered
+    from apps.custom_app import build_summary_prompt, mark_triggered, save_report
 
     sched_for = slot.scheduled_for.strftime("%Y-%m-%d %H:%M")
-    print(f"[scheduler] triggering summary for '{capp['name']}' (scheduled_for={sched_for}, trigger={trigger})")
+    print(
+        f"[scheduler] triggering summary for '{capp['name']}' (scheduled_for={sched_for}, trigger={trigger})"
+    )
     prompt = build_summary_prompt(capp)
     if not prompt:
         return
     mcfg = _get_model_config()
     if not mcfg.get("model") or not mcfg.get("api_key"):
         return
-    import os as _os, litellm as _lt
+    import os as _os
+
+    import litellm as _lt
+
     _os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
-    _KNOWN = ("openai/", "azure/", "anthropic/", "cohere/",
-              "huggingface/", "ollama/", "deepseek/", "groq/",
-              "together_ai/", "openrouter/", "gemini/", "mistral/")
+    _KNOWN = (
+        "openai/",
+        "azure/",
+        "anthropic/",
+        "cohere/",
+        "huggingface/",
+        "ollama/",
+        "deepseek/",
+        "groq/",
+        "together_ai/",
+        "openrouter/",
+        "gemini/",
+        "mistral/",
+    )
     _m = mcfg["model"]
     if not any(_m.startswith(p) for p in _KNOWN) and mcfg.get("api_base"):
         _m = f"openai/{_m}"
@@ -3609,15 +4077,18 @@ def _exec_custom_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str
         messages=[{"role": "user", "content": prompt}],
         api_key=mcfg["api_key"],
         api_base=mcfg.get("api_base"),
-        temperature=0.5, max_tokens=4096,
+        temperature=0.5,
+        max_tokens=4096,
     )
     _u = getattr(resp, "usage", None)
     if _u:
         _s_pi = getattr(_u, "prompt_tokens", 0)
         _s_co = getattr(_u, "completion_tokens", 0)
         from apps.llm_utils import record_tokens as _rec
+
         _rec(prompt_tokens=_s_pi, completion_tokens=_s_co)
         from apps.llm_utils import record_task_usage as _rec_t
+
         _rec_t(f"app_{capp.get('name', capp_id)}", _s_pi, _s_co, 0)
     content = resp.choices[0].message.content or ""
     save_report(capp_id, content=content, params_used={}, report_type="summary")
@@ -3645,6 +4116,7 @@ def _start_app_scheduler():
     _init_scheduler_service()
 
     from myxai_desk.core.scheduler_service import cleanup_stale_running
+
     cleaned = cleanup_stale_running()
     if cleaned:
         print(f"[scheduler] cleaned up {cleaned} stale running task(s) from previous session")
@@ -3669,6 +4141,7 @@ def _start_app_scheduler():
 # Routes — scheduler / task runs
 # ---------------------------------------------------------------------------
 
+
 @flask_app.route("/api/scheduler/trigger/<task_id>", methods=["POST"])
 def api_scheduler_trigger(task_id):
     """Manually trigger a scheduled task."""
@@ -3682,6 +4155,7 @@ def api_scheduler_trigger(task_id):
 def api_scheduler_runs(task_id):
     """Return recent run history for a task (for UI display)."""
     from myxai_desk.core.scheduler_service import get_recent_runs
+
     limit = request.args.get("limit", 20, type=int)
     runs = get_recent_runs(task_id, limit=limit)
     return jsonify({"runs": runs})
@@ -3691,26 +4165,34 @@ def api_scheduler_runs(task_id):
 def api_scheduler_status():
     """Quick overview: list all scheduled tasks with next/last info."""
     from myxai_desk.core.scheduler_service import compute_due_slots
+
     tasks = _load_official_tasks() + _load_custom_tasks()
     now = datetime.now()
     items = []
     for t in tasks:
         due = compute_due_slots(t, now)
-        items.append({
-            "task_id": t.task_id,
-            "catchup_policy": t.catchup_policy,
-            "last_success_at": t.last_success_at,
-            "pending_catchup": len(due),
-            "pending_slots": [{"scheduled_for": s.scheduled_for.isoformat(),
-                               "idempotency_key": s.idempotency_key} for s in due],
-        })
+        items.append(
+            {
+                "task_id": t.task_id,
+                "catchup_policy": t.catchup_policy,
+                "last_success_at": t.last_success_at,
+                "pending_catchup": len(due),
+                "pending_slots": [
+                    {
+                        "scheduled_for": s.scheduled_for.isoformat(),
+                        "idempotency_key": s.idempotency_key,
+                    }
+                    for s in due
+                ],
+            }
+        )
     return jsonify({"tasks": items})
 
 
 # Official app display names / icons
 _OFFICIAL_APP_META = {
-    "daily_digest":  {"name_zh": "每日私享", "name_en": "Daily Briefing", "icon": "🎯"},
-    "email_summary": {"name_zh": "邮件简报",  "name_en": "Email Briefing", "icon": "📧"},
+    "daily_digest": {"name_zh": "每日私享", "name_en": "Daily Briefing", "icon": "🎯"},
+    "email_summary": {"name_zh": "邮件简报", "name_en": "Email Briefing", "icon": "📧"},
 }
 
 
@@ -3722,8 +4204,11 @@ def api_scheduler_today():
     Statuses: planned | running | success | failed
     """
     from myxai_desk.core.scheduler_service import (
-        compute_due_slots, get_today_runs, get_running_tasks,
+        compute_due_slots,
+        get_running_tasks,
+        get_today_runs,
     )
+
     now = datetime.now()
     today_str = now.strftime("%Y-%m-%d")
 
@@ -3752,8 +4237,10 @@ def api_scheduler_today():
                 name_en = base_name
         sched_time = t.schedule.get("time", "")
         task_meta[t.task_id] = {
-            "name_zh": name_zh, "name_en": name_en,
-            "icon": icon, "time": sched_time,
+            "name_zh": name_zh,
+            "name_en": name_en,
+            "icon": icon,
+            "time": sched_time,
             "mode": t.schedule.get("mode", "daily"),
             "catchup_policy": t.catchup_policy,
         }
@@ -3775,20 +4262,25 @@ def api_scheduler_today():
     # 1) Tasks with existing runs today
     for task_id, runs in run_by_task.items():
         seen_tasks.add(task_id)
-        meta = task_meta.get(task_id, {"name_zh": task_id, "name_en": task_id, "icon": "🤖", "time": "", "mode": "daily"})
+        meta = task_meta.get(
+            task_id,
+            {"name_zh": task_id, "name_en": task_id, "icon": "🤖", "time": "", "mode": "daily"},
+        )
         latest = runs[-1]
-        items.append({
-            "task_id": task_id,
-            "name_zh": meta["name_zh"],
-            "name_en": meta["name_en"],
-            "icon": meta["icon"],
-            "scheduled_time": meta["time"],
-            "status": latest["status"],
-            "started_at": latest.get("started_at", ""),
-            "finished_at": latest.get("finished_at", ""),
-            "error": latest.get("error", ""),
-            "trigger": latest.get("trigger", ""),
-        })
+        items.append(
+            {
+                "task_id": task_id,
+                "name_zh": meta["name_zh"],
+                "name_en": meta["name_en"],
+                "icon": meta["icon"],
+                "scheduled_time": meta["time"],
+                "status": latest["status"],
+                "started_at": latest.get("started_at", ""),
+                "finished_at": latest.get("finished_at", ""),
+                "error": latest.get("error", ""),
+                "trigger": latest.get("trigger", ""),
+            }
+        )
 
     # 2) Tasks that are due but haven't run yet
     for t in tasks:
@@ -3813,33 +4305,42 @@ def api_scheduler_today():
                 elif sched_mode == "interval":
                     show_planned = True
             if show_planned:
-                meta = task_meta.get(t.task_id, {"name_zh": t.task_id, "name_en": t.task_id, "icon": "🤖", "time": ""})
-                items.append({
+                meta = task_meta.get(
+                    t.task_id,
+                    {"name_zh": t.task_id, "name_en": t.task_id, "icon": "🤖", "time": ""},
+                )
+                items.append(
+                    {
+                        "task_id": t.task_id,
+                        "name_zh": meta["name_zh"],
+                        "name_en": meta["name_en"],
+                        "icon": meta["icon"],
+                        "scheduled_time": sched_time,
+                        "status": "planned",
+                        "started_at": "",
+                        "finished_at": "",
+                        "error": "",
+                        "trigger": "",
+                    }
+                )
+        else:
+            meta = task_meta.get(
+                t.task_id, {"name_zh": t.task_id, "name_en": t.task_id, "icon": "🤖", "time": ""}
+            )
+            items.append(
+                {
                     "task_id": t.task_id,
                     "name_zh": meta["name_zh"],
                     "name_en": meta["name_en"],
                     "icon": meta["icon"],
-                    "scheduled_time": sched_time,
-                    "status": "planned",
+                    "scheduled_time": meta["time"],
+                    "status": "pending_catchup",
                     "started_at": "",
                     "finished_at": "",
                     "error": "",
                     "trigger": "",
-                })
-        else:
-            meta = task_meta.get(t.task_id, {"name_zh": t.task_id, "name_en": t.task_id, "icon": "🤖", "time": ""})
-            items.append({
-                "task_id": t.task_id,
-                "name_zh": meta["name_zh"],
-                "name_en": meta["name_en"],
-                "icon": meta["icon"],
-                "scheduled_time": meta["time"],
-                "status": "pending_catchup",
-                "started_at": "",
-                "finished_at": "",
-                "error": "",
-                "trigger": "",
-            })
+                }
+            )
 
     # Sort: running first, then pending_catchup, then planned, then success, then failed
     status_order = {"running": 0, "pending_catchup": 1, "planned": 2, "success": 3, "failed": 4}
@@ -3902,27 +4403,32 @@ def api_cases_stats():
         for line in lines[-n:]:
             try:
                 obj = json.loads(line)
-                result.append({
-                    "ts": obj.get("ts", ""),
-                    "prompt": (obj.get("prompt", "") or "")[:80],
-                    "comment": obj.get("comment", ""),
-                })
+                result.append(
+                    {
+                        "ts": obj.get("ts", ""),
+                        "prompt": (obj.get("prompt", "") or "")[:80],
+                        "comment": obj.get("comment", ""),
+                    }
+                )
             except Exception:
                 pass
         result.reverse()
         return result
 
-    return jsonify({
-        "positive_count": _count(pos_file),
-        "negative_count": _count(neg_file),
-        "recent_positive": _recent(pos_file),
-        "recent_negative": _recent(neg_file),
-    })
+    return jsonify(
+        {
+            "positive_count": _count(pos_file),
+            "negative_count": _count(neg_file),
+            "recent_positive": _recent(pos_file),
+            "recent_negative": _recent(neg_file),
+        }
+    )
 
 
 # ---------------------------------------------------------------------------
 # Routes — gateway
 # ---------------------------------------------------------------------------
+
 
 def _find_nanobot_cmd() -> list[str]:
     """Locate the nanobot executable; fall back to python -c wrapper."""
@@ -3930,7 +4436,8 @@ def _find_nanobot_cmd() -> list[str]:
     if exe:
         return [exe, "gateway"]
     return [
-        sys.executable, "-c",
+        sys.executable,
+        "-c",
         "import sys; sys.argv=['nanobot','gateway']; from nanobot.cli.commands import app; app()",
     ]
 
@@ -3945,10 +4452,9 @@ def _kill_process_tree(pid: int) -> None:
         )
     else:
         import signal
-        try:
+
+        with contextlib.suppress(ProcessLookupError, PermissionError):
             os.killpg(os.getpgid(pid), signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
-            pass
 
 
 def _cleanup_gateway() -> None:
@@ -3990,10 +4496,8 @@ def api_gateway_stop():
         return jsonify({"error": "网关未运行"}), 400
     pid = _gateway_process.pid
     _kill_process_tree(pid)
-    try:
+    with contextlib.suppress(Exception):
         _gateway_process.wait(timeout=5)
-    except Exception:
-        pass
     _gateway_process = None
     return jsonify({"success": True})
 
@@ -4002,10 +4506,12 @@ def api_gateway_stop():
 def api_gateway_status():
     _cleanup_gateway()
     running = _gateway_process is not None
-    return jsonify({
-        "running": running,
-        "pid": _gateway_process.pid if running else None,
-    })
+    return jsonify(
+        {
+            "running": running,
+            "pid": _gateway_process.pid if running else None,
+        }
+    )
 
 
 @flask_app.route("/api/gateway/logs")
@@ -4049,6 +4555,7 @@ def api_desk_lang():
 # Cleanup
 # ---------------------------------------------------------------------------
 
+
 def _shutdown():
     """Terminate all background resources before exit."""
     global _gateway_process, _agent, _async_loop, _cron_service, _app_scheduler_timer
@@ -4073,13 +4580,13 @@ def _shutdown():
         _gateway_process = None
 
     # 2. Close MCP connections & async loop
-    if _agent is not None and getattr(_agent, '_mcp_stack', None) is not None:
+    if _agent is not None and getattr(_agent, "_mcp_stack", None) is not None:
         if _async_loop is not None and _async_loop.is_running():
+
             async def _close_mcp():
-                try:
+                with contextlib.suppress(Exception):
                     await _agent._mcp_stack.aclose()
-                except Exception:
-                    pass
+
             try:
                 f = asyncio.run_coroutine_threadsafe(_close_mcp(), _async_loop)
                 f.result(timeout=5)
@@ -4095,12 +4602,14 @@ def _shutdown():
 
 
 import atexit
+
 atexit.register(_shutdown)
 
 
 # ---------------------------------------------------------------------------
 # Entry‑point
 # ---------------------------------------------------------------------------
+
 
 def main():
     global _desk_manager
@@ -4119,8 +4628,11 @@ def main():
         print("pywebview 未安装，将在浏览器中打开。")
         print("安装方法：pip install pywebview")
         import webbrowser
+
         threading.Thread(
-            target=lambda: flask_app.run(host="127.0.0.1", port=port, threaded=True, use_reloader=False),
+            target=lambda: flask_app.run(
+                host="127.0.0.1", port=port, threaded=True, use_reloader=False
+            ),
             daemon=True,
         ).start()
         time.sleep(1)
@@ -4135,11 +4647,14 @@ def main():
 
     # --- start Flask in background ---------------------------------------- #
     threading.Thread(
-        target=lambda: flask_app.run(host="127.0.0.1", port=port, threaded=True, use_reloader=False),
+        target=lambda: flask_app.run(
+            host="127.0.0.1", port=port, threaded=True, use_reloader=False
+        ),
         daemon=True,
     ).start()
 
     import urllib.request
+
     for _attempt in range(80):
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{port}/api/check", timeout=1)
@@ -4160,16 +4675,19 @@ def main():
         # Reports from all app types
         try:
             from apps.custom_app import all_unread_counts
+
             total += sum(all_unread_counts().values())
         except Exception:
             pass
         try:
             from apps.daily_digest import list_reports as _dl
+
             total += sum(1 for r in _dl(limit=60) if not r.get("read"))
         except Exception:
             pass
         try:
             from apps.email_summary import list_reports as _el
+
             total += sum(1 for r in _el() if not r.get("read"))
         except Exception:
             pass
@@ -4179,6 +4697,7 @@ def main():
 
     try:
         from apps.llm_utils import get_token_usage
+
         _desk_manager._get_token_usage = get_token_usage
     except ImportError:
         pass
@@ -4189,11 +4708,11 @@ def main():
         """Auto-allow microphone/camera permissions in WebView2."""
         win.events.loaded.wait(30)
         try:
-            from webview.platforms.winforms import BrowserView
             from System import Func, Type
+            from webview.platforms.winforms import BrowserView
 
             bv = BrowserView.instances.get(win.uid)
-            if not bv or not getattr(bv, 'browser', None):
+            if not bv or not getattr(bv, "browser", None):
                 return
 
             def _setup():

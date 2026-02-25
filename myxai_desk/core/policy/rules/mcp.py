@@ -17,9 +17,8 @@ def evaluate(op: str, args: dict, policy: ModePolicy) -> tuple[str, int, str]:
         return "DENY", 70, "MCP_NOT_ALLOWED_IN_MODE"
 
     server = args.get("server", "")
-    if policy.mcp_server_allowlist:
-        if server not in policy.mcp_server_allowlist:
-            return "DENY", 60, f"MCP_SERVER_NOT_IN_ALLOWLIST:{server}"
+    if policy.mcp_server_allowlist and server not in policy.mcp_server_allowlist:
+        return "DENY", 60, f"MCP_SERVER_NOT_IN_ALLOWLIST:{server}"
 
     if policy.confirm_level == "strong":
         return "REQUIRE_CONFIRM", 30, "MCP_STRONG_CONFIRM"

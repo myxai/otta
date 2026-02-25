@@ -7,9 +7,20 @@ from datetime import date, timedelta
 from pathlib import Path
 
 _KNOWN_LITELLM_PREFIXES = (
-    "openai/", "azure/", "anthropic/", "bedrock/", "vertex_ai/",
-    "cohere/", "huggingface/", "ollama/", "deepseek/", "groq/",
-    "together_ai/", "openrouter/", "gemini/", "mistral/",
+    "openai/",
+    "azure/",
+    "anthropic/",
+    "bedrock/",
+    "vertex_ai/",
+    "cohere/",
+    "huggingface/",
+    "ollama/",
+    "deepseek/",
+    "groq/",
+    "together_ai/",
+    "openrouter/",
+    "gemini/",
+    "mistral/",
 )
 
 _USAGE_DIR = Path.home() / ".nanobot" / "usage"
@@ -136,7 +147,9 @@ def record_task_usage(
             cat["search"] += search_calls
             cat["count"] += 1
             _persist_task()
-        print(f"[llm_utils] record_task_usage: {category} +{prompt_tokens}/{completion_tokens} (file={'exists' if _TASK_FILE.exists() else 'MISSING'})")
+        print(
+            f"[llm_utils] record_task_usage: {category} +{prompt_tokens}/{completion_tokens} (file={'exists' if _TASK_FILE.exists() else 'MISSING'})"
+        )
     except Exception as e:
         print(f"[llm_utils] record_task_usage error: {e}")
 
@@ -173,8 +186,10 @@ def get_category_usage(days: int = 7) -> dict:
                     total_out += day.get("output", 0)
             if total_in or total_out:
                 merged["chat"] = {
-                    "input": total_in, "output": total_out,
-                    "search": 0, "count": max((total_in + total_out) // 3000, 1),
+                    "input": total_in,
+                    "output": total_out,
+                    "search": 0,
+                    "count": max((total_in + total_out) // 3000, 1),
                 }
 
     return {"categories": merged, "days": days}

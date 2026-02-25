@@ -5,11 +5,8 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
 
 from myxai_desk.core.storage.paths import NANOBOT_HOME, ensure_dir
-
 
 _CRON_FILE = NANOBOT_HOME / "cron" / "app_triggers.json"
 
@@ -68,7 +65,5 @@ class CronCapability:
 
     def mark_fired(self, trigger_id: str) -> None:
         if trigger_id in self._triggers:
-            self._triggers[trigger_id]["last_fired"] = (
-                datetime.now(timezone.utc).isoformat()
-            )
+            self._triggers[trigger_id]["last_fired"] = datetime.now(timezone.utc).isoformat()
             self._save()

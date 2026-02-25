@@ -1,21 +1,20 @@
 """Simplified persona storage — two JSON files, no versioning overhead.
 
-  ~/.nanobot/profile/persona_stable.json
-  ~/.nanobot/profile/persona_recent.json
+~/.nanobot/profile/persona_stable.json
+~/.nanobot/profile/persona_recent.json
 """
 
 from __future__ import annotations
 
 import json
 import shutil
-from pathlib import Path
 
+from myxai_desk.core.profile.persona_model import RecentSnapshot, StablePersona
 from myxai_desk.core.storage.paths import (
-    PERSONA_STABLE_FILE,
     PERSONA_RECENT_FILE,
+    PERSONA_STABLE_FILE,
     ensure_dir,
 )
-from myxai_desk.core.profile.persona_model import StablePersona, RecentSnapshot
 
 
 def load_stable() -> StablePersona:

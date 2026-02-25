@@ -19,10 +19,12 @@ from __future__ import annotations
 import hashlib
 import hmac
 import secrets
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from myxai_desk.core.storage.paths import POLICY_DIR, ensure_dir
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _KEY_FILE = POLICY_DIR / "signing_key"
 _SIG_FILENAME = ".signature"

@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
 
 _SENSITIVE_DATA_RE = re.compile(
-    r'(password|secret|token|api_key|credit.?card|ssn)',
+    r"(password|secret|token|api_key|credit.?card|ssn)",
     re.IGNORECASE,
 )
 

@@ -22,24 +22,27 @@ class Net:
     def __init__(self, *, audit_ledger: Any = None):
         self._audit = audit_ledger
 
-    async def http_get(self, url: str, *, headers: dict | None = None,
-                       timeout: int = 30) -> dict:
+    async def http_get(self, url: str, *, headers: dict | None = None, timeout: int = 30) -> dict:
         import aiohttp  # optional dependency
 
         action_id = _new_action_id()
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=headers,
-                                       timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
-                    body = await resp.text()
-                    result = {
-                        "status": resp.status,
-                        "body": body[:100_000],
-                        "headers": dict(resp.headers),
-                        "action_id": action_id,
-                    }
+            async with (
+                aiohttp.ClientSession() as session,
+                session.get(
+                    url, headers=headers, timeout=aiohttp.ClientTimeout(total=timeout)
+                ) as resp,
+            ):
+                body = await resp.text()
+                result = {
+                    "status": resp.status,
+                    "body": body[:100_000],
+                    "headers": dict(resp.headers),
+                    "action_id": action_id,
+                }
         except ImportError:
             import urllib.request
+
             req = urllib.request.Request(url, headers=headers or {})
             with urllib.request.urlopen(req, timeout=timeout) as resp:
                 body = resp.read().decode("utf-8", errors="replace")[:100_000]
@@ -54,15 +57,24 @@ class Net:
         self._log(url, "GET", action_id)
         return result
 
-    async def http_post(self, url: str, *, data: str | dict | None = None,
-                        headers: dict | None = None,
-                        timeout: int = 30) -> dict:
-        import urllib.request
+    async def http_post(
+        self,
+        url: str,
+        *,
+        data: str | dict | None = None,
+        headers: dict | None = None,
+        timeout: int = 30,
+    ) -> dict:
         import json
+        import urllib.request
 
         action_id = _new_action_id()
         try:
-            body_bytes = json.dumps(data).encode("utf-8") if isinstance(data, dict) else (data or "").encode("utf-8")
+            body_bytes = (
+                json.dumps(data).encode("utf-8")
+                if isinstance(data, dict)
+                else (data or "").encode("utf-8")
+            )
             hdrs = headers or {}
             if isinstance(data, dict):
                 hdrs.setdefault("Content-Type", "application/json")
@@ -80,8 +92,7 @@ class Net:
         self._log(url, "POST", action_id)
         return result
 
-    async def download(self, url: str, dest: str, *,
-                       timeout: int = 60) -> dict:
+    async def download(self, url: str, dest: str, *, timeout: int = 60) -> dict:
         import urllib.request
         from pathlib import Path
 

@@ -7,13 +7,13 @@ Only two products:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, asdict
-from typing import Any
+from dataclasses import asdict, dataclass, field
 
 
 @dataclass
 class StablePersona:
     """Long-term stable user profile (signals persisting 7+ days)."""
+
     identity_role: str = ""
     long_term_goals: list[str] = field(default_factory=list)
     capability_assessment: str = ""
@@ -39,13 +39,14 @@ class StablePersona:
 @dataclass
 class TopicEntry:
     topic: str = ""
-    trend: str = ""       # "升温" | "稳定"
+    trend: str = ""  # "升温" | "稳定"
     evidence: str = ""
 
 
 @dataclass
 class RecentSnapshot:
     """7-day interest snapshot for recommendations."""
+
     core_topics: list[dict] = field(default_factory=list)
     active_project: dict = field(default_factory=dict)
     recommendations: list[str] = field(default_factory=list)

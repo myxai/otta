@@ -6,17 +6,19 @@ simplified persona engine access (stable + recent, prompt generation).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import uuid
-from pathlib import Path
-from typing import Any
 
-from myxai_desk.core.storage.paths import (
-    PROFILE_SUMMARY_FILE, PROFILE_PREFS_FILE, ensure_dir,
-)
 from myxai_desk.core.profile.events import EventStore
 from myxai_desk.core.profile.feature_extraction import (
-    build_summary, extract_topics,
+    build_summary,
+    extract_topics,
+)
+from myxai_desk.core.storage.paths import (
+    PROFILE_PREFS_FILE,
+    PROFILE_SUMMARY_FILE,
+    ensure_dir,
 )
 
 
@@ -54,8 +56,7 @@ class Profile:
         return {
             "active_projects": [t["topic"] for t in work_topics[:5]],
             "recent_technologies": [
-                t["topic"] for t in work_topics
-                if t["topic"] in _TECH_KEYWORDS
+                t["topic"] for t in work_topics if t["topic"] in _TECH_KEYWORDS
             ][:10],
         }
 
@@ -66,12 +67,10 @@ class Profile:
 
         current = {}
         if PROFILE_PREFS_FILE.exists():
-            try:
+            with contextlib.suppress(json.JSONDecodeError, OSError):
                 current = json.loads(
                     PROFILE_PREFS_FILE.read_text(encoding="utf-8"),
                 )
-            except (json.JSONDecodeError, OSError):
-                pass
 
         current.update(patch)
         PROFILE_PREFS_FILE.write_text(
@@ -134,6 +133,7 @@ class Profile:
                 f.rename(f.with_suffix(f.suffix + ".cleared"))
         try:
             from myxai_desk.core.profile import persona_store
+
             persona_store.delete_all()
         except Exception:
             pass
@@ -145,6 +145,7 @@ class Profile:
         """Return both stable + recent persona as a dict."""
         try:
             from myxai_desk.core.profile import persona_store
+
             stable = persona_store.load_stable()
             recent = persona_store.load_recent()
             return {
@@ -165,6 +166,7 @@ class Profile:
         """Trigger a full persona update cycle."""
         try:
             from myxai_desk.core.profile.update_engine import run_full_update
+
             return run_full_update(
                 model=model,
                 api_key=api_key,
@@ -178,6 +180,7 @@ class Profile:
         """Generate persona-enhanced prompt for LLM injection."""
         try:
             from myxai_desk.core.profile.prompt_builder import build_prompt
+
             return build_prompt(task_context=task_context)
         except Exception:
             return ""
@@ -186,12 +189,13 @@ class Profile:
         """Manually edit fields in the stable persona."""
         try:
             from myxai_desk.core.profile import persona_store
-            from myxai_desk.core.profile.persona_model import StablePersona
+
             stable = persona_store.load_stable()
             for key, value in patch.items():
                 if hasattr(stable, key) and key not in ("updated_at",):
                     setattr(stable, key, value)
             from datetime import datetime, timezone
+
             stable.updated_at = datetime.now(timezone.utc).isoformat()
             persona_store.save_stable(stable)
             return {"status": "ok", "updated_fields": list(patch.keys())}
@@ -202,11 +206,13 @@ class Profile:
         """Manually edit fields in the recent snapshot."""
         try:
             from myxai_desk.core.profile import persona_store
+
             recent = persona_store.load_recent()
             for key, value in patch.items():
                 if hasattr(recent, key) and key not in ("updated_at",):
                     setattr(recent, key, value)
             from datetime import datetime, timezone
+
             recent.updated_at = datetime.now(timezone.utc).isoformat()
             persona_store.save_recent(recent)
             return {"status": "ok", "updated_fields": list(patch.keys())}
@@ -215,9 +221,35 @@ class Profile:
 
 
 _TECH_KEYWORDS = {
-    "python", "javascript", "typescript", "react", "vue", "angular",
-    "node", "django", "flask", "fastapi", "docker", "kubernetes",
-    "aws", "azure", "gcp", "git", "linux", "rust", "go", "java",
-    "postgresql", "mongodb", "redis", "graphql", "rest", "api",
-    "tensorflow", "pytorch", "llm", "openai", "langchain",
+    "python",
+    "javascript",
+    "typescript",
+    "react",
+    "vue",
+    "angular",
+    "node",
+    "django",
+    "flask",
+    "fastapi",
+    "docker",
+    "kubernetes",
+    "aws",
+    "azure",
+    "gcp",
+    "git",
+    "linux",
+    "rust",
+    "go",
+    "java",
+    "postgresql",
+    "mongodb",
+    "redis",
+    "graphql",
+    "rest",
+    "api",
+    "tensorflow",
+    "pytorch",
+    "llm",
+    "openai",
+    "langchain",
 }

@@ -7,9 +7,7 @@ implementation.  Container-based isolation can be added later.
 from __future__ import annotations
 
 import os
-import tempfile
 from pathlib import Path
-from typing import Any
 
 from myxai_desk.core.storage.paths import NANOBOT_HOME, ensure_dir
 
@@ -33,7 +31,9 @@ class Sandbox:
         """Check if *path* is within the sandbox workspace."""
         try:
             resolved = Path(path).resolve()
-            return self.workspace.resolve() in resolved.parents or resolved == self.workspace.resolve()
+            return (
+                self.workspace.resolve() in resolved.parents or resolved == self.workspace.resolve()
+            )
         except (OSError, ValueError):
             return False
 
@@ -44,8 +44,7 @@ class Sandbox:
         env["MYXAI_APP_ID"] = self.app_id
         env["MYXAI_WORKSPACE"] = str(self.workspace)
         # Remove potentially dangerous env vars for third-party apps
-        for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY",
-                     "GITHUB_TOKEN", "OPENAI_API_KEY"):
+        for key in ("AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "GITHUB_TOKEN", "OPENAI_API_KEY"):
             env.pop(key, None)
         return env
 

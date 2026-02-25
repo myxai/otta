@@ -8,13 +8,15 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from threading import Lock
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from myxai_desk.core.storage.paths import AUDIT_LEDGER_FILE, ensure_dir
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @dataclass
@@ -92,6 +94,7 @@ class AuditLedger:
     ) -> str:
         """Convenience method to create and append an entry."""
         from myxai_desk.core.policy.modes import get_current_mode
+
         entry = AuditEntry(
             ts=datetime.now(timezone.utc).isoformat(),
             app_id=app_id,
@@ -155,3 +158,49 @@ class AuditLedger:
             except json.JSONDecodeError:
                 continue
         return entries
+
+    def query(
+        self,
+        *,
+        request_id: str | None = None,
+        app_id: str | None = None,
+        capability: str | None = None,
+        limit: int = 100,
+    ) -> list[dict]:
+        """Query audit entries with filters.
+
+        Args:
+            request_id: Filter by request_id (from undo.action_id)
+            app_id: Filter by app_id
+            capability: Filter by capability
+            limit: Maximum number of results
+
+        Returns:
+            List of matching audit entries
+        """
+        if not self._path.exists():
+            return []
+
+        results = []
+        lines = self._path.read_text(encoding="utf-8").strip().splitlines()
+
+        for line in reversed(lines):  # Latest first
+            if len(results) >= limit:
+                break
+
+            try:
+                entry = json.loads(line)
+
+                # Apply filters
+                if request_id and entry.get("undo", {}).get("action_id") != request_id:
+                    continue
+                if app_id and entry.get("app_id") != app_id:
+                    continue
+                if capability and entry.get("capability") != capability:
+                    continue
+
+                results.append(entry)
+            except json.JSONDecodeError:
+                continue
+
+        return results

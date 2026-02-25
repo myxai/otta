@@ -22,8 +22,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-from myxai_desk.core.storage.paths import TRASH_DIR, ensure_dir
 from myxai_desk.core.policy.rules.fs import is_safe_path
+from myxai_desk.core.storage.paths import TRASH_DIR, ensure_dir
 
 _LOCAL_TZ = timezone(timedelta(hours=8))
 _BACKUP_SUFFIX = ".myxai_bak"
@@ -31,11 +31,13 @@ _BACKUP_SUFFIX = ".myxai_bak"
 
 # ── ActionId helper ────────────────────────────────────────────────
 
+
 def _new_action_id() -> str:
     return f"act_{uuid.uuid4().hex[:12]}"
 
 
 # ── Trash helpers (from safe_fs.py) ────────────────────────────────
+
 
 def _trash_dest(original: Path) -> Path:
     ensure_dir(TRASH_DIR)
@@ -45,6 +47,7 @@ def _trash_dest(original: Path) -> Path:
 
 
 # ── FS Capability ──────────────────────────────────────────────────
+
 
 class FS:
     """Standalone auditable FS capability (fallback for Prompt App runtime).
@@ -87,8 +90,9 @@ class FS:
 
     # -- write operations (side-effects, require audit + undo) --
 
-    def write_text(self, path: str | Path, content: str,
-                   *, atomic: bool = True, backup: bool = True) -> str:
+    def write_text(
+        self, path: str | Path, content: str, *, atomic: bool = True, backup: bool = True
+    ) -> str:
         """Write text to *path* atomically; back up the previous version.
 
         Returns an ``ActionId``.
@@ -120,11 +124,15 @@ class FS:
         else:
             p.write_text(content, encoding="utf-8")
 
-        self._register_undo(action_id, "write_text", {
-            "path": str(p),
-            "existed": existed,
-            "old_content": old_content,
-        })
+        self._register_undo(
+            action_id,
+            "write_text",
+            {
+                "path": str(p),
+                "existed": existed,
+                "old_content": old_content,
+            },
+        )
         self._log_audit("fs.write_text", {"path": str(p)}, action_id)
         return action_id
 
@@ -144,9 +152,14 @@ class FS:
         d.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(s), str(d))
 
-        self._register_undo(action_id, "move", {
-            "src": str(d), "dst": str(s),
-        })
+        self._register_undo(
+            action_id,
+            "move",
+            {
+                "src": str(d),
+                "dst": str(s),
+            },
+        )
         self._log_audit("fs.move", {"src": str(s), "dst": str(d)}, action_id)
         return action_id
 
@@ -183,9 +196,14 @@ class FS:
         dest = _trash_dest(p)
         shutil.move(str(p), str(dest))
 
-        self._register_undo(action_id, "remove", {
-            "trash_path": str(dest), "original_path": str(p),
-        })
+        self._register_undo(
+            action_id,
+            "remove",
+            {
+                "trash_path": str(dest),
+                "original_path": str(p),
+            },
+        )
         self._log_audit("fs.remove", {"path": str(p), "trash": str(dest)}, action_id)
         return action_id
 

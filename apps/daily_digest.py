@@ -20,15 +20,12 @@ Pipeline:
   6. Deep-dive exploration — click any card to start a contextual chat
 """
 
-import html as _html
 import json
 import os
 import re
 import shutil
 import sqlite3
 import tempfile
-import urllib.parse
-import urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -52,12 +49,24 @@ EDGE_HISTORY_PATHS = [
 # Filtering rules
 # ---------------------------------------------------------------------------
 BLOCKED_DOMAIN_FRAGMENTS = [
-    "accounts.google.com", "login.microsoftonline.com", "login.live.com",
-    "signin", "passport", "sso.",
-    "alipay.com", "pay.", "bank.",
-    "mail.google.com", "outlook.live.com", "mail.qq.com", "mail.163.com",
-    "web.whatsapp.com", "web.telegram.org",
-    "localhost", "127.0.0.1", "192.168.",
+    "accounts.google.com",
+    "login.microsoftonline.com",
+    "login.live.com",
+    "signin",
+    "passport",
+    "sso.",
+    "alipay.com",
+    "pay.",
+    "bank.",
+    "mail.google.com",
+    "outlook.live.com",
+    "mail.qq.com",
+    "mail.163.com",
+    "web.whatsapp.com",
+    "web.telegram.org",
+    "localhost",
+    "127.0.0.1",
+    "192.168.",
 ]
 
 BLOCKED_URL_PATTERNS = [
@@ -74,125 +83,475 @@ BLOCKED_URL_PATTERNS = [
 # Category classification
 # ---------------------------------------------------------------------------
 WORK_DOMAINS = {
-    "github.com", "gitlab.com", "bitbucket.org", "stackoverflow.com",
-    "stackexchange.com", "dev.to", "hashnode.dev",
-    "docs.python.org", "docs.microsoft.com", "learn.microsoft.com",
-    "developer.mozilla.org", "npmjs.com", "pypi.org",
-    "hub.docker.com", "vercel.com", "netlify.com",
-    "aws.amazon.com", "cloud.google.com", "azure.microsoft.com",
-    "jenkins.io", "circleci.com", "travis-ci.org",
+    "github.com",
+    "gitlab.com",
+    "bitbucket.org",
+    "stackoverflow.com",
+    "stackexchange.com",
+    "dev.to",
+    "hashnode.dev",
+    "docs.python.org",
+    "docs.microsoft.com",
+    "learn.microsoft.com",
+    "developer.mozilla.org",
+    "npmjs.com",
+    "pypi.org",
+    "hub.docker.com",
+    "vercel.com",
+    "netlify.com",
+    "aws.amazon.com",
+    "cloud.google.com",
+    "azure.microsoft.com",
+    "jenkins.io",
+    "circleci.com",
+    "travis-ci.org",
 }
 
 WORK_KEYWORDS = {
-    "api", "sdk", "framework", "library", "code", "programming",
-    "developer", "engineering", "deploy", "docker", "kubernetes",
-    "database", "server", "backend", "frontend", "devops", "cicd",
-    "git", "pipeline", "microservice", "architecture", "debug",
-    "testing", "agile", "sprint", "release", "版本", "部署", "开发",
-    "接口", "框架", "工具", "组件", "源码",
+    "api",
+    "sdk",
+    "framework",
+    "library",
+    "code",
+    "programming",
+    "developer",
+    "engineering",
+    "deploy",
+    "docker",
+    "kubernetes",
+    "database",
+    "server",
+    "backend",
+    "frontend",
+    "devops",
+    "cicd",
+    "git",
+    "pipeline",
+    "microservice",
+    "architecture",
+    "debug",
+    "testing",
+    "agile",
+    "sprint",
+    "release",
+    "版本",
+    "部署",
+    "开发",
+    "接口",
+    "框架",
+    "工具",
+    "组件",
+    "源码",
 }
 
 STUDY_DOMAINS = {
-    "arxiv.org", "scholar.google.com", "semanticscholar.org",
-    "coursera.org", "udemy.com", "edx.org", "khanacademy.org",
-    "medium.com", "towardsdatascience.com",
-    "wikipedia.org", "zhihu.com", "juejin.cn", "csdn.net",
-    "segmentfault.com", "infoq.cn", "cnblogs.com",
-    "youtube.com", "bilibili.com",
+    "arxiv.org",
+    "scholar.google.com",
+    "semanticscholar.org",
+    "coursera.org",
+    "udemy.com",
+    "edx.org",
+    "khanacademy.org",
+    "medium.com",
+    "towardsdatascience.com",
+    "wikipedia.org",
+    "zhihu.com",
+    "juejin.cn",
+    "csdn.net",
+    "segmentfault.com",
+    "infoq.cn",
+    "cnblogs.com",
+    "youtube.com",
+    "bilibili.com",
 }
 
 STUDY_KEYWORDS = {
-    "tutorial", "guide", "course", "learn", "paper", "research",
-    "algorithm", "theory", "study", "model", "neural", "transformer",
-    "machine learning", "deep learning", "ai",
-    "教程", "学习", "入门", "进阶", "论文", "原理", "解析",
-    "机器学习", "深度学习", "人工智能", "训练", "模型",
+    "tutorial",
+    "guide",
+    "course",
+    "learn",
+    "paper",
+    "research",
+    "algorithm",
+    "theory",
+    "study",
+    "model",
+    "neural",
+    "transformer",
+    "machine learning",
+    "deep learning",
+    "ai",
+    "教程",
+    "学习",
+    "入门",
+    "进阶",
+    "论文",
+    "原理",
+    "解析",
+    "机器学习",
+    "深度学习",
+    "人工智能",
+    "训练",
+    "模型",
 }
 
 LIFE_DOMAINS = {
-    "amazon.com", "amazon.cn", "jd.com", "taobao.com", "tmall.com",
-    "pinduoduo.com", "suning.com",
-    "news.qq.com", "news.sina.com.cn", "toutiao.com", "163.com",
-    "douban.com", "dianping.com", "meituan.com",
-    "ctrip.com", "booking.com", "tripadvisor.com",
-    "smzdm.com", "xiaohongshu.com", "weibo.com",
+    "amazon.com",
+    "amazon.cn",
+    "jd.com",
+    "taobao.com",
+    "tmall.com",
+    "pinduoduo.com",
+    "suning.com",
+    "news.qq.com",
+    "news.sina.com.cn",
+    "toutiao.com",
+    "163.com",
+    "douban.com",
+    "dianping.com",
+    "meituan.com",
+    "ctrip.com",
+    "booking.com",
+    "tripadvisor.com",
+    "smzdm.com",
+    "xiaohongshu.com",
+    "weibo.com",
 }
 
 LIFE_KEYWORDS = {
-    "review", "recommendation", "buy", "price", "deal", "coupon",
-    "health", "fitness", "recipe", "travel", "hotel", "flight",
-    "restaurant", "movie", "book", "game", "music",
-    "评测", "推荐", "购买", "价格", "优惠", "折扣",
-    "健康", "健身", "食谱", "旅行", "电影", "音乐",
-    "攻略", "测评", "种草", "开箱",
+    "review",
+    "recommendation",
+    "buy",
+    "price",
+    "deal",
+    "coupon",
+    "health",
+    "fitness",
+    "recipe",
+    "travel",
+    "hotel",
+    "flight",
+    "restaurant",
+    "movie",
+    "book",
+    "game",
+    "music",
+    "评测",
+    "推荐",
+    "购买",
+    "价格",
+    "优惠",
+    "折扣",
+    "健康",
+    "健身",
+    "食谱",
+    "旅行",
+    "电影",
+    "音乐",
+    "攻略",
+    "测评",
+    "种草",
+    "开箱",
 }
 
 # ---------------------------------------------------------------------------
 # Stop words
 # ---------------------------------------------------------------------------
 STOP_WORDS = {
-    "the", "a", "an", "is", "are", "was", "were", "be", "been",
-    "have", "has", "had", "do", "does", "did", "will", "would",
-    "should", "can", "could", "may", "might", "must",
-    "that", "this", "these", "those", "there", "here",
-    "with", "from", "into", "about", "for", "and", "but", "or",
-    "not", "no", "all", "any", "each", "every", "some",
-    "more", "most", "other", "what", "which", "who", "how",
-    "when", "where", "why", "if", "then", "than", "too", "very",
-    "just", "also", "only", "so", "now", "new", "get", "one",
-    "use", "you", "your", "we", "our", "they", "their", "my",
-    "http", "https", "www", "com", "org", "net", "html", "php",
-    "page", "home", "index", "site", "web", "free", "online",
-    "search", "api", "app", "tool", "best", "top", "list",
-    "based", "using", "like", "make", "open", "source",
-    "de", "la", "en", "el", "les", "des",
-    "的", "了", "在", "是", "我", "有", "和", "就", "不", "人",
-    "都", "一", "上", "也", "很", "到", "说", "要", "去", "你",
-    "会", "着", "没有", "看", "好", "自己", "这", "那", "他", "她",
-    "首页", "官网", "登录", "注册", "搜索", "更多", "下载",
+    "the",
+    "a",
+    "an",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "have",
+    "has",
+    "had",
+    "do",
+    "does",
+    "did",
+    "will",
+    "would",
+    "should",
+    "can",
+    "could",
+    "may",
+    "might",
+    "must",
+    "that",
+    "this",
+    "these",
+    "those",
+    "there",
+    "here",
+    "with",
+    "from",
+    "into",
+    "about",
+    "for",
+    "and",
+    "but",
+    "or",
+    "not",
+    "no",
+    "all",
+    "any",
+    "each",
+    "every",
+    "some",
+    "more",
+    "most",
+    "other",
+    "what",
+    "which",
+    "who",
+    "how",
+    "when",
+    "where",
+    "why",
+    "if",
+    "then",
+    "than",
+    "too",
+    "very",
+    "just",
+    "also",
+    "only",
+    "so",
+    "now",
+    "new",
+    "get",
+    "one",
+    "use",
+    "you",
+    "your",
+    "we",
+    "our",
+    "they",
+    "their",
+    "my",
+    "http",
+    "https",
+    "www",
+    "com",
+    "org",
+    "net",
+    "html",
+    "php",
+    "page",
+    "home",
+    "index",
+    "site",
+    "web",
+    "free",
+    "online",
+    "search",
+    "api",
+    "app",
+    "tool",
+    "best",
+    "top",
+    "list",
+    "based",
+    "using",
+    "like",
+    "make",
+    "open",
+    "source",
+    "de",
+    "la",
+    "en",
+    "el",
+    "les",
+    "des",
+    "的",
+    "了",
+    "在",
+    "是",
+    "我",
+    "有",
+    "和",
+    "就",
+    "不",
+    "人",
+    "都",
+    "一",
+    "上",
+    "也",
+    "很",
+    "到",
+    "说",
+    "要",
+    "去",
+    "你",
+    "会",
+    "着",
+    "没有",
+    "看",
+    "好",
+    "自己",
+    "这",
+    "那",
+    "他",
+    "她",
+    "首页",
+    "官网",
+    "登录",
+    "注册",
+    "搜索",
+    "更多",
+    "下载",
 }
 
 # Domain base-names that should never become interest keywords.
 # These are platform/infrastructure names, not user interests.
 _DOMAIN_NOISE = {
     # Search engines
-    "google", "bing", "baidu", "yahoo", "duckduckgo", "yandex", "sogou",
+    "google",
+    "bing",
+    "baidu",
+    "yahoo",
+    "duckduckgo",
+    "yandex",
+    "sogou",
     # Code platforms
-    "github", "gitlab", "bitbucket", "stackoverflow", "stackexchange",
-    "gitee", "codeberg",
+    "github",
+    "gitlab",
+    "bitbucket",
+    "stackoverflow",
+    "stackexchange",
+    "gitee",
+    "codeberg",
     # Big tech
-    "microsoft", "apple", "amazon", "facebook", "meta", "twitter",
-    "instagram", "tiktok", "reddit", "quora", "linkedin", "pinterest",
+    "microsoft",
+    "apple",
+    "amazon",
+    "facebook",
+    "meta",
+    "twitter",
+    "instagram",
+    "tiktok",
+    "reddit",
+    "quora",
+    "linkedin",
+    "pinterest",
     # Video / music
-    "youtube", "bilibili", "youku", "iqiyi", "netflix", "spotify",
+    "youtube",
+    "bilibili",
+    "youku",
+    "iqiyi",
+    "netflix",
+    "spotify",
     # Wiki
-    "wikipedia", "fandom", "wikia",
+    "wikipedia",
+    "fandom",
+    "wikia",
     # E-commerce (CN)
-    "taobao", "tmall", "jd.com", "pinduoduo", "suning",
+    "taobao",
+    "tmall",
+    "jd.com",
+    "pinduoduo",
+    "suning",
     # Social / chat
-    "alipay", "wechat", "weixin", "weibo", "douyin", "zhihu",
-    "douban", "xiaohongshu", "meituan", "dianping", "ctrip",
-    "discord", "slack", "telegram", "whatsapp", "mochat",
-    "dingtalk", "feishu", "lark",
+    "alipay",
+    "wechat",
+    "weixin",
+    "weibo",
+    "douyin",
+    "zhihu",
+    "douban",
+    "xiaohongshu",
+    "meituan",
+    "dianping",
+    "ctrip",
+    "discord",
+    "slack",
+    "telegram",
+    "whatsapp",
+    "mochat",
+    "dingtalk",
+    "feishu",
+    "lark",
     # Email
-    "outlook", "gmail", "hotmail", "protonmail",
+    "outlook",
+    "gmail",
+    "hotmail",
+    "protonmail",
     # Browsers
-    "chrome", "firefox", "edge", "safari", "opera", "brave",
+    "chrome",
+    "firefox",
+    "edge",
+    "safari",
+    "opera",
+    "brave",
     # Infra / hosting
-    "cloudflare", "vercel", "netlify", "heroku", "railway",
-    "docker", "npm", "pypi", "conda", "brew",
-    "localhost", "127",
+    "cloudflare",
+    "vercel",
+    "netlify",
+    "heroku",
+    "railway",
+    "docker",
+    "npm",
+    "pypi",
+    "conda",
+    "brew",
+    "localhost",
+    "127",
     # AI products & LLM providers — must not become "interests"
-    "nanobot", "chatgpt", "openai", "anthropic", "deepseek",
-    "dashscope", "moonshot", "groq", "gemini", "claude", "xclaude",
-    "qwen", "tongyi", "wenxin", "ernie", "llama", "mistral",
-    "copilot", "cursor", "coze", "dify", "langchain", "llamaindex",
+    "nanobot",
+    "chatgpt",
+    "openai",
+    "anthropic",
+    "deepseek",
+    "dashscope",
+    "moonshot",
+    "groq",
+    "gemini",
+    "claude",
+    "xclaude",
+    "qwen",
+    "tongyi",
+    "wenxin",
+    "ernie",
+    "llama",
+    "mistral",
+    "copilot",
+    "cursor",
+    "coze",
+    "dify",
+    "langchain",
+    "llamaindex",
     # Common UI / generic fragments that leak from page titles
-    "windows", "linux", "macos", "ubuntu", "android", "ios",
-    "desktop", "client", "server", "download", "install", "update",
-    "settings", "personal", "account", "profile", "dashboard",
-    "version", "release", "latest", "official",
-    "ultra", "lightweight", "powerful", "simple", "fast", "easy",
+    "windows",
+    "linux",
+    "macos",
+    "ubuntu",
+    "android",
+    "ios",
+    "desktop",
+    "client",
+    "server",
+    "download",
+    "install",
+    "update",
+    "settings",
+    "personal",
+    "account",
+    "profile",
+    "dashboard",
+    "version",
+    "release",
+    "latest",
+    "official",
+    "ultra",
+    "lightweight",
+    "powerful",
+    "simple",
+    "fast",
+    "easy",
 }
 
 # ---------------------------------------------------------------------------
@@ -206,6 +565,7 @@ _PROFILE_FILE = _DIGEST_DIR / "user_profile.json"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _chrome_ts_to_dt(chrome_time: int):
     if not chrome_time:
@@ -229,6 +589,7 @@ def find_browser_history_paths() -> list[dict]:
 # Step 1 — Read browser history
 # ---------------------------------------------------------------------------
 
+
 def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
     targets: list[Path] = []
     if browser in ("auto", "chrome"):
@@ -241,8 +602,7 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     cutoff_chrome = int(
-        (cutoff - datetime(1601, 1, 1, tzinfo=timezone.utc)).total_seconds()
-        * 1_000_000
+        (cutoff - datetime(1601, 1, 1, tzinfo=timezone.utc)).total_seconds() * 1_000_000
     )
 
     records: list[dict] = []
@@ -266,23 +626,27 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
                     continue
                 seen_urls.add(url)
                 parsed = urlparse(url)
-                records.append({
-                    "url": url,
-                    "title": title.strip(),
-                    "domain": parsed.netloc.lower(),
-                    "visit_count": visit_count or 1,
-                    "timestamp": (
-                        _chrome_ts_to_dt(last_visit_time).isoformat()
-                        if last_visit_time else None
-                    ),
-                    "browser": "Chrome" if "Chrome" in str(hist_path) else "Edge",
-                })
+                records.append(
+                    {
+                        "url": url,
+                        "title": title.strip(),
+                        "domain": parsed.netloc.lower(),
+                        "visit_count": visit_count or 1,
+                        "timestamp": (
+                            _chrome_ts_to_dt(last_visit_time).isoformat()
+                            if last_visit_time
+                            else None
+                        ),
+                        "browser": "Chrome" if "Chrome" in str(hist_path) else "Edge",
+                    }
+                )
             conn.close()
         except Exception as exc:
             print(f"[daily_digest] read error ({hist_path}): {exc}")
         finally:
             try:
                 from apps.safe_fs import safe_remove
+
                 safe_remove(tmp_name)
             except OSError:
                 pass
@@ -293,6 +657,7 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
 # ---------------------------------------------------------------------------
 # Step 2 — Filter noise
 # ---------------------------------------------------------------------------
+
 
 def filter_history(records: list[dict]) -> list[dict]:
     filtered = []
@@ -344,11 +709,13 @@ def read_chat_history(hours: int = 72) -> list[dict]:
         msgs = sess.get("messages", [])
         if not msgs:
             continue
-        sessions.append({
-            "session_title": sess.get("title", sid),
-            "updated_at": updated,
-            "messages": msgs,
-        })
+        sessions.append(
+            {
+                "session_title": sess.get("title", sid),
+                "updated_at": updated,
+                "messages": msgs,
+            }
+        )
 
     sessions.sort(key=lambda s: s["updated_at"], reverse=True)
     return sessions
@@ -393,6 +760,7 @@ def _build_chat_block(sessions: list[dict], limit: int = 40) -> str:
 # Step 3 — Extract interest keywords
 # ---------------------------------------------------------------------------
 
+
 def extract_keywords(records: list[dict], top_n: int = 30) -> list[dict]:
     counts: Counter = Counter()
     kw_records: dict[str, list] = defaultdict(list)
@@ -405,16 +773,14 @@ def extract_keywords(records: list[dict], top_n: int = 30) -> list[dict]:
         title = r["title"]
         weight = min(r["visit_count"], 10)
 
-        parts = re.split(r'[-–—|·•/\\:：,，]', title)
+        parts = re.split(r"[-–—|·•/\\:：,，]", title)
         for part in parts:
             part = part.strip()
             if len(part) < 2:
                 continue
 
             # Single tokens
-            tokens = re.findall(
-                r'[a-zA-Z][a-zA-Z0-9+#.]{1,}|[\u4e00-\u9fff]{2,6}', part
-            )
+            tokens = re.findall(r"[a-zA-Z][a-zA-Z0-9+#.]{1,}|[\u4e00-\u9fff]{2,6}", part)
             for tok in tokens:
                 tok_lower = tok.lower()
                 if tok_lower in STOP_WORDS or tok_lower in _DOMAIN_NOISE:
@@ -426,9 +792,7 @@ def extract_keywords(records: list[dict], top_n: int = 30) -> list[dict]:
                     kw_records[tok_lower].append(r)
 
             # Multi-word English phrases (2-4 words) — much better search terms
-            en_phrases = re.findall(
-                r'[A-Za-z][a-z]+(?:\s+[A-Za-z][a-z]+){1,3}', part
-            )
+            en_phrases = re.findall(r"[A-Za-z][a-z]+(?:\s+[A-Za-z][a-z]+){1,3}", part)
             for phrase in en_phrases:
                 p_lower = phrase.lower().strip()
                 p_words = p_lower.split()
@@ -451,11 +815,13 @@ def extract_keywords(records: list[dict], top_n: int = 30) -> list[dict]:
     for phrase, cnt in phrase_counts.most_common(top_n):
         if cnt < 2:
             continue
-        merged.append({
-            "keyword": phrase,
-            "count": cnt,
-            "records": phrase_records.get(phrase, []),
-        })
+        merged.append(
+            {
+                "keyword": phrase,
+                "count": cnt,
+                "records": phrase_records.get(phrase, []),
+            }
+        )
         seen.update(phrase.split())
 
     for kw, cnt in counts.most_common(top_n * 2):
@@ -463,11 +829,13 @@ def extract_keywords(records: list[dict], top_n: int = 30) -> list[dict]:
             continue
         if kw in _DOMAIN_NOISE:
             continue
-        merged.append({
-            "keyword": kw,
-            "count": cnt,
-            "records": kw_records.get(kw, []),
-        })
+        merged.append(
+            {
+                "keyword": kw,
+                "count": cnt,
+                "records": kw_records.get(kw, []),
+            }
+        )
         seen.add(kw)
         if len(merged) >= top_n:
             break
@@ -478,6 +846,7 @@ def extract_keywords(records: list[dict], top_n: int = 30) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Step 4 — Classify into work / study / life
 # ---------------------------------------------------------------------------
+
 
 def classify_interests(keywords: list[dict]) -> dict[str, list]:
     categories: dict[str, list] = {"work": [], "study": [], "life": []}
@@ -526,9 +895,20 @@ def classify_interests(keywords: list[dict]) -> dict[str, list]:
 # "openai/" automatically unless a prefix is already present.
 
 _KNOWN_LITELLM_PREFIXES = (
-    "openai/", "azure/", "anthropic/", "bedrock/", "vertex_ai/",
-    "cohere/", "huggingface/", "ollama/", "deepseek/", "groq/",
-    "together_ai/", "openrouter/", "gemini/", "mistral/",
+    "openai/",
+    "azure/",
+    "anthropic/",
+    "bedrock/",
+    "vertex_ai/",
+    "cohere/",
+    "huggingface/",
+    "ollama/",
+    "deepseek/",
+    "groq/",
+    "together_ai/",
+    "openrouter/",
+    "gemini/",
+    "mistral/",
 )
 
 
@@ -565,6 +945,7 @@ def _llm_call(
     usage = getattr(resp, "usage", None)
     if usage:
         from apps.llm_utils import record_tokens
+
         record_tokens(
             prompt_tokens=getattr(usage, "prompt_tokens", 0),
             completion_tokens=getattr(usage, "completion_tokens", 0),
@@ -688,7 +1069,7 @@ def llm_analyze_interests(
         )
 
         # Extract JSON from markdown code block if present
-        json_match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', text, re.DOTALL)
+        json_match = re.search(r"```(?:json)?\s*\n?(.*?)\n?```", text, re.DOTALL)
         json_str = json_match.group(1) if json_match else text.strip()
         data = json.loads(json_str)
 
@@ -706,7 +1087,7 @@ def llm_analyze_interests(
             return None
 
         print(
-            f"[daily_digest] LLM analysis: "
+            "[daily_digest] LLM analysis: "
             + ", ".join(f"{c}={len(v['queries'])}q" for c, v in result.items())
         )
         return result
@@ -719,13 +1100,18 @@ def llm_analyze_interests(
 # Step 5 — Web search  (delegates to shared apps.web_search module)
 # ===================================================================
 
+import contextlib
+
 from apps.web_search import multi_engine_search as _multi_engine_search
 
 
-def _web_search(query: str, brave_api_key: str | None = None,
-                baidu_api_key: str | None = None,
-                count: int = 8,
-                _session_state: dict | None = None) -> list[dict]:
+def _web_search(
+    query: str,
+    brave_api_key: str | None = None,
+    baidu_api_key: str | None = None,
+    count: int = 8,
+    _session_state: dict | None = None,
+) -> list[dict]:
     """Search via available APIs (Baidu / Brave).
 
     Delegates to the shared multi-engine search in apps.web_search.
@@ -733,8 +1119,10 @@ def _web_search(query: str, brave_api_key: str | None = None,
     """
     try:
         results, engine = _multi_engine_search(
-            query, brave_api_key=brave_api_key,
-            baidu_api_key=baidu_api_key, count=count,
+            query,
+            brave_api_key=brave_api_key,
+            baidu_api_key=baidu_api_key,
+            count=count,
         )
         if results:
             print(f"[daily_digest] search OK via {engine}: {len(results)} results")
@@ -765,8 +1153,9 @@ _CAT_QUERY_SUFFIXES = {
 }
 
 
-def build_search_queries(categories: dict[str, list],
-                         max_kw_per_cat: int = 4) -> dict[str, list[str]]:
+def build_search_queries(
+    categories: dict[str, list], max_kw_per_cat: int = 4
+) -> dict[str, list[str]]:
     """Build compact search queries — combine keywords to minimise API calls.
 
     Strategy: top keywords are grouped, producing ~2 queries per category
@@ -797,6 +1186,7 @@ def build_search_queries(categories: dict[str, list],
 
 # -- 5c. Run all searches and deduplicate ----------------------------------
 
+
 def search_for_recommendations(
     queries: dict[str, list[str]],
     brave_api_key: str | None = None,
@@ -826,9 +1216,11 @@ def search_for_recommendations(
             print(f"[daily_digest] search [{cat}]: {q}")
 
             hits = _web_search(
-                q, brave_api_key=brave_api_key,
+                q,
+                brave_api_key=brave_api_key,
                 baidu_api_key=baidu_api_key,
-                count=results_per_query, _session_state=session,
+                count=results_per_query,
+                _session_state=session,
             )
             for h in hits:
                 normalized = h["url"].rstrip("/").lower()
@@ -848,6 +1240,7 @@ def search_for_recommendations(
 # Step 6 — Build LLM prompt (includes real search results)
 # ===================================================================
 
+
 def _fmt_results(results: list[dict], limit: int = 10) -> str:
     """Format search results into a readable block for the LLM prompt."""
     if not results:
@@ -863,9 +1256,9 @@ def _fmt_results(results: list[dict], limit: int = 10) -> str:
 
 
 _CAT_META = {
-    "work":  {"emoji": "🧠", "zh": "工作精选"},
+    "work": {"emoji": "🧠", "zh": "工作精选"},
     "study": {"emoji": "📚", "zh": "学习精选"},
-    "life":  {"emoji": "🌿", "zh": "生活精选"},
+    "life": {"emoji": "🌿", "zh": "生活精选"},
 }
 
 
@@ -902,14 +1295,12 @@ def _update_user_profile(interests: dict) -> None:
     _DIGEST_DIR.mkdir(parents=True, exist_ok=True)
     profile: dict = {}
     if _PROFILE_FILE.exists():
-        try:
+        with contextlib.suppress(Exception):
             profile = json.loads(_PROFILE_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            pass
 
     kw_counts: dict = profile.get("keyword_counts", {})
     for cat in ("work", "study", "life"):
-        for item in (interests.get(cat) or []):
+        for item in interests.get(cat) or []:
             kw = item["keyword"] if isinstance(item, dict) else str(item)
             kw_counts[kw] = kw_counts.get(kw, 0) + 1
 
@@ -918,8 +1309,10 @@ def _update_user_profile(interests: dict) -> None:
     profile["last_updated"] = datetime.now().astimezone().isoformat()
 
     _PROFILE_FILE.write_text(
-        json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(profile, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
+
 
 _JSON_SCHEMA_EXAMPLE = """\
 {
@@ -936,10 +1329,12 @@ _JSON_SCHEMA_EXAMPLE = """\
 }"""
 
 
-def build_report_prompt(categories: dict[str, list],
-                        search_results: dict[str, list[dict]],
-                        date_str: str,
-                        prev_titles: list[str] | None = None) -> str:
+def build_report_prompt(
+    categories: dict[str, list],
+    search_results: dict[str, list[dict]],
+    date_str: str,
+    prev_titles: list[str] | None = None,
+) -> str:
     def _top_kw(cat, n=8):
         return ", ".join(i["keyword"] for i in categories.get(cat, [])[:n])
 
@@ -967,9 +1362,7 @@ def build_report_prompt(categories: dict[str, list],
         )
     results_block = "\n\n".join(results_block_parts) if results_block_parts else "(无搜索结果)"
 
-    active_cats_hint = ", ".join(
-        f'"{c}"' for c in active_cats
-    ) if active_cats else '"work"'
+    active_cats_hint = ", ".join(f'"{c}"' for c in active_cats) if active_cats else '"work"'
 
     if prev_titles:
         dedup_list = "\n".join(f"- {t}" for t in prev_titles)
@@ -1030,9 +1423,10 @@ def build_report_prompt(categories: dict[str, list],
 # Step 7 — Call LLM
 # ===================================================================
 
-def generate_report_llm(prompt: str, model: str, api_key: str,
-                        api_base: str | None = None,
-                        date_str: str = "") -> tuple[str, dict | None]:
+
+def generate_report_llm(
+    prompt: str, model: str, api_key: str, api_base: str | None = None, date_str: str = ""
+) -> tuple[str, dict | None]:
     """Generate report via LLM.  Returns (html_content, items_data_or_None)."""
     raw = _llm_call(
         messages=[{"role": "user", "content": prompt}],
@@ -1054,24 +1448,21 @@ def generate_report_llm(prompt: str, model: str, api_key: str,
 def _esc(text: str) -> str:
     """Minimal HTML-escape for user-supplied text."""
     return (
-        text.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .replace('"', "&quot;")
+        text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
     )
 
 
 def _json_to_html(data: dict, date_str: str) -> str:
     """Render the structured JSON report into HTML matching existing CSS classes."""
-    parts: list[str] = [f'<h1>\U0001f4c5 {date_str} 每日私享</h1>']
+    parts: list[str] = [f"<h1>\U0001f4c5 {date_str} 每日私享</h1>"]
 
     for sec in data.get("sections", []):
         cat = sec.get("category", "")
         meta = _CAT_META.get(cat)
         if not meta:
             continue
-        parts.append(f'<section class="dr-section">')
-        parts.append(f'<h2>{meta["emoji"]} {meta["zh"]}</h2>')
+        parts.append('<section class="dr-section">')
+        parts.append(f"<h2>{meta['emoji']} {meta['zh']}</h2>")
         for item in sec.get("items", []):
             title = _esc(str(item.get("title", "")))
             url = _esc(str(item.get("url", "")))
@@ -1086,25 +1477,25 @@ def _json_to_html(data: dict, date_str: str) -> str:
             )
             if action:
                 parts.append(f'<p class="dr-action">\U0001f4a1 {action}</p>')
-            parts.append('</div>')
-        parts.append('</section>')
+            parts.append("</div>")
+        parts.append("</section>")
 
     focus = data.get("focus", "")
     if focus:
         parts.append('<section class="dr-section dr-focus">')
-        parts.append('<h2>\U0001f525 今日重点关注</h2>')
-        parts.append(f'<p>{_esc(focus)}</p>')
-        parts.append('</section>')
+        parts.append("<h2>\U0001f525 今日重点关注</h2>")
+        parts.append(f"<p>{_esc(focus)}</p>")
+        parts.append("</section>")
 
     actions = data.get("actions", [])
     if actions:
         parts.append('<section class="dr-section dr-actions">')
-        parts.append('<h2>\U0001f3af 今日建议行动</h2>')
-        parts.append('<ul>')
+        parts.append("<h2>\U0001f3af 今日建议行动</h2>")
+        parts.append("<ul>")
         for a in actions:
-            parts.append(f'<li>{_esc(str(a))}</li>')
-        parts.append('</ul>')
-        parts.append('</section>')
+            parts.append(f"<li>{_esc(str(a))}</li>")
+        parts.append("</ul>")
+        parts.append("</section>")
 
     return "\n".join(parts)
 
@@ -1115,15 +1506,17 @@ def _extract_json_from_llm(text: str) -> dict | None:
     if text.startswith("```"):
         first_nl = text.find("\n")
         if first_nl != -1:
-            text = text[first_nl + 1:]
+            text = text[first_nl + 1 :]
         if text.endswith("```"):
             text = text[:-3].strip()
 
-    for start_char, end_char in [("{", "}"), ]:
+    for start_char, end_char in [
+        ("{", "}"),
+    ]:
         idx_start = text.find(start_char)
         idx_end = text.rfind(end_char)
         if idx_start != -1 and idx_end > idx_start:
-            candidate = text[idx_start:idx_end + 1]
+            candidate = text[idx_start : idx_end + 1]
             try:
                 obj = json.loads(candidate)
                 if isinstance(obj, dict) and "sections" in obj:
@@ -1139,11 +1532,11 @@ def _extract_json_from_llm(text: str) -> dict | None:
     return None
 
 
-def generate_report_fallback(categories: dict[str, list],
-                             search_results: dict[str, list[dict]],
-                             date_str: str) -> str:
+def generate_report_fallback(
+    categories: dict[str, list], search_results: dict[str, list[dict]], date_str: str
+) -> str:
     """HTML report when LLM is unavailable — still uses real search links."""
-    parts: list[str] = [f'<h1>📅 {date_str} 每日私享</h1>']
+    parts: list[str] = [f"<h1>📅 {date_str} 每日私享</h1>"]
 
     for cat in ("work", "study", "life"):
         meta = _CAT_META[cat]
@@ -1151,8 +1544,8 @@ def generate_report_fallback(categories: dict[str, list],
         kws = [i["keyword"] for i in categories.get(cat, [])[:5]]
         if not results and not kws:
             continue
-        parts.append(f'<section class="dr-section">')
-        parts.append(f'<h2>{meta["emoji"]} {meta["zh"]}</h2>')
+        parts.append('<section class="dr-section">')
+        parts.append(f"<h2>{meta['emoji']} {meta['zh']}</h2>")
         if results:
             for r in results[:5]:
                 title = _esc(r["title"][:80])
@@ -1164,11 +1557,11 @@ def generate_report_fallback(categories: dict[str, list],
                     f'<h3><a href="{url}" target="_blank">{title}</a></h3>'
                     f'<span class="dr-tag">{kw}</span>'
                     f'<p class="dr-desc">{desc}</p>'
-                    f'</div>'
+                    f"</div>"
                 )
         else:
-            parts.append(f'<p>关注关键词：{_esc(", ".join(kws))}（未能获取搜索结果）</p>')
-        parts.append('</section>')
+            parts.append(f"<p>关注关键词：{_esc(', '.join(kws))}（未能获取搜索结果）</p>")
+        parts.append("</section>")
 
     all_kws = []
     for cat in ("work", "study", "life"):
@@ -1176,18 +1569,18 @@ def generate_report_fallback(categories: dict[str, list],
     all_kws.sort(key=lambda x: x.get("count", 0), reverse=True)
 
     parts.append('<section class="dr-section dr-focus">')
-    parts.append('<h2>🔥 今日重点关注</h2>')
+    parts.append("<h2>🔥 今日重点关注</h2>")
     if all_kws:
-        parts.append(f'<p>你今天最关注的主题是：<strong>{_esc(all_kws[0]["keyword"])}</strong></p>')
-    parts.append('</section>')
+        parts.append(f"<p>你今天最关注的主题是：<strong>{_esc(all_kws[0]['keyword'])}</strong></p>")
+    parts.append("</section>")
 
     parts.append('<section class="dr-section dr-actions">')
-    parts.append('<h2>🎯 今日建议行动</h2>')
-    parts.append('<ul>')
-    parts.append('<li>点击上方链接深入阅读你感兴趣的内容</li>')
-    parts.append('<li>将有价值的文章加入收藏或笔记</li>')
-    parts.append('</ul>')
-    parts.append('</section>')
+    parts.append("<h2>🎯 今日建议行动</h2>")
+    parts.append("<ul>")
+    parts.append("<li>点击上方链接深入阅读你感兴趣的内容</li>")
+    parts.append("<li>将有价值的文章加入收藏或笔记</li>")
+    parts.append("</ul>")
+    parts.append("</section>")
 
     return "\n".join(parts)
 
@@ -1196,11 +1589,15 @@ def generate_report_fallback(categories: dict[str, list],
 # Report persistence
 # ===================================================================
 
-def save_report(content: str, date_str: str | None = None,
-                interests: dict | None = None,
-                search_stats: dict | None = None,
-                search_results: dict | None = None,
-                items: dict | None = None) -> dict:
+
+def save_report(
+    content: str,
+    date_str: str | None = None,
+    interests: dict | None = None,
+    search_stats: dict | None = None,
+    search_results: dict | None = None,
+    items: dict | None = None,
+) -> dict:
     if date_str is None:
         date_str = datetime.now().strftime("%Y-%m-%d")
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1209,9 +1606,12 @@ def save_report(content: str, date_str: str | None = None,
         sr_compact = {}
         for cat, sr_items in search_results.items():
             sr_compact[cat] = [
-                {"title": r["title"][:120], "url": r["url"],
-                 "description": r["description"][:300],
-                 "query_keyword": r.get("query_keyword", "")}
+                {
+                    "title": r["title"][:120],
+                    "url": r["url"],
+                    "description": r["description"][:300],
+                    "query_keyword": r.get("query_keyword", ""),
+                }
                 for r in sr_items[:20]
             ]
     data = {
@@ -1225,7 +1625,8 @@ def save_report(content: str, date_str: str | None = None,
     if items is not None:
         data["items"] = items
     (_REPORTS_DIR / f"{date_str}.json").write_text(
-        json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8",
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
     )
     return data
 
@@ -1243,6 +1644,7 @@ def _extract_prev_titles(date_str: str) -> list[str]:
     """Extract card titles from yesterday's report to avoid duplication."""
     import re
     from datetime import timedelta
+
     yesterday = (datetime.strptime(date_str, "%Y-%m-%d") - timedelta(days=1)).strftime("%Y-%m-%d")
     rpt = load_report(yesterday)
     if not rpt:
@@ -1260,7 +1662,7 @@ def _extract_prev_titles(date_str: str) -> list[str]:
     content = rpt.get("content", "")
     if not content:
         return []
-    titles = re.findall(r'<h3[^>]*>(.*?)</h3>', content, re.S)
+    titles = re.findall(r"<h3[^>]*>(.*?)</h3>", content, re.S)
     return [re.sub(r"<[^>]+>", "", t).strip() for t in titles if t.strip()]
 
 
@@ -1296,11 +1698,13 @@ def list_reports(limit: int = 30) -> list[dict]:
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
             key = d.get("date", f.stem)
-            reports.append({
-                "date": key,
-                "generated_at": d.get("generated_at", ""),
-                "read": key in read_set,
-            })
+            reports.append(
+                {
+                    "date": key,
+                    "generated_at": d.get("generated_at", ""),
+                    "read": key in read_set,
+                }
+            )
         except Exception:
             pass
     return reports
@@ -1308,6 +1712,7 @@ def list_reports(limit: int = 30) -> list[dict]:
 
 def delete_report(date_str: str) -> bool:
     from apps.safe_fs import safe_remove
+
     fp = _REPORTS_DIR / f"{date_str}.json"
     if fp.exists():
         safe_remove(fp)
@@ -1359,10 +1764,7 @@ def build_explore_prompt(item: dict, interests: dict | None = None) -> str:
                     k["keyword"] if isinstance(k, dict) else str(k) for k in kws[:5]
                 )
                 context_lines.append(f"- {cat_name}兴趣：{kw_text}")
-    context_block = (
-        "【用户兴趣方向】\n" + "\n".join(context_lines)
-        if context_lines else ""
-    )
+    context_block = "【用户兴趣方向】\n" + "\n".join(context_lines) if context_lines else ""
 
     return _EXPLORE_PROMPT_TEMPLATE.format(
         title=title,
@@ -1376,6 +1778,7 @@ def build_explore_prompt(item: dict, interests: dict | None = None) -> str:
 # ===================================================================
 # Orchestrator — run the full pipeline
 # ===================================================================
+
 
 def run_daily_digest(config: dict, progress_cb=None) -> dict:
     """Execute the full daily digest pipeline.
@@ -1431,7 +1834,10 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
         if progress_cb:
             progress_cb("正在通过 AI 分析兴趣…")
         llm_analysis = llm_analyze_interests(
-            filtered, model, api_key, api_base,
+            filtered,
+            model,
+            api_key,
+            api_base,
             chat_sessions=chat_sessions,
         )
 
@@ -1440,13 +1846,10 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
         for cat in ("work", "study", "life"):
             entry = llm_analysis[cat]
             search_queries[cat] = entry["queries"]
-            interests_summary[cat] = [
-                {"keyword": kw, "count": 0} for kw in entry["interests"]
-            ]
+            interests_summary[cat] = [{"keyword": kw, "count": 0} for kw in entry["interests"]]
             # Build a compatible categories structure for report prompt
             categories[cat] = [
-                {"keyword": kw, "count": 0, "records": []}
-                for kw in entry["interests"]
+                {"keyword": kw, "count": 0, "records": []} for kw in entry["interests"]
             ]
         print("[daily_digest] using LLM-generated search queries")
     else:
@@ -1464,8 +1867,7 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
         print("[daily_digest] using rule-based search queries")
 
     print(
-        "[daily_digest] queries: "
-        + ", ".join(f"{c}={len(q)}" for c, q in search_queries.items())
+        "[daily_digest] queries: " + ", ".join(f"{c}={len(q)}" for c, q in search_queries.items())
     )
 
     # ── 5. Web search ───────────────────────────────────────────────
@@ -1497,24 +1899,36 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
     items_data: dict | None = None
     if has_llm:
         try:
-            prompt = build_report_prompt(categories, search_results, date_str,
-                                         prev_titles=prev_titles)
+            prompt = build_report_prompt(
+                categories, search_results, date_str, prev_titles=prev_titles
+            )
             report_text, items_data = generate_report_llm(
-                prompt, model, api_key, api_base, date_str=date_str,
+                prompt,
+                model,
+                api_key,
+                api_base,
+                date_str=date_str,
             )
         except Exception as exc:
             print(f"[daily_digest] LLM report error, falling back: {exc}")
             report_text = generate_report_fallback(
-                categories, search_results, date_str,
+                categories,
+                search_results,
+                date_str,
             )
     else:
         report_text = generate_report_fallback(
-            categories, search_results, date_str,
+            categories,
+            search_results,
+            date_str,
         )
 
     # ── 7. Save + update profile ─────────────────────────────────────
     report_data = save_report(
-        report_text, date_str, interests_summary, search_stats,
+        report_text,
+        date_str,
+        interests_summary,
+        search_stats,
         search_results=search_results,
         items=items_data,
     )

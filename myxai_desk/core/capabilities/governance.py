@@ -14,7 +14,6 @@ import hashlib
 import json
 import re
 import uuid
-from pathlib import Path
 from typing import Any
 
 # Lazy singletons — created on first use, then reused.
@@ -26,6 +25,7 @@ def _get_audit():
     global _audit_ledger
     if _audit_ledger is None:
         from myxai_desk.core.audit.ledger import AuditLedger
+
         _audit_ledger = AuditLedger()
     return _audit_ledger
 
@@ -34,6 +34,7 @@ def _get_undo():
     global _undo_registry
     if _undo_registry is None:
         from myxai_desk.core.audit.undo import UndoRegistry
+
         _undo_registry = UndoRegistry()
     return _undo_registry
 
@@ -48,6 +49,7 @@ def _digest(obj: Any) -> str:
 
 
 # ── Post-execution audit ──────────────────────────────────────────
+
 
 def post_execution_audit(
     capability: str,
@@ -76,13 +78,16 @@ _PATH_KEYS = ("path", "file_path", "destination", "target", "filename", "src", "
 
 # nanobot tool names → (capability, operation) for undo classification
 _WRITE_TOOL_PATTERNS = re.compile(
-    r"(write_file|create_file|file_write|save_file)", re.I,
+    r"(write_file|create_file|file_write|save_file)",
+    re.I,
 )
 _MOVE_TOOL_PATTERNS = re.compile(
-    r"(move_file|rename_file|file_move|file_rename)", re.I,
+    r"(move_file|rename_file|file_move|file_rename)",
+    re.I,
 )
 _REMOVE_TOOL_PATTERNS = re.compile(
-    r"(remove_file|delete_file|file_delete)", re.I,
+    r"(remove_file|delete_file|file_delete)",
+    re.I,
 )
 
 
@@ -116,30 +121,48 @@ def post_execution_undo(
         path_str = _extract_path(args)
 
         if op in ("write_text", "write", "create"):
-            undo.register(action_id, "fs", "write_text", {
-                "path": path_str,
-                "existed": True,
-                "old_content": None,
-                "note": "Written by nanobot tool; original content not captured by governance layer.",
-            }, cooldown_seconds=cooldown_seconds)
+            undo.register(
+                action_id,
+                "fs",
+                "write_text",
+                {
+                    "path": path_str,
+                    "existed": True,
+                    "old_content": None,
+                    "note": "Written by nanobot tool; original content not captured by governance layer.",
+                },
+                cooldown_seconds=cooldown_seconds,
+            )
 
         elif op in ("move", "rename"):
             src = args.get("src", args.get("source", args.get("path", "")))
             dst = args.get("dst", args.get("destination", args.get("new_path", "")))
             if src and dst:
-                undo.register(action_id, "fs", "move", {
-                    "src": dst,
-                    "dst": src,
-                }, cooldown_seconds=cooldown_seconds)
+                undo.register(
+                    action_id,
+                    "fs",
+                    "move",
+                    {
+                        "src": dst,
+                        "dst": src,
+                    },
+                    cooldown_seconds=cooldown_seconds,
+                )
 
         elif op in ("remove", "delete"):
             # nanobot's file tools go through safe_fs which moves to trash,
             # so we record the original path for potential restore.
-            undo.register(action_id, "fs", "remove", {
-                "original_path": path_str,
-                "trash_path": "",
-                "note": "Moved to trash by nanobot; check ~/.nanobot/trash/",
-            }, cooldown_seconds=cooldown_seconds)
+            undo.register(
+                action_id,
+                "fs",
+                "remove",
+                {
+                    "original_path": path_str,
+                    "trash_path": "",
+                    "note": "Moved to trash by nanobot; check ~/.nanobot/trash/",
+                },
+                cooldown_seconds=cooldown_seconds,
+            )
 
     except Exception as e:
         print(f"[governance] undo registration error: {e}")

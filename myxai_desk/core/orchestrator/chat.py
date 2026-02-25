@@ -8,13 +8,17 @@ concerns around the chat flow:
   2. Tool-call interception: delegate to Policy Engine (already in app.py)
   3. Post-processing: record to audit + profile event store
   4. History compression awareness
+  5. ExecutionContext management: unified request tracking
 
 The actual LLM <-> tool-call loop remains inside nanobot's AgentLoop.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from myxai_desk.core.orchestrator.context import ExecutionContext
 
 
 def enrich_with_profile(message: str, *, max_tokens: int = 500) -> str:
@@ -26,12 +30,16 @@ def enrich_with_profile(message: str, *, max_tokens: int = 500) -> str:
     return message
 
 
-def record_chat_event(role: str, content: str, session_id: str = "") -> None:
+def record_chat_event(
+    role: str, content: str, session_id: str = "", ctx: ExecutionContext | None = None
+) -> None:
     """Record a chat message to the profile event store."""
     try:
-        from myxai_desk.core.profile.events import EventStore, ChatMessage
         import hashlib
         import time
+
+        from myxai_desk.core.profile.events import ChatMessage, EventStore
+
         digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
         event = ChatMessage(
             role=role,
@@ -41,11 +49,23 @@ def record_chat_event(role: str, content: str, session_id: str = "") -> None:
         )
         store = EventStore()
         store.append(event)
+
+        # Also add to context if provided
+        if ctx:
+            ctx.add_audit_event(
+                {
+                    "event": "chat_message",
+                    "role": role,
+                    "digest": digest,
+                }
+            )
     except Exception:
         pass
 
 
-def build_system_context(mode: str = "", workspace: str = "") -> str:
+def build_system_context(
+    mode: str = "", workspace: str = "", ctx: ExecutionContext | None = None
+) -> str:
     """Build additional system context reflecting the current governance state."""
     parts = []
     if mode:
@@ -53,6 +73,7 @@ def build_system_context(mode: str = "", workspace: str = "") -> str:
 
     try:
         from myxai_desk.core.policy.modes import get_current_mode, get_current_policy
+
         m = get_current_mode()
         p = get_current_policy()
         parts.append(f"安全模式: {m.value}")
@@ -65,5 +86,9 @@ def build_system_context(mode: str = "", workspace: str = "") -> str:
 
     if workspace:
         parts.append(f"工作区: {workspace}")
+
+    # Add request_id if context is provided
+    if ctx:
+        parts.append(f"请求 ID: {ctx.request_id}")
 
     return "\n".join(parts) if parts else ""
