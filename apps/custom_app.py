@@ -2,225 +2,17 @@
 
 A custom app = prompt template + app type + output format + schedule + summary.
 Execution is 100% delegated to the nanobot agent (same path as chat).
-
-Every custom app automatically gets a marketplace-compatible package
-(``app.yaml`` + ``prompt.md``) written under ``~/.nanobot/apps/user/<app_id>/``
-so that it can be discovered by ``myxai_desk.core.runtime.app_runtime.discover_apps``
-and governed through the standard manifest-based pipeline.
 """
 
 import json
 import re
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Any
-
 _LOCAL_TZ = timezone(timedelta(hours=8))  # CST
 from pathlib import Path
 
 _BASE_DIR = Path.home() / ".nanobot" / "apps" / "custom"
 _PARAM_RE = re.compile(r"\{\{([^}]+)\}\}")
-
-try:
-    from myxai_desk.core.storage.paths import MARKETPLACE_USER_DIR, ensure_dir
-except ImportError:
-    MARKETPLACE_USER_DIR = Path.home() / ".nanobot" / "apps" / "user"
-    def ensure_dir(p: Path) -> Path:
-        p.mkdir(parents=True, exist_ok=True)
-        return p
-
-# ── Marketplace package sync ───────────────────────────────────────────
-
-_OUTPUT_FMT_TO_MANIFEST: dict[str, str] = {
-    "report":       "report.html",
-    "notification": "notification",
-    "text":         "text",
-}
-
-_SECURITY_MODE_PERMISSIONS: dict[str, list[str]] = {
-    "Observer":  ["search.web", "net.http_get", "notify.push", "fs.read",
-                  "profile.read.summary"],
-    "Assistant": ["search.web", "net.http_get", "notify.push", "fs.read",
-                  "fs.write", "profile.read.summary", "profile.read.topics"],
-    "Operator":  ["search.web", "net.http_get", "notify.push", "fs.read",
-                  "fs.write", "fs.delete", "proc.exec",
-                  "profile.read.summary", "profile.read.topics"],
-    "Developer": ["search.web", "net.http_get", "notify.push", "fs.read",
-                  "fs.write", "fs.delete", "proc.exec", "mcp.call",
-                  "profile.read.summary", "profile.read.topics"],
-}
-
-
-def _schedule_to_cron(schedule: dict) -> str:
-    """Convert custom app schedule dict to a cron expression."""
-    if not schedule.get("enabled"):
-        return ""
-    time_str = schedule.get("time", "")
-    if not time_str or ":" not in time_str:
-        return ""
-    hh, mm = time_str.split(":")[:2]
-    mode = schedule.get("mode", "daily")
-    if mode == "daily":
-        return f"{mm} {hh} * * *"
-    if mode == "weekly":
-        dow = schedule.get("day_of_week", 0)
-        return f"{mm} {hh} * * {dow}"
-    if mode == "monthly":
-        dom = schedule.get("day_of_month", 1)
-        return f"{mm} {hh} {dom} * *"
-    if mode == "interval":
-        return f"{mm} {hh} * * *"
-    return ""
-
-
-def _build_manifest_dict(app: dict) -> dict[str, Any]:
-    """Build an ``app.yaml``-compatible dict from a custom app record."""
-    sec_mode = app.get("security_mode") or "Observer"
-    permissions = _SECURITY_MODE_PERMISSIONS.get(sec_mode,
-                  _SECURITY_MODE_PERMISSIONS["Observer"])
-
-    triggers: list[dict] = [{"type": "manual"}]
-    sched = app.get("schedule", {})
-    cron_expr = _schedule_to_cron(sched)
-    if cron_expr:
-        triggers.append({"type": "cron", "cron": cron_expr})
-
-    out_type = _OUTPUT_FMT_TO_MANIFEST.get(
-        app.get("output_format", "text"), "text")
-
-    return {
-        "id": app["id"],
-        "name": app.get("name", app["id"]),
-        "name_en": app.get("name", app["id"]),
-        "version": "1.0.0",
-        "source": "user",
-        "entry": "prompt",
-        "prompt_file": "prompt.md",
-        "description": app.get("name", ""),
-        "description_en": "",
-        "author": "user",
-        "triggers": triggers,
-        "permissions": permissions,
-        "budgets": {
-            "tokens_per_day": 200000,
-            "search_calls_per_day": 100,
-        },
-        "mode_requirements": {
-            "min_mode": sec_mode,
-        },
-        "data_policy": {
-            "allow_raw_history": False,
-            "allow_network_exfiltration": False,
-        },
-        "outputs": [
-            {"type": out_type, "path": f"reports/{{{{date}}}}_{app['id']}.html"}
-            if out_type == "report.html"
-            else {"type": out_type},
-        ],
-        "ui": {
-            "icon": app.get("icon", "🤖"),
-            "category": "custom",
-        },
-    }
-
-
-def _build_prompt_md(app: dict) -> str:
-    """Generate the ``prompt.md`` content from a custom app's template."""
-    fmt = app.get("output_format", "text")
-    fmt_label = OUTPUT_FORMATS.get(fmt, {}).get("label_zh", "纯文本")
-    suffix = OUTPUT_FORMATS.get(fmt, {}).get("suffix", "")
-
-    lines = [
-        f"# {app.get('name', '自定义应用')}",
-        "",
-        "你正在执行用户自定义的 Prompt 应用。",
-        "",
-        "## 应用信息",
-        f"- 应用名称：{app.get('name', '')}",
-        f"- 输出格式：{fmt_label}",
-        "",
-        "## 用户模板",
-        "",
-        app.get("prompt_template", ""),
-        "",
-    ]
-
-    if suffix:
-        lines += [
-            "## 输出要求",
-            "",
-            suffix.lstrip("，"),
-            "",
-        ]
-
-    lines += [
-        "## 约束",
-        "",
-        "- 严格按照用户模板中的指令执行",
-        "- 输出格式必须符合上述要求",
-        "- 如果模板中包含搜索或网络查询需求，使用可用工具完成",
-        "- 所有数据来源必须真实可查，禁止编造",
-    ]
-    return "\n".join(lines) + "\n"
-
-
-def sync_marketplace_package(app: dict) -> Path:
-    """Write (or overwrite) the marketplace package for a custom app.
-
-    Returns the package directory path.
-    """
-    try:
-        import yaml
-    except ImportError:
-        yaml = None  # type: ignore[assignment]
-
-    pkg_dir = MARKETPLACE_USER_DIR / app["id"]
-    ensure_dir(pkg_dir)
-
-    manifest = _build_manifest_dict(app)
-
-    if yaml is not None:
-        (pkg_dir / "app.yaml").write_text(
-            yaml.dump(manifest, allow_unicode=True, sort_keys=False,
-                      default_flow_style=False),
-            encoding="utf-8",
-        )
-    else:
-        (pkg_dir / "app.yaml").write_text(
-            json.dumps(manifest, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-
-    (pkg_dir / "prompt.md").write_text(
-        _build_prompt_md(app), encoding="utf-8",
-    )
-    return pkg_dir
-
-
-def remove_marketplace_package(app_id: str) -> bool:
-    """Remove the marketplace package for a custom app."""
-    from apps.safe_fs import safe_remove
-    pkg_dir = MARKETPLACE_USER_DIR / app_id
-    if pkg_dir.exists():
-        safe_remove(pkg_dir)
-        return True
-    return False
-
-
-def migrate_existing_apps() -> list[str]:
-    """One-time migration: generate marketplace packages for all existing
-    custom apps that don't have one yet.
-
-    Returns list of migrated app IDs.
-    """
-    migrated: list[str] = []
-    for app in list_apps():
-        pkg_dir = MARKETPLACE_USER_DIR / app["id"]
-        if not (pkg_dir / "app.yaml").exists():
-            sync_marketplace_package(app)
-            migrated.append(app["id"])
-    return migrated
-
 
 # ── Constants ──────────────────────────────────────────────────────────
 
@@ -320,10 +112,6 @@ def create_app(name: str, prompt_template: str, icon: str = "🤖",
             set_app_mode(app_id, SecurityMode(security_mode))
         except Exception:
             pass
-    try:
-        sync_marketplace_package(app)
-    except Exception:
-        pass
     return app
 
 
@@ -359,10 +147,6 @@ def update_app(app_id: str, **kwargs) -> dict | None:
         except Exception:
             pass
     _save(app)
-    try:
-        sync_marketplace_package(app)
-    except Exception:
-        pass
     return app
 
 
@@ -375,10 +159,6 @@ def delete_app(app_id: str) -> bool:
     d = _BASE_DIR / app_id
     if d.exists():
         safe_remove(d)
-    try:
-        remove_marketplace_package(app_id)
-    except Exception:
-        pass
     return True
 
 

@@ -1596,66 +1596,6 @@ def api_persona_update():
 
 
 # ---------------------------------------------------------------------------
-# Marketplace API (Prompt App discovery, three sources)
-# ---------------------------------------------------------------------------
-
-@flask_app.route("/api/marketplace/apps")
-def api_marketplace_apps():
-    """Return all Prompt Apps from official/user/third_party sources."""
-    from pathlib import Path as _P
-    from myxai_desk.core.runtime.app_runtime import discover_apps
-    from myxai_desk.core.runtime.manifest import manifest_to_dict
-    from myxai_desk.core.storage.paths import (
-        MARKETPLACE_USER_DIR, MARKETPLACE_THIRD_PARTY_DIR,
-    )
-
-    official_dir = _P(__file__).parent / "myxai_desk" / "marketplace" / "official"
-    search_dirs = [official_dir, MARKETPLACE_USER_DIR, MARKETPLACE_THIRD_PARTY_DIR]
-    manifests = discover_apps(search_dirs)
-    result = []
-    for m in manifests:
-        d = manifest_to_dict(m)
-        d["installed"] = True
-        d["enabled"] = True
-        d["type"] = "prompt_app"
-        result.append(d)
-    return jsonify(result)
-
-
-@flask_app.route("/api/marketplace/app/<app_id>/run", methods=["POST"])
-def api_marketplace_run(app_id):
-    """Run a Prompt App by ID."""
-    from pathlib import Path as _P
-    from myxai_desk.core.runtime.app_runtime import run_app, discover_apps
-    from myxai_desk.core.storage.paths import (
-        MARKETPLACE_USER_DIR, MARKETPLACE_THIRD_PARTY_DIR,
-    )
-
-    official_dir = _P(__file__).parent / "myxai_desk" / "marketplace" / "official"
-    all_apps = discover_apps([official_dir, MARKETPLACE_USER_DIR,
-                              MARKETPLACE_THIRD_PARTY_DIR])
-    manifest = next((m for m in all_apps if m.id == app_id), None)
-    if not manifest:
-        return jsonify({"error": f"App not found: {app_id}"}), 404
-
-    input_ctx = request.json or {}
-    agent = None
-    try:
-        agent = _get_or_create_agent()
-    except Exception:
-        pass
-
-    result = run_app(manifest, input_ctx, agent=agent)
-    return jsonify({
-        "app_id": result.app_id,
-        "success": result.success,
-        "output": result.output,
-        "output_type": result.output_type,
-        "error": result.error,
-    })
-
-
-# ---------------------------------------------------------------------------
 # Plan Confirmation API
 # ---------------------------------------------------------------------------
 
@@ -3022,7 +2962,7 @@ def api_report_content(app_id, key):
 
 
 # ---------------------------------------------------------------------------
-# Routes — Web Monitor  [COMPAT] legacy — see marketplace/official/web_monitor/
+# Routes — Web Monitor
 # ---------------------------------------------------------------------------
 
 _monitor_task_lock = threading.Lock()
@@ -3160,7 +3100,7 @@ def api_monitor_history(site_id):
 
 
 # ---------------------------------------------------------------------------
-# Routes — Email Summary  [COMPAT] legacy — see marketplace/official/email_briefing/
+# Routes — Email Summary
 # ---------------------------------------------------------------------------
 
 @flask_app.route("/api/apps/email_summary/run", methods=["POST"])
@@ -3234,9 +3174,7 @@ def api_email_presets():
 
 
 # ---------------------------------------------------------------------------
-# Routes — Custom Apps  [COMPAT] legacy routes, to be replaced by Prompt App
-# runtime via /api/marketplace/. Kept for backward compatibility during
-# migration — see myxai_desk/marketplace/official/custom_app/
+# Routes — Custom Apps
 # ---------------------------------------------------------------------------
 
 @flask_app.route("/api/apps/custom", methods=["GET"])
@@ -4391,14 +4329,6 @@ atexit.register(_shutdown)
 
 def main():
     global _desk_manager
-
-    try:
-        from apps.custom_app import migrate_existing_apps
-        migrated = migrate_existing_apps()
-        if migrated:
-            print(f"[marketplace] Migrated {len(migrated)} custom app(s): {migrated}")
-    except Exception as e:
-        print(f"[marketplace] Migration skipped: {e}")
 
     _start_app_scheduler()
 

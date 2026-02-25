@@ -239,17 +239,11 @@ async def _run_agent(agent: Any, app_id: str, prompt: str) -> str:
 # ── Discovery ──────────────────────────────────────────────────────
 
 def default_search_dirs() -> list[Path]:
-    """Return the standard marketplace search directories."""
-    from myxai_desk.core.storage.paths import (
-        MARKETPLACE_USER_DIR, MARKETPLACE_THIRD_PARTY_DIR,
-    )
-    pkg_root = Path(__file__).resolve().parent.parent.parent
+    """Return the standard app search directories."""
+    from myxai_desk.core.storage.paths import APPS_DIR
     return [
-        pkg_root / "marketplace" / "official",
-        pkg_root / "marketplace" / "user",
-        pkg_root / "marketplace" / "third_party",
-        MARKETPLACE_USER_DIR,
-        MARKETPLACE_THIRD_PARTY_DIR,
+        APPS_DIR / "user",
+        APPS_DIR / "third_party",
     ]
 
 
@@ -272,5 +266,5 @@ def discover_apps(search_dirs: list[Path] | None = None) -> list[AppManifest]:
                         seen_ids.add(m.id)
                         manifests.append(m)
                 except Exception as e:
-                    print(f"[marketplace] Failed to load {pkg_dir}: {e}")
+                    print(f"[app_runtime] Failed to load {pkg_dir}: {e}")
     return manifests

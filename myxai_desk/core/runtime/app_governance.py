@@ -49,41 +49,23 @@ _FALLBACK_DECLARATIONS: dict[str, dict] = {
 
 CUSTOM_APP_DEFAULT_CAPABILITIES = ["search.web", "net.http_get", "notify.push", "fs.read"]
 
-# Mapping from official app_id → marketplace directory name
-_OFFICIAL_ID_MAP: dict[str, str] = {
-    "daily_digest": "daily_briefing",
-    "email_summary": "email_briefing",
-    "web_monitor": "web_monitor",
-}
-
-
 def _find_manifest_dir(app_id: str) -> Path | None:
-    """Locate the marketplace package directory for *app_id*.
+    """Locate the app.yaml package directory for *app_id*.
 
     Search order:
-      1. ``~/.nanobot/apps/user/<app_id>/`` (user custom apps)
-      2. ``myxai_desk/marketplace/official/<mapped_name>/`` (official apps)
-      3. ``~/.nanobot/apps/third_party/<app_id>/`` (third-party)
+      1. ``~/.nanobot/apps/user/<app_id>/``
+      2. ``~/.nanobot/apps/third_party/<app_id>/``
     """
     try:
-        from myxai_desk.core.storage.paths import (
-            MARKETPLACE_USER_DIR, MARKETPLACE_THIRD_PARTY_DIR,
-        )
+        from myxai_desk.core.storage.paths import APPS_DIR
     except ImportError:
-        MARKETPLACE_USER_DIR = Path.home() / ".nanobot" / "apps" / "user"
-        MARKETPLACE_THIRD_PARTY_DIR = Path.home() / ".nanobot" / "apps" / "third_party"
+        APPS_DIR = Path.home() / ".nanobot" / "apps"
 
-    user_pkg = MARKETPLACE_USER_DIR / app_id
+    user_pkg = APPS_DIR / "user" / app_id
     if (user_pkg / "app.yaml").exists():
         return user_pkg
 
-    pkg_root = Path(__file__).resolve().parent.parent.parent
-    official_name = _OFFICIAL_ID_MAP.get(app_id, app_id)
-    official_pkg = pkg_root / "marketplace" / "official" / official_name
-    if (official_pkg / "app.yaml").exists():
-        return official_pkg
-
-    tp_pkg = MARKETPLACE_THIRD_PARTY_DIR / app_id
+    tp_pkg = APPS_DIR / "third_party" / app_id
     if (tp_pkg / "app.yaml").exists():
         return tp_pkg
 
@@ -120,7 +102,7 @@ def _get_app_decl(app_id: str, source: str = "",
     """Get the capability declaration for *app_id*.
 
     Resolution order:
-      1. Marketplace manifest (``app.yaml``) — authoritative
+      1. App manifest (``app.yaml``) — authoritative
       2. Hardcoded fallback table (``_FALLBACK_DECLARATIONS``)
       3. Generic custom-app defaults
     """

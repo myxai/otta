@@ -21,7 +21,7 @@ CASES_DIR: Path = NANOBOT_HOME / "desktop_cases"
 AUDIT_DIR: Path = NANOBOT_HOME / "audit"
 AUDIT_LEDGER_FILE: Path = AUDIT_DIR / "ledger.jsonl"
 
-# ── Apps / Marketplace ─────────────────────────────────────────────
+# ── Apps ───────────────────────────────────────────────────────────
 
 APPS_DIR: Path = NANOBOT_HOME / "apps"
 APPS_REGISTRY_FILE: Path = APPS_DIR / "registry.json"
@@ -31,8 +31,6 @@ CUSTOM_APPS_DIR: Path = APPS_DIR / "custom"
 DAILY_DIGEST_DIR: Path = APPS_DIR / "daily_digest"
 EMAIL_SUMMARY_DIR: Path = APPS_DIR / "email_summary"
 WEB_MONITOR_DIR: Path = APPS_DIR / "web_monitor"
-MARKETPLACE_USER_DIR: Path = APPS_DIR / "user"
-MARKETPLACE_THIRD_PARTY_DIR: Path = APPS_DIR / "third_party"
 
 # ── Profile ────────────────────────────────────────────────────────
 
