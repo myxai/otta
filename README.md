@@ -163,7 +163,6 @@ myai/
 │   ├── daily_digest.py  # Daily Briefing pipeline
 │   ├── email_summary.py # Email Briefing (IMAP + AI)
 │   ├── web_monitor.py   # Page change detection
-│   ├── focus_timer.py   # Pomodoro timer
 │   ├── custom_app.py    # Custom app framework
 │   ├── web_search.py    # Multi-engine search + quota
 │   ├── safe_fs.py       # Safe file operations (zero deletion, trash-based)

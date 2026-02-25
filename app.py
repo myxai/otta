@@ -82,6 +82,9 @@ _last_tools_lock = threading.Lock()
 _last_usage: dict[str, dict] = {}
 _last_usage_lock = threading.Lock()
 
+_last_turn_audit: dict[str, dict] = {}
+_last_turn_audit_lock = threading.Lock()
+
 
 def _mcp_record(server: str, level: str, message: str):
     """Append an MCP diagnostic entry (thread-safe)."""
@@ -501,6 +504,7 @@ def _patch_agent_tool_history(agent):
         iteration = 0
         final_content = None
         tools_used = []
+        _turn_events: list[dict] = []
         progress = on_progress or _bus_progress
         nudge_count = 0
         from myxai_desk.core.policy.modes import get_current_mode as _gcm, SecurityMode as _SM
@@ -574,6 +578,7 @@ def _patch_agent_tool_history(agent):
                                 f"(当前模式={_decision.evidence.get('mode','')}, "
                                 f"code={_decision.reason_code})"
                             )
+                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "DENY", "code": _decision.reason_code})
                             print(f"[policy] DENIED: {_decision.reason_code}")
 
                         elif _decision.action == "REQUIRE_CONFIRM":
@@ -597,6 +602,7 @@ def _patch_agent_tool_history(agent):
                                 f"请在对话中向用户说明要执行的操作内容和风险，"
                                 f"并询问用户是否确认执行。用户回复「确认」后将自动执行。"
                             )
+                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "CONFIRM", "risk": _decision.risk})
                             print(f"[policy] REQUIRE_CONFIRM → pending {_pending_id}")
 
                         elif _decision.action == "REQUIRE_SANDBOX":
@@ -608,6 +614,7 @@ def _patch_agent_tool_history(agent):
                                     f"[SANDBOX] 路径 {_path_arg} 不在沙箱工作区内，操作被拒绝。\n"
                                     f"(risk={_decision.risk}, code={_decision.reason_code})"
                                 )
+                                _turn_events.append({"tool": tc.name, "cap": _cap, "action": "SANDBOX_DENY"})
                                 print(f"[policy] SANDBOX blocked path: {_path_arg}")
                             else:
                                 result = await self.tools.execute(tc.name, tc.arguments)
@@ -616,6 +623,7 @@ def _patch_agent_tool_history(agent):
                                 )
                                 post_execution_audit(_cap, _op, tc.arguments, result, _decision)
                                 post_execution_undo(_cap, _op, tc.arguments, result)
+                                _turn_events.append({"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True})
                                 print(f"[policy] SANDBOX: passed, executed")
 
                         elif _decision.action == "REQUIRE_COOLDOWN":
@@ -629,6 +637,7 @@ def _patch_agent_tool_history(agent):
                                 _cap, _op, tc.arguments, result,
                                 cooldown_seconds=_cooldown_secs,
                             )
+                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True, "cooldown": _cooldown_secs})
                             print(f"[policy] COOLDOWN: executed with {_cooldown_secs}s cooldown")
 
                         else:
@@ -645,6 +654,7 @@ def _patch_agent_tool_history(agent):
                             post_execution_undo(
                                 _cap, _op, tc.arguments, result,
                             )
+                            _turn_events.append({"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True})
 
                         print(f"[agent] result: {str(result)[:100]}")
                         messages = self.context.add_tool_result(
@@ -692,6 +702,30 @@ def _patch_agent_tool_history(agent):
                 "output": _turn_output,
                 "search": _turn_search,
             }
+
+        # ── Turn-level audit: minimal key events + fingerprint + ref ──
+        if _turn_events:
+            try:
+                import hashlib as _hl
+                _events_json = json.dumps(_turn_events, sort_keys=True, ensure_ascii=False, default=str)
+                _fingerprint = _hl.sha256(_events_json.encode("utf-8")).hexdigest()[:16]
+                from myxai_desk.core.audit.ledger import AuditLedger
+                _audit_hash = AuditLedger().append_entry(
+                    capability="chat.turn",
+                    args={"session": key, "events": _turn_events, "fingerprint": _fingerprint},
+                    result_summary=f"tools={len(tools_used)},tokens_in={_turn_input},tokens_out={_turn_output}",
+                    source="chat",
+                )
+                with _last_turn_audit_lock:
+                    _last_turn_audit[key] = {
+                        "fingerprint": _fingerprint,
+                        "events": _turn_events,
+                        "audit_hash": _audit_hash,
+                        "session_id": key,
+                    }
+                print(f"[audit] chat.turn fp={_fingerprint} events={len(_turn_events)} hash={_audit_hash[:12]}…")
+            except Exception as _ae:
+                print(f"[audit] turn audit failed: {_ae}")
 
         return OutboundMessage(
             channel=msg.channel, chat_id=msg.chat_id,
@@ -2087,9 +2121,17 @@ def api_chat():
             )
             with _last_usage_lock:
                 _usage_data = _last_usage.pop(session_id, {})
+            with _last_turn_audit_lock:
+                _audit_data = _last_turn_audit.pop(session_id, None)
             _done_payload = {"type": "done", "content": response or ""}
             if _usage_data:
                 _done_payload["usage"] = _usage_data
+            if _audit_data:
+                _done_payload["audit"] = {
+                    "fingerprint": _audit_data["fingerprint"],
+                    "events": _audit_data["events"],
+                    "hash": _audit_data["audit_hash"][:16],
+                }
             q.put(json.dumps(_done_payload, ensure_ascii=False))
         except Exception as exc:
             q.put(json.dumps({"type": "error", "content": str(exc)}, ensure_ascii=False))
@@ -2301,18 +2343,6 @@ _APP_CATALOG = {
         "category": "productivity",
         "min_mode": "Assistant",
     },
-    "focus_timer": {
-        "id": "focus_timer",
-        "name": "专注计时",
-        "name_en": "Focus Timer",
-        "icon": "⏱️",
-        "description": "番茄钟工作法，自动记录专注时间并统计",
-        "description_en": "Pomodoro timer with automatic focus time tracking",
-        "version": "1.0.0",
-        "author": "nanobot",
-        "category": "productivity",
-        "min_mode": "Observer",
-    },
 }
 
 _DEFAULT_DIGEST_CONFIG = {
@@ -2340,15 +2370,6 @@ _DEFAULT_EMAIL_CONFIG = {
     "max_emails": 50,
     "schedule_time": "08:00",
 }
-
-_DEFAULT_FOCUS_CONFIG = {
-    "focus_minutes": 25,
-    "break_minutes": 5,
-    "long_break_minutes": 15,
-    "long_break_interval": 4,
-    "push_notification": True,
-}
-
 
 def _load_apps_registry() -> dict:
     _APPS_DIR.mkdir(parents=True, exist_ok=True)
@@ -2468,7 +2489,6 @@ def api_app_install(app_id):
         "daily_digest": _DEFAULT_DIGEST_CONFIG,
         "web_monitor": _DEFAULT_MONITOR_CONFIG,
         "email_summary": _DEFAULT_EMAIL_CONFIG,
-        "focus_timer": _DEFAULT_FOCUS_CONFIG,
     }
     registry[app_id] = {
         "installed_at": datetime.now(timezone.utc).isoformat(),
@@ -3224,66 +3244,6 @@ def api_email_presets():
 
 
 # ---------------------------------------------------------------------------
-# Routes — Focus Timer  [COMPAT] legacy — see marketplace/official/focus_timer/
-# ---------------------------------------------------------------------------
-
-@flask_app.route("/api/apps/focus_timer/sessions", methods=["POST"])
-def api_focus_save():
-    from myxai_desk.core.runtime.app_governance import gate_app_run, finish_app_run
-    decision = gate_app_run("focus_timer")
-    if not decision["allowed"]:
-        return jsonify({"error": decision["reason"]}), 403
-    body = request.json or {}
-    from apps.focus_timer import save_session
-    entry = save_session(body)
-    finish_app_run("focus_timer")
-    return jsonify(entry)
-
-
-@flask_app.route("/api/apps/focus_timer/sessions")
-def api_focus_sessions():
-    days = request.args.get("days", 7, type=int)
-    tag = request.args.get("tag", "")
-    from apps.focus_timer import list_sessions
-    return jsonify(list_sessions(days=days, tag=tag))
-
-
-@flask_app.route("/api/apps/focus_timer/sessions/<session_id>", methods=["DELETE"])
-def api_focus_delete(session_id):
-    from myxai_desk.core.runtime.app_governance import gate_app_run
-    decision = gate_app_run("focus_timer", capabilities=["fs.write"])
-    if not decision["allowed"]:
-        return jsonify({"error": decision["reason"]}), 403
-
-    from apps.focus_timer import delete_session
-    if delete_session(session_id):
-        try:
-            from myxai_desk.core.audit.ledger import AuditLedger
-            AuditLedger().append_entry(
-                capability="app.focus_timer.delete_session",
-                args={"session_id": session_id},
-                action_id="", result_summary="deleted",
-            )
-        except Exception:
-            pass
-        return jsonify({"success": True})
-    return jsonify({"error": "会话不存在"}), 404
-
-
-@flask_app.route("/api/apps/focus_timer/stats")
-def api_focus_stats():
-    days = request.args.get("days", 30, type=int)
-    from apps.focus_timer import get_stats
-    return jsonify(get_stats(days=days))
-
-
-@flask_app.route("/api/apps/focus_timer/tags")
-def api_focus_tags():
-    from apps.focus_timer import get_tags
-    return jsonify(get_tags())
-
-
-# ---------------------------------------------------------------------------
 # Routes — Custom Apps  [COMPAT] legacy routes, to be replaced by Prompt App
 # runtime via /api/marketplace/. Kept for backward compatibility during
 # migration — see myxai_desk/marketplace/official/custom_app/
@@ -3980,6 +3940,11 @@ def _start_app_scheduler():
     global _app_scheduler_timer
     _init_scheduler_service()
 
+    from myxai_desk.core.scheduler_service import cleanup_stale_running
+    cleaned = cleanup_stale_running()
+    if cleaned:
+        print(f"[scheduler] cleaned up {cleaned} stale running task(s) from previous session")
+
     def _tick():
         global _app_scheduler_timer
         try:
@@ -3999,6 +3964,15 @@ def _start_app_scheduler():
 # ---------------------------------------------------------------------------
 # Routes — scheduler / task runs
 # ---------------------------------------------------------------------------
+
+@flask_app.route("/api/scheduler/trigger/<task_id>", methods=["POST"])
+def api_scheduler_trigger(task_id):
+    """Manually trigger a scheduled task."""
+    ok, msg = _scheduler_svc.trigger_now(task_id)
+    if ok:
+        return jsonify({"success": True, "message": msg})
+    return jsonify({"error": msg}), 404
+
 
 @flask_app.route("/api/scheduler/runs/<task_id>", methods=["GET"])
 def api_scheduler_runs(task_id):
@@ -4121,9 +4095,21 @@ def api_scheduler_today():
             continue
         due = compute_due_slots(t, now)
         if not due:
-            # Check if it's a daily task scheduled for later today
             sched_time = t.schedule.get("time", "")
+            sched_mode = t.schedule.get("mode", "daily")
+            show_planned = False
             if sched_time and sched_time > now.strftime("%H:%M"):
+                if sched_mode == "daily":
+                    show_planned = True
+                elif sched_mode == "weekly":
+                    if now.weekday() == t.schedule.get("day_of_week", 0):
+                        show_planned = True
+                elif sched_mode == "monthly":
+                    if now.day == t.schedule.get("day_of_month", 1):
+                        show_planned = True
+                elif sched_mode == "interval":
+                    show_planned = True
+            if show_planned:
                 meta = task_meta.get(t.task_id, {"name_zh": t.task_id, "name_en": t.task_id, "icon": "🤖", "time": ""})
                 items.append({
                     "task_id": t.task_id,

@@ -7,7 +7,7 @@
 const I18N = {
   zh: {
     "nav.newChat":"新对话","nav.settings":"设置","nav.status":"状态","nav.gateway":"网关",
-    "tasks.btn":"任务","tasks.today":"今日任务","tasks.planned":"待执行","tasks.running":"执行中","tasks.success":"已完成","tasks.failed":"失败","tasks.pendingCatchup":"待补偿","tasks.noTasks":"今日无任务","tasks.catchupNote":"补偿",
+    "tasks.btn":"任务","tasks.today":"今日任务","tasks.planned":"待执行","tasks.running":"执行中","tasks.success":"已完成","tasks.failed":"失败","tasks.pendingCatchup":"待补偿","tasks.noTasks":"今日无任务","tasks.catchupNote":"补偿","tasks.runNow":"立即执行","tasks.triggered":"已触发执行","tasks.triggerFail":"触发失败",
     "setup.welcome":"欢迎使用 MyxAI Desk",
     "setup.install.title":"安装 nanobot","setup.install.desc":"在终端运行以下命令：",
     "setup.onboard.title":"初始化配置","setup.onboard.desc":"点击下方按钮自动初始化。","setup.onboard.btn":"初始化 nanobot",
@@ -20,6 +20,7 @@ const I18N = {
     "chat.rated":"已评价","chat.thankFeedback":"感谢反馈！","chat.willImprove":"已记录，会改进",
     "chat.askDislike":"可以说说哪里不满意吗？（可留空）",
     "chat.error":"错误: ","chat.requestFail":"请求失败: ",
+    "chat.executing":"执行中…","chat.execDone":"执行完成","chat.steps":"步",
     "settings.title":"设置","settings.save":"保存配置",
     "settings.model":"模型设置","settings.modelName":"模型名称",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"最大工具迭代次数","settings.memoryWindow":"记忆窗口大小",
@@ -149,17 +150,6 @@ const I18N = {
     "email.testFail":"连接失败","email.runNow":"立即生成","email.running":"正在生成…",
     "email.saveConfig":"保存设置","email.configSaved":"设置已保存",
     "email.reports":"历史报告","email.noReports":"暂无报告","email.viewReport":"查看",
-    "focus.title":"专注计时","focus.subtitle":"番茄钟工作法，记录专注时间",
-    "focus.timer":"计时器","focus.start":"开始专注","focus.pause":"暂停",
-    "focus.resume":"继续","focus.reset":"重置","focus.skip":"跳过",
-    "focus.working":"专注中","focus.breaking":"休息中","focus.longBreaking":"长休息",
-    "focus.focusMin":"专注时长（分钟）","focus.breakMin":"休息时长","focus.longBreakMin":"长休息时长",
-    "focus.longBreakInterval":"长休息间隔（轮）","focus.tag":"任务标签","focus.newTag":"新标签…",
-    "focus.saveConfig":"保存设置","focus.configSaved":"设置已保存",
-    "focus.stats":"统计","focus.today":"今日","focus.thisWeek":"本周","focus.thisMonth":"本月",
-    "focus.sessions":"个番茄钟","focus.totalMin":"分钟","focus.dailyAvg":"日均",
-    "focus.byTag":"按标签","focus.trend":"每日趋势","focus.history":"历史记录",
-    "focus.noSessions":"暂无记录","focus.completed":"已完成！","focus.breakTime":"休息时间到",
     "custom.title":"自定义应用","custom.create":"新建自定义应用","custom.createFromChat":"保存为应用",
     "custom.name":"应用名称","custom.icon":"图标","custom.template":"任务描述",
     "custom.templateHelp":"用 {{变量名}} 标记可变部分，如：搜索{{关键词}}的最新资讯",
@@ -207,7 +197,7 @@ const I18N = {
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
-    "tasks.btn":"Tasks","tasks.today":"Today's Tasks","tasks.planned":"Planned","tasks.running":"Running","tasks.success":"Done","tasks.failed":"Failed","tasks.pendingCatchup":"Catch-up","tasks.noTasks":"No tasks today","tasks.catchupNote":"catch-up",
+    "tasks.btn":"Tasks","tasks.today":"Today's Tasks","tasks.planned":"Planned","tasks.running":"Running","tasks.success":"Done","tasks.failed":"Failed","tasks.pendingCatchup":"Catch-up","tasks.noTasks":"No tasks today","tasks.catchupNote":"catch-up","tasks.runNow":"Run Now","tasks.triggered":"Task triggered","tasks.triggerFail":"Trigger failed",
     "setup.welcome":"Welcome to MyxAI Desk",
     "setup.install.title":"Install nanobot","setup.install.desc":"Run the following command in terminal:",
     "setup.onboard.title":"Initialize","setup.onboard.desc":"Click the button below to auto-initialize.","setup.onboard.btn":"Initialize nanobot",
@@ -220,6 +210,7 @@ const I18N = {
     "chat.rated":"Rated","chat.thankFeedback":"Thanks for the feedback!","chat.willImprove":"Noted, will improve",
     "chat.askDislike":"What could be better? (optional)",
     "chat.error":"Error: ","chat.requestFail":"Request failed: ",
+    "chat.executing":"Executing…","chat.execDone":"Done","chat.steps":"steps",
     "settings.title":"Settings","settings.save":"Save",
     "settings.model":"Model Settings","settings.modelName":"Model Name",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"Max Tool Iterations","settings.memoryWindow":"Memory Window Size",
@@ -349,17 +340,6 @@ const I18N = {
     "email.testFail":"Connection Failed","email.runNow":"Generate Now","email.running":"Generating…",
     "email.saveConfig":"Save Settings","email.configSaved":"Settings Saved",
     "email.reports":"Report History","email.noReports":"No reports yet","email.viewReport":"View",
-    "focus.title":"Focus Timer","focus.subtitle":"Pomodoro technique with focus time tracking",
-    "focus.timer":"Timer","focus.start":"Start Focus","focus.pause":"Pause",
-    "focus.resume":"Resume","focus.reset":"Reset","focus.skip":"Skip",
-    "focus.working":"Focusing","focus.breaking":"Break","focus.longBreaking":"Long Break",
-    "focus.focusMin":"Focus Duration (min)","focus.breakMin":"Break Duration","focus.longBreakMin":"Long Break Duration",
-    "focus.longBreakInterval":"Long Break Interval","focus.tag":"Task Tag","focus.newTag":"New tag…",
-    "focus.saveConfig":"Save Settings","focus.configSaved":"Settings Saved",
-    "focus.stats":"Statistics","focus.today":"Today","focus.thisWeek":"This Week","focus.thisMonth":"This Month",
-    "focus.sessions":"sessions","focus.totalMin":"minutes","focus.dailyAvg":"Daily Avg",
-    "focus.byTag":"By Tag","focus.trend":"Daily Trend","focus.history":"History",
-    "focus.noSessions":"No records yet","focus.completed":"Completed!","focus.breakTime":"Break time!",
     "custom.title":"Custom App","custom.create":"New Custom App","custom.createFromChat":"Save as App",
     "custom.name":"App Name","custom.icon":"Icon","custom.template":"Task Description",
     "custom.templateHelp":"Use {{variable}} for dynamic parts, e.g.: Search {{keywords}} for latest news",
@@ -641,9 +621,13 @@ function renderSessionList() {
       const active = s.id === sessionId ? " active" : "";
       const title = escapeHtml(s.title || t("chat.newChat"));
       const sid = escapeAttr(s.id);
+      const unread = _unreadSessions.has(s.id) ? `<span class="session-unread-dot"></span>` : "";
+      const pending = _pendingResponses[s.id] ? `<span class="session-pending-icon" title="${t("tasks.running")}">⏳</span>` : "";
       return `<div class="session-item${active}" data-sid="${sid}" onclick="switchSession('${sid}')">
         <span class="session-icon">💬</span>
+        ${unread}
         <span class="session-title" title="${title}" ondblclick="event.stopPropagation();startRenameSession('${sid}')">${title}</span>
+        ${pending}
         <button class="session-edit" onclick="event.stopPropagation();startRenameSession('${sid}')" title="${t("chat.rename")}">✏️</button>
         <button class="session-delete" onclick="event.stopPropagation();deleteSession('${sid}')" title="${t("mcp.delete")}">✕</button>
       </div>`;
@@ -695,9 +679,20 @@ async function loadLastSessionOrNew() { await newChat(true); }
 
 async function switchSession(sid, skipPageSwitch = false) {
   sessionId = sid;
+  _unreadSessions.delete(sid);
   chatMessages = [];
   try { const res = await api(`/api/history/${encodeURIComponent(sid)}`); chatMessages = res.messages || []; } catch (_) {}
   renderChatFromHistory();
+
+  if (_pendingResponses[sid]) {
+    chatBusy = true;
+    document.getElementById("send-btn").disabled = true;
+    appendThinking();
+  } else {
+    chatBusy = false;
+    document.getElementById("send-btn").disabled = false;
+  }
+
   renderSessionList();
   if (!skipPageSwitch) switchPage("chat");
 }
@@ -740,11 +735,28 @@ function renderChatFromHistory() {
     return;
   }
   container.innerHTML = "";
+  const lastBotIdx = _findLastBotIndex();
   for (let i = 0; i < chatMessages.length; i++) {
     const msg = chatMessages[i];
-    appendMessageDOM(msg.role, msg.content, !!msg.markdown, i, msg.feedback || null);
+    const isLast = (i === lastBotIdx);
+    appendMessageDOM(msg.role, msg.content, !!msg.markdown, i, msg.feedback || null, isLast, msg.steps || null, msg.audit || null);
   }
 }
+
+function _findLastBotIndex() {
+  for (let i = chatMessages.length - 1; i >= 0; i--) {
+    if (chatMessages[i].role === "bot") return i;
+  }
+  return -1;
+}
+
+function _hidePreviousFeedback() {
+  document.querySelectorAll(".message-feedback").forEach(el => el.remove());
+}
+
+// Track pending background responses per session
+let _pendingResponses = {};
+let _unreadSessions = new Set();
 
 async function sendMessage() {
   if (chatBusy) return;
@@ -757,82 +769,144 @@ async function sendMessage() {
   document.getElementById("send-btn").disabled = true;
   chatBusy = true;
 
+  const msgSessionId = sessionId;
+
   clearWelcome();
   appendMessageDOM("user", text);
   chatMessages.push({ role: "user", content: text, markdown: false });
+  _hidePreviousFeedback();
+
+  await _persistSession(msgSessionId, chatMessages);
+
   const thinkingId = appendThinking();
 
-  let finalContent = null;
-  let finalUsage = null;
-  try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, session_id: sessionId }),
-    });
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let progressEl = null;
+  _startBackgroundChat(msgSessionId, text, thinkingId);
+}
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+function _startBackgroundChat(msgSessionId, text, thinkingId) {
+  _pendingResponses[msgSessionId] = true;
+  const isActive = () => sessionId === msgSessionId;
 
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-          const data = JSON.parse(line.slice(6));
-          if (data.type === "progress") {
-            if (!progressEl) { removeElement(thinkingId); progressEl = appendMessageDOM("bot progress", "↳ " + data.content); }
-            else updateMessageContent(progressEl, "↳ " + data.content);
-          } else if (data.type === "done") {
-            finalContent = data.content;
-            if (data.usage) finalUsage = data.usage;
-          } else if (data.type === "error") {
-            removeElement(thinkingId);
-            if (progressEl) removeElement(progressEl);
-            appendMessageDOM("bot", t("chat.error") + data.content);
-            finalContent = t("chat.error") + data.content;
-          }
-        } catch (_) {}
+  let progressBlockId = null;
+  let progressSteps = [];
+
+  (async () => {
+    let finalContent = null;
+    let finalUsage = null;
+    let finalAudit = null;
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, session_id: msgSessionId }),
+      });
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "progress") {
+              if (isActive()) {
+                if (!progressBlockId) { removeElement(thinkingId); progressBlockId = appendProgressBlock(); }
+                progressSteps.push(data.content);
+                addProgressStep(progressBlockId, data.content);
+              } else {
+                progressSteps.push(data.content);
+              }
+            } else if (data.type === "done") {
+              finalContent = data.content;
+              if (data.usage) finalUsage = data.usage;
+              if (data.audit) finalAudit = data.audit;
+            } else if (data.type === "error") {
+              finalContent = t("chat.error") + data.content;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      finalContent = t("chat.requestFail") + e.message;
+    }
+
+    delete _pendingResponses[msgSessionId];
+
+    const savedMessages = await _loadSessionMessages(msgSessionId);
+    const isMd = finalContent ? !finalContent.startsWith(t("chat.error")) : false;
+    if (finalContent !== null) {
+      savedMessages.push({
+        role: "bot", content: finalContent, markdown: isMd, feedback: null,
+        steps: progressSteps.length ? progressSteps : undefined,
+        audit: finalAudit || undefined,
+      });
+    }
+    await _persistSession(msgSessionId, savedMessages);
+
+    if (isActive()) {
+      chatMessages = savedMessages;
+      const hasProgressDom = progressBlockId && document.getElementById(progressBlockId);
+      const hasThinkingDom = document.querySelector(".thinking-message");
+      if (hasProgressDom) {
+        _removeAllThinking();
+        closeProgressBlock(progressBlockId, progressSteps.length, finalAudit);
+        if (finalContent !== null) {
+          _injectFinalIntoProgressBlock(progressBlockId, finalContent, chatMessages.length - 1, finalUsage, isMd);
+        }
+      } else if (hasThinkingDom && finalContent !== null) {
+        _removeAllThinking();
+        const msgEl = appendMessageDOM("bot", finalContent, isMd, chatMessages.length - 1, null, true);
+        if (finalUsage && msgEl) appendUsageBadge(msgEl, finalUsage);
+      } else {
+        renderChatFromHistory();
+      }
+      chatBusy = false;
+      document.getElementById("send-btn").disabled = false;
+      document.getElementById("chat-input").focus();
+      renderSessionList();
+    } else {
+      _unreadSessions.add(msgSessionId);
+      renderSessionList();
+      if (!_pendingResponses[sessionId]) {
+        chatBusy = false;
+        document.getElementById("send-btn").disabled = false;
       }
     }
+  })();
+}
 
-    removeElement(thinkingId);
-    if (progressEl) removeElement(progressEl);
-    if (finalContent !== null) {
-      chatMessages.push({ role: "bot", content: finalContent, markdown: true, feedback: null });
-      const msgEl = appendMessageDOM("bot", finalContent, true, chatMessages.length - 1, null);
-      if (finalUsage && msgEl) appendUsageBadge(msgEl, finalUsage);
-    }
-  } catch (e) {
-    removeElement(thinkingId);
-    finalContent = t("chat.requestFail") + e.message;
-    chatMessages.push({ role: "bot", content: finalContent, markdown: false, feedback: null });
-    appendMessageDOM("bot", finalContent, false, chatMessages.length - 1, null);
-  }
-  await persistCurrentSession();
-  chatBusy = false;
-  document.getElementById("send-btn").disabled = false;
-  input.focus();
+async function _persistSession(sid, messages) {
+  if (!messages.length) return;
+  const firstUser = messages.find((m) => m.role === "user");
+  const title = firstUser ? firstUser.content.slice(0, 50) : t("chat.newChat");
+  try { await api(`/api/history/${encodeURIComponent(sid)}`, "POST", { title, messages }); } catch (_) {}
+  await loadSessionList();
+}
+
+async function _loadSessionMessages(sid) {
+  try {
+    const res = await api(`/api/history/${encodeURIComponent(sid)}`);
+    return res.messages || [];
+  } catch (_) { return []; }
 }
 
 async function persistCurrentSession() {
-  if (!chatMessages.length) return;
-  const firstUser = chatMessages.find((m) => m.role === "user");
-  const title = firstUser ? firstUser.content.slice(0, 50) : t("chat.newChat");
-  try { await api(`/api/history/${encodeURIComponent(sessionId)}`, "POST", { title, messages: chatMessages }); } catch (_) {}
-  await loadSessionList();
+  await _persistSession(sessionId, chatMessages);
 }
 
 async function newChat(skipPageSwitch = false) {
   try { const res = await api("/api/chat/new", "POST"); if (res.session_id) sessionId = res.session_id; }
   catch (_) { sessionId = "desktop:" + Date.now(); }
   chatMessages = [];
+  chatBusy = false;
+  document.getElementById("send-btn").disabled = false;
   renderChatFromHistory();
   renderSessionList();
   if (!skipPageSwitch) switchPage("chat");
@@ -840,7 +914,7 @@ async function newChat(skipPageSwitch = false) {
 
 function clearWelcome() { const w = document.querySelector(".welcome-message"); if (w) w.remove(); }
 
-function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existingFeedback = null) {
+function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existingFeedback = null, isLast = false, steps = null, audit = null) {
   const container = document.getElementById("chat-messages");
   const id = "msg-" + Date.now() + Math.random().toString(36).slice(2, 6);
   const isUser = type.includes("user");
@@ -873,8 +947,13 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
     rendered = renderMd ? renderMarkdown(content) : escapeHtml(content);
   }
 
+  let stepsHtml = "";
+  if (steps && steps.length && isBotFinal) {
+    stepsHtml = renderProgressDetails(steps, false, audit);
+  }
+
   let feedbackHtml = "";
-  if (isBotFinal && msgIndex >= 0) {
+  if (isBotFinal && msgIndex >= 0 && isLast) {
     const likeClass = existingFeedback === "like" ? " selected-like" : existingFeedback === "dislike" ? " dimmed" : "";
     const dislikeClass = existingFeedback === "dislike" ? " selected-dislike" : existingFeedback === "like" ? " dimmed" : "";
     const commentText = existingFeedback ? `<span class="feedback-comment">${t("chat.rated")}</span>` : "";
@@ -891,6 +970,7 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
     <div class="message-avatar">${avatar}</div>
     <div class="message-body">
       <div class="message-sender">${sender}</div>
+      ${stepsHtml}
       <div class="message-content">${rendered}</div>
       ${feedbackHtml}
     </div>`;
@@ -958,75 +1038,121 @@ async function regenerateMessage(botMsgIndex) {
 
   chatBusy = true;
   document.getElementById("send-btn").disabled = true;
+  _hidePreviousFeedback();
+
+  await _persistSession(sessionId, chatMessages);
+
   const thinkingId = appendThinking();
-
-  let finalContent = null;
-  let finalUsage = null;
-  try {
-    const response = await fetch("/api/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: userText, session_id: sessionId }),
-    });
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let progressEl = null;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (!line.startsWith("data: ")) continue;
-        try {
-          const data = JSON.parse(line.slice(6));
-          if (data.type === "progress") {
-            if (!progressEl) { removeElement(thinkingId); progressEl = appendMessageDOM("bot progress", "↳ " + data.content); }
-            else updateMessageContent(progressEl, "↳ " + data.content);
-          } else if (data.type === "done") {
-            finalContent = data.content;
-            if (data.usage) finalUsage = data.usage;
-          } else if (data.type === "error") {
-            removeElement(thinkingId);
-            if (progressEl) removeElement(progressEl);
-            appendMessageDOM("bot", t("chat.error") + data.content);
-            finalContent = t("chat.error") + data.content;
-          }
-        } catch (_) {}
-      }
-    }
-
-    removeElement(thinkingId);
-    if (progressEl) removeElement(progressEl);
-    if (finalContent !== null) {
-      chatMessages.push({ role: "bot", content: finalContent, markdown: true, feedback: null });
-      const msgEl = appendMessageDOM("bot", finalContent, true, chatMessages.length - 1, null);
-      if (finalUsage && msgEl) appendUsageBadge(msgEl, finalUsage);
-    }
-  } catch (e) {
-    removeElement(thinkingId);
-    finalContent = t("chat.requestFail") + e.message;
-    chatMessages.push({ role: "bot", content: finalContent, markdown: false, feedback: null });
-    appendMessageDOM("bot", finalContent, false, chatMessages.length - 1, null);
-  }
-  await persistCurrentSession();
-  chatBusy = false;
-  document.getElementById("send-btn").disabled = false;
+  _startBackgroundChat(sessionId, userText, thinkingId);
 }
 
 function appendThinking() {
   const container = document.getElementById("chat-messages");
   const id = "thinking-" + Date.now();
   const div = document.createElement("div");
-  div.className = "message bot"; div.id = id;
+  div.className = "message bot thinking-message"; div.id = id;
   div.innerHTML = `<div class="message-avatar">🌀</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div></div></div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return id;
+}
+
+function _removeAllThinking() {
+  document.querySelectorAll(".thinking-message").forEach(el => el.remove());
+}
+
+function appendProgressBlock() {
+  const container = document.getElementById("chat-messages");
+  const id = "exec-" + Date.now() + Math.random().toString(36).slice(2, 6);
+  const div = document.createElement("div");
+  div.className = "message bot exec-progress-wrap";
+  div.id = id;
+  div.innerHTML = `<div class="message-avatar">🌀</div>
+    <div class="message-body"><div class="message-sender">nanobot</div>
+      <details class="exec-details" open>
+        <summary class="exec-summary"><span class="exec-summary-icon">⏳</span> <span class="exec-summary-text">${t("chat.executing") || "执行中…"}</span></summary>
+        <div class="exec-steps"></div>
+      </details>
+    </div>`;
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+  return id;
+}
+
+function addProgressStep(blockId, content) {
+  const el = document.getElementById(blockId);
+  if (!el) return;
+  const steps = el.querySelector(".exec-steps");
+  if (!steps) return;
+  const step = document.createElement("div");
+  step.className = "exec-step";
+  step.textContent = content;
+  steps.appendChild(step);
+  const container = document.getElementById("chat-messages");
+  if (container) container.scrollTop = container.scrollHeight;
+}
+
+function closeProgressBlock(blockId, stepCount, audit) {
+  const el = document.getElementById(blockId);
+  if (!el) return;
+  const details = el.querySelector(".exec-details");
+  if (details) details.removeAttribute("open");
+  const icon = el.querySelector(".exec-summary-icon");
+  if (icon) icon.textContent = "✅";
+  const txt = el.querySelector(".exec-summary-text");
+  let label = (t("chat.execDone") || "执行完成") + ` (${stepCount} ${t("chat.steps") || "步"})`;
+  if (audit && audit.fingerprint) label += ` · fp:${audit.fingerprint}`;
+  if (txt) txt.textContent = label;
+}
+
+function renderProgressDetails(steps, open, audit) {
+  if (!steps || !steps.length) return "";
+  const icon = open ? "⏳" : "✅";
+  let label = open ? (t("chat.executing") || "执行中…") : (t("chat.execDone") || "执行完成") + ` (${steps.length} ${t("chat.steps") || "步"})`;
+  if (!open && audit && audit.fingerprint) label += ` · fp:${audit.fingerprint}`;
+  return `<details class="exec-details"${open ? " open" : ""}>
+    <summary class="exec-summary"><span class="exec-summary-icon">${icon}</span> <span class="exec-summary-text">${label}</span></summary>
+    <div class="exec-steps">${steps.map(s => `<div class="exec-step">${escapeHtml(s)}</div>`).join("")}</div>
+  </details>`;
+}
+
+function _injectFinalIntoProgressBlock(blockId, content, msgIndex, usage, asMd = true) {
+  const el = document.getElementById(blockId);
+  if (!el) return;
+  const body = el.querySelector(".message-body");
+  if (!body) return;
+
+  const contentDiv = document.createElement("div");
+  contentDiv.className = "message-content";
+  contentDiv.innerHTML = asMd ? renderMarkdown(content) : escapeHtml(content);
+  body.appendChild(contentDiv);
+  if (asMd) highlightCode(contentDiv);
+
+  if (msgIndex >= 0) {
+    const fb = document.createElement("div");
+    fb.className = "message-feedback";
+    fb.dataset.msgindex = msgIndex;
+    fb.innerHTML = `
+      <button class="feedback-btn" data-rating="like" onclick="handleFeedback(this)">👍</button>
+      <button class="feedback-btn" data-rating="dislike" onclick="handleFeedback(this)">👎</button>
+      <button class="feedback-btn regenerate-btn" onclick="regenerateMessage(${msgIndex})" title="${t("chat.regenerate")}">🔄</button>
+      <button class="feedback-btn save-app-btn" onclick="saveAsCustomApp(${msgIndex})" title="${t("custom.createFromChat")}">💾</button>`;
+    body.appendChild(fb);
+  }
+
+  if (usage) {
+    const inp = (usage.input || 0).toLocaleString();
+    const out = (usage.output || 0).toLocaleString();
+    const badge = document.createElement("div");
+    badge.className = "message-usage";
+    let html = `<span>tokens: ${inp} in / ${out} out</span>`;
+    if (usage.search) html += `<span class="message-usage-sep">|</span><span>search: ${usage.search}</span>`;
+    badge.innerHTML = html;
+    body.appendChild(badge);
+  }
+
+  const container = document.getElementById("chat-messages");
+  if (container) container.scrollTop = container.scrollHeight;
 }
 
 function updateMessageContent(id, content) {
@@ -2246,7 +2372,6 @@ async function openAppDetail(appId) {
   if (appId === "daily_digest") { await openDigestDetail(); return; }
   if (appId === "web_monitor") { await openMonitorDetail(); return; }
   if (appId === "email_summary") { await openEmailDetail(); return; }
-  if (appId === "focus_timer") { await openFocusDetail(); return; }
   if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
 }
@@ -2983,365 +3108,6 @@ async function _refreshEmailReports() {
   } catch (_) {}
 }
 
-// ── Focus Timer Detail ────────────────────────────────────────────────
-
-let _focusState = {
-  running: false, paused: false, mode: "focus",
-  remaining: 0, total: 0, interval: null,
-  round: 1, tag: "", startedAt: null,
-};
-
-async function openFocusDetail() {
-  document.getElementById("app-detail-title").textContent = `⏱️ ${t("focus.title")}`;
-  switchPage("app-detail");
-  const container = document.getElementById("app-detail-content");
-  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
-
-  let appData = _appsCache.find(a => a.id === "focus_timer");
-  if (!appData) { await loadApps(); appData = _appsCache.find(a => a.id === "focus_timer"); }
-  if (!appData || !appData.installed) {
-    container.innerHTML = `<div class="app-detail-loading">${t("apps.notInstalled")}</div>`;
-    return;
-  }
-
-  const config = appData.config || {};
-  const isEnabled = appData.enabled;
-  const focusMin = config.focus_minutes || 25;
-  const breakMin = config.break_minutes || 5;
-  const longBreakMin = config.long_break_minutes || 15;
-  const longBreakInterval = config.long_break_interval || 4;
-
-  let tagsOptions = "";
-  try {
-    const tags = await api("/api/apps/focus_timer/tags");
-    tagsOptions = tags.map(t_ => `<option value="${escapeAttr(t_)}">${escapeHtml(t_)}</option>`).join("");
-  } catch (_) {}
-
-  let statsHtml = await _renderFocusStats(7);
-  let historyHtml = await _renderFocusHistory(7);
-
-  _focusState.total = focusMin * 60;
-  _focusState.remaining = focusMin * 60;
-  _focusState.mode = "focus";
-
-  container.innerHTML = `
-    <div class="app-detail-section">
-      <div class="digest-status-bar">
-        <div class="digest-status-left">
-          ${_renderModeBadge("Observer")}
-          <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
-          <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
-        </div>
-        <label class="toggle">
-          <input type="checkbox" id="focus-enabled" ${isEnabled ? "checked" : ""} onchange="toggleAppEnabled('focus_timer',this)" />
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-    </div>
-
-    <div class="app-detail-section focus-timer-section">
-      <div class="focus-timer-ring" id="focus-timer-ring">
-        <svg viewBox="0 0 200 200" class="focus-ring-svg">
-          <circle cx="100" cy="100" r="90" class="focus-ring-bg" />
-          <circle cx="100" cy="100" r="90" class="focus-ring-progress" id="focus-ring-progress"
-            stroke-dasharray="565.49" stroke-dashoffset="0" />
-        </svg>
-        <div class="focus-timer-display">
-          <div class="focus-timer-time" id="focus-timer-time">${_fmtTime(focusMin * 60)}</div>
-          <div class="focus-timer-label" id="focus-timer-label">${t("focus.working")}</div>
-        </div>
-      </div>
-      <div class="focus-timer-tag-row">
-        <label>${t("focus.tag")}:</label>
-        <select id="focus-tag" class="digest-select focus-tag-select">
-          <option value="">—</option>
-          ${tagsOptions}
-        </select>
-        <input type="text" id="focus-new-tag" placeholder="${t("focus.newTag")}" class="monitor-input monitor-input-sm" onchange="focusAddNewTag()" />
-      </div>
-      <div class="focus-timer-controls">
-        <button class="btn btn-primary btn-lg" id="focus-start-btn" onclick="focusToggle()">${t("focus.start")}</button>
-        <button class="btn btn-lg" id="focus-reset-btn" onclick="focusReset()" style="display:none;">${t("focus.reset")}</button>
-        <button class="btn btn-lg" id="focus-skip-btn" onclick="focusSkip()" style="display:none;">${t("focus.skip")}</button>
-      </div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>${t("digest.config")}</h3>
-      <div class="digest-config-grid">
-        <div class="form-group"><label>${t("focus.focusMin")}</label><input type="number" id="focus-focus-min" value="${focusMin}" min="1" max="120" /></div>
-        <div class="form-group"><label>${t("focus.breakMin")}</label><input type="number" id="focus-break-min" value="${breakMin}" min="1" max="30" /></div>
-        <div class="form-group"><label>${t("focus.longBreakMin")}</label><input type="number" id="focus-long-break-min" value="${longBreakMin}" min="1" max="60" /></div>
-        <div class="form-group"><label>${t("focus.longBreakInterval")}</label><input type="number" id="focus-long-break-interval" value="${longBreakInterval}" min="2" max="10" /></div>
-      </div>
-      <div class="digest-actions">
-        <button class="btn btn-primary" onclick="saveFocusConfig()">${t("focus.saveConfig")}</button>
-      </div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>${t("focus.stats")}</h3>
-      <div id="focus-stats-content">${statsHtml}</div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>${t("focus.history")}</h3>
-      <div id="focus-history-content">${historyHtml}</div>
-    </div>
-  `;
-}
-
-function _fmtTime(seconds) {
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return `${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
-}
-
-function _updateFocusRing() {
-  const prog = document.getElementById("focus-ring-progress");
-  const timeEl = document.getElementById("focus-timer-time");
-  const labelEl = document.getElementById("focus-timer-label");
-  if (!prog) return;
-  const ratio = _focusState.total > 0 ? (_focusState.total - _focusState.remaining) / _focusState.total : 0;
-  const circumference = 565.49;
-  prog.style.strokeDashoffset = circumference * (1 - ratio);
-  if (timeEl) timeEl.textContent = _fmtTime(_focusState.remaining);
-
-  const modeColors = { focus: "var(--blue)", break: "var(--green)", longbreak: "var(--mauve)" };
-  prog.style.stroke = modeColors[_focusState.mode] || "var(--blue)";
-
-  if (labelEl) {
-    const labels = { focus: t("focus.working"), break: t("focus.breaking"), longbreak: t("focus.longBreaking") };
-    labelEl.textContent = labels[_focusState.mode] || "";
-  }
-}
-
-function focusToggle() {
-  const btn = document.getElementById("focus-start-btn");
-  const resetBtn = document.getElementById("focus-reset-btn");
-  const skipBtn = document.getElementById("focus-skip-btn");
-
-  if (!_focusState.running) {
-    // Start
-    _focusState.running = true;
-    _focusState.paused = false;
-    if (!_focusState.startedAt) _focusState.startedAt = new Date().toISOString();
-    btn.textContent = t("focus.pause");
-    resetBtn.style.display = "";
-    skipBtn.style.display = "";
-    _focusState.interval = setInterval(() => {
-      if (_focusState.remaining > 0) {
-        _focusState.remaining--;
-        _updateFocusRing();
-      } else {
-        _focusTimerComplete();
-      }
-    }, 1000);
-  } else if (!_focusState.paused) {
-    // Pause
-    _focusState.paused = true;
-    clearInterval(_focusState.interval);
-    btn.textContent = t("focus.resume");
-  } else {
-    // Resume
-    _focusState.paused = false;
-    btn.textContent = t("focus.pause");
-    _focusState.interval = setInterval(() => {
-      if (_focusState.remaining > 0) {
-        _focusState.remaining--;
-        _updateFocusRing();
-      } else {
-        _focusTimerComplete();
-      }
-    }, 1000);
-  }
-}
-
-async function _focusTimerComplete() {
-  clearInterval(_focusState.interval);
-
-  if (_focusState.mode === "focus") {
-    const tag = document.getElementById("focus-tag")?.value || "";
-    const duration = Math.round(_focusState.total / 60);
-    try {
-      await api("/api/apps/focus_timer/sessions", "POST", {
-        tag: tag,
-        duration_minutes: duration,
-        started_at: _focusState.startedAt,
-        completed_at: new Date().toISOString(),
-      });
-    } catch (_) {}
-    toast(t("focus.completed"), "success");
-    speakText(t("focus.completed"));
-
-    // Switch to break
-    const cfg = (_appsCache.find(a => a.id === "focus_timer") || {}).config || {};
-    const longInterval = cfg.long_break_interval || 4;
-    if (_focusState.round % longInterval === 0) {
-      _focusState.mode = "longbreak";
-      _focusState.total = (cfg.long_break_minutes || 15) * 60;
-    } else {
-      _focusState.mode = "break";
-      _focusState.total = (cfg.break_minutes || 5) * 60;
-    }
-    _focusState.remaining = _focusState.total;
-    _focusState.startedAt = null;
-    _focusState.running = false;
-    _focusState.paused = false;
-    document.getElementById("focus-start-btn").textContent = t("focus.start");
-    _updateFocusRing();
-    // Refresh stats
-    document.getElementById("focus-stats-content").innerHTML = await _renderFocusStats(7);
-    document.getElementById("focus-history-content").innerHTML = await _renderFocusHistory(7);
-  } else {
-    // Break done, go back to focus
-    toast(t("focus.breakTime"), "info");
-    speakText(t("focus.breakTime"));
-    _focusState.round++;
-    const cfg = (_appsCache.find(a => a.id === "focus_timer") || {}).config || {};
-    _focusState.mode = "focus";
-    _focusState.total = (cfg.focus_minutes || 25) * 60;
-    _focusState.remaining = _focusState.total;
-    _focusState.startedAt = null;
-    _focusState.running = false;
-    _focusState.paused = false;
-    document.getElementById("focus-start-btn").textContent = t("focus.start");
-    _updateFocusRing();
-  }
-}
-
-function focusReset() {
-  clearInterval(_focusState.interval);
-  const cfg = (_appsCache.find(a => a.id === "focus_timer") || {}).config || {};
-  _focusState.running = false;
-  _focusState.paused = false;
-  _focusState.mode = "focus";
-  _focusState.total = (cfg.focus_minutes || 25) * 60;
-  _focusState.remaining = _focusState.total;
-  _focusState.startedAt = null;
-  document.getElementById("focus-start-btn").textContent = t("focus.start");
-  document.getElementById("focus-reset-btn").style.display = "none";
-  document.getElementById("focus-skip-btn").style.display = "none";
-  _updateFocusRing();
-}
-
-function focusSkip() {
-  _focusState.remaining = 0;
-  _focusTimerComplete();
-}
-
-function focusAddNewTag() {
-  const input = document.getElementById("focus-new-tag");
-  const select = document.getElementById("focus-tag");
-  const val = input.value.trim();
-  if (!val) return;
-  const exists = [...select.options].some(o => o.value === val);
-  if (!exists) {
-    const opt = document.createElement("option");
-    opt.value = val;
-    opt.textContent = val;
-    select.appendChild(opt);
-  }
-  select.value = val;
-  input.value = "";
-}
-
-async function saveFocusConfig() {
-  const config = {
-    focus_minutes: parseInt(document.getElementById("focus-focus-min").value) || 25,
-    break_minutes: parseInt(document.getElementById("focus-break-min").value) || 5,
-    long_break_minutes: parseInt(document.getElementById("focus-long-break-min").value) || 15,
-    long_break_interval: parseInt(document.getElementById("focus-long-break-interval").value) || 4,
-    push_notification: true,
-  };
-  try {
-    const res = await api("/api/apps/focus_timer/config", "POST", config);
-    if (res.success) {
-      toast(t("focus.configSaved"), "success");
-      const app = _appsCache.find(a => a.id === "focus_timer");
-      if (app) app.config = config;
-      // Update timer if not running
-      if (!_focusState.running) {
-        _focusState.total = config.focus_minutes * 60;
-        _focusState.remaining = _focusState.total;
-        _updateFocusRing();
-      }
-    } else toast(res.error || t("digest.configFail"), "error");
-  } catch (e) { toast(e.message, "error"); }
-}
-
-async function _renderFocusStats(days) {
-  try {
-    const stats = await api(`/api/apps/focus_timer/stats?days=${days}`);
-    let html = `<div class="focus-stats-grid">
-      <div class="focus-stat-card">
-        <div class="focus-stat-num">${stats.today_sessions}</div>
-        <div class="focus-stat-label">${t("focus.today")} ${t("focus.sessions")}</div>
-        <div class="focus-stat-sub">${stats.today_minutes} ${t("focus.totalMin")}</div>
-      </div>
-      <div class="focus-stat-card">
-        <div class="focus-stat-num">${stats.total_sessions}</div>
-        <div class="focus-stat-label">${days}${_lang === "zh" ? "天" : "d"} ${t("focus.sessions")}</div>
-        <div class="focus-stat-sub">${stats.total_minutes} ${t("focus.totalMin")}</div>
-      </div>
-      <div class="focus-stat-card">
-        <div class="focus-stat-num">${stats.daily_average}</div>
-        <div class="focus-stat-label">${t("focus.dailyAvg")} (${t("focus.totalMin")})</div>
-      </div>
-    </div>`;
-
-    // Daily trend chart (simple CSS bars)
-    if (stats.trend && stats.trend.length) {
-      const maxMin = Math.max(...stats.trend.map(d => d.minutes), 1);
-      html += `<h4 style="margin-top:16px;">${t("focus.trend")}</h4>`;
-      html += `<div class="focus-trend-chart">`;
-      for (const d of stats.trend) {
-        const pct = Math.round((d.minutes / maxMin) * 100);
-        const label = d.date.slice(5);
-        html += `<div class="focus-trend-bar-wrap" title="${d.date}: ${d.minutes}min, ${d.count} sessions">
-          <div class="focus-trend-bar" style="height:${Math.max(pct, 2)}%"></div>
-          <div class="focus-trend-label">${label}</div>
-        </div>`;
-      }
-      html += `</div>`;
-    }
-
-    // By tag
-    if (stats.by_tag && Object.keys(stats.by_tag).length) {
-      const totalTagMin = Object.values(stats.by_tag).reduce((a,b) => a + b, 0) || 1;
-      html += `<h4 style="margin-top:16px;">${t("focus.byTag")}</h4>`;
-      html += `<div class="focus-tag-bars">`;
-      for (const [tag, min] of Object.entries(stats.by_tag)) {
-        const pct = Math.round((min / totalTagMin) * 100);
-        html += `<div class="focus-tag-bar-row">
-          <span class="focus-tag-bar-label">${escapeHtml(tag)}</span>
-          <div class="focus-tag-bar-track"><div class="focus-tag-bar-fill" style="width:${pct}%"></div></div>
-          <span class="focus-tag-bar-value">${min} min</span>
-        </div>`;
-      }
-      html += `</div>`;
-    }
-
-    return html;
-  } catch (_) {
-    return `<div class="digest-empty">${t("focus.noSessions")}</div>`;
-  }
-}
-
-async function _renderFocusHistory(days) {
-  try {
-    const sessions = await api(`/api/apps/focus_timer/sessions?days=${days}`);
-    if (!sessions.length) return `<div class="digest-empty">${t("focus.noSessions")}</div>`;
-    return sessions.slice(0, 20).map(s => `
-      <div class="focus-history-item">
-        <span class="focus-history-tag">${escapeHtml(s.tag || "—")}</span>
-        <span class="focus-history-dur">${s.duration_minutes} min</span>
-        <span class="focus-history-time">${s.completed_at ? s.completed_at.replace("T"," ").slice(0,16) : ""}</span>
-      </div>`).join("");
-  } catch (_) {
-    return `<div class="digest-empty">${t("focus.noSessions")}</div>`;
-  }
-}
 
 // ── Common app helpers ────────────────────────────────────────────────
 
@@ -3442,6 +3208,7 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
 
   const weekdays = t("custom.weekdays").split(",");
   const dowOptions = weekdays.map((d,i) => `<option value="${i}" ${(sched.day_of_week||0)===i?'selected':''}>${d}</option>`).join("");
+  const summDowOptions = weekdays.map((d,i) => `<option value="${i}" ${(summSched.day_of_week||0)===i?'selected':''}>${d}</option>`).join("");
 
   const overlay = document.createElement("div");
   overlay.id = "custom-app-wizard";
@@ -3574,13 +3341,21 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
             <div class="digest-config-grid">
               <div class="form-group">
                 <label>${t("custom.schedMode")}</label>
-                <select id="wizard-summ-mode" class="digest-select">
+                <select id="wizard-summ-mode" class="digest-select" onchange="_wizardSummSchedModeChange()">
                   <option value="daily" ${(summSched.mode||'daily')==='daily'?'selected':''}>${t("custom.sched.daily")}</option>
                   <option value="weekly" ${summSched.mode==='weekly'?'selected':''}>${t("custom.sched.weekly")}</option>
                   <option value="monthly" ${summSched.mode==='monthly'?'selected':''}>${t("custom.sched.monthly")}</option>
                 </select>
               </div>
               <div class="form-group"><label>${t("custom.scheduleTime")}</label><input type="time" id="wizard-summ-time" value="${escapeAttr(summSched.time||'')}" /></div>
+              <div class="form-group" id="wizard-summ-dow-group" style="${summSched.mode==='weekly'?'':'display:none;'}">
+                <label>${t("custom.schedDow")}</label>
+                <select id="wizard-summ-dow" class="digest-select">${summDowOptions}</select>
+              </div>
+              <div class="form-group" id="wizard-summ-dom-group" style="${summSched.mode==='monthly'?'':'display:none;'}">
+                <label>${t("custom.schedDom")}</label>
+                <input type="number" id="wizard-summ-dom" min="1" max="31" value="${summSched.day_of_month||1}" />
+              </div>
             </div>
           </div>
         </div>
@@ -3734,6 +3509,12 @@ function _wizardToggleSummFields() {
   document.getElementById("wizard-summ-fields").style.display = on ? "" : "none";
 }
 
+function _wizardSummSchedModeChange() {
+  const mode = document.getElementById("wizard-summ-mode").value;
+  document.getElementById("wizard-summ-dow-group").style.display = mode === "weekly" ? "" : "none";
+  document.getElementById("wizard-summ-dom-group").style.display = mode === "monthly" ? "" : "none";
+}
+
 function _wizardSchedModeChange() {
   const mode = document.getElementById("wizard-sched-mode").value;
   document.getElementById("wizard-sched-dow-group").style.display = mode === "weekly" ? "" : "none";
@@ -3879,6 +3660,8 @@ async function _wizardSave() {
       enabled: document.getElementById("wizard-summ-sched-enabled").checked,
       mode: document.getElementById("wizard-summ-mode").value,
       time: document.getElementById("wizard-summ-time").value,
+      day_of_week: parseInt(document.getElementById("wizard-summ-dow")?.value) || 0,
+      day_of_month: parseInt(document.getElementById("wizard-summ-dom")?.value) || 1,
     },
   };
 
@@ -4689,30 +4472,14 @@ function _updateTaskBadge(tasks) {
   const btn = document.getElementById("task-nav-btn");
   if (!badge) return;
   const running = tasks.filter(t => t.status === "running").length;
-  const pending = tasks.filter(t => t.status === "pending_catchup").length;
-  const active = running + pending;
-  const done = tasks.filter(t => t.status === "success").length;
-  const total = tasks.length;
-  if (total === 0) {
-    badge.style.display = "none";
-    badge.removeAttribute("data-count");
-    if (btn) btn.classList.remove("has-active");
-    return;
-  }
-  if (active > 0) {
-    badge.setAttribute("data-count", String(active));
+  if (running > 0) {
+    badge.setAttribute("data-count", String(running));
     badge.setAttribute("data-has-running", "true");
-    badge.textContent = String(active);
+    badge.textContent = String(running);
     badge.style.display = "";
     if (btn) btn.classList.add("has-active");
-  } else if (done < total) {
-    badge.setAttribute("data-count", String(total - done));
-    badge.removeAttribute("data-has-running");
-    badge.textContent = String(total - done);
-    badge.style.display = "";
-    if (btn) btn.classList.remove("has-active");
   } else {
-    badge.setAttribute("data-count", "");
+    badge.removeAttribute("data-count");
     badge.removeAttribute("data-has-running");
     badge.style.display = "none";
     if (btn) btn.classList.remove("has-active");
@@ -4749,6 +4516,12 @@ function _renderTaskPanel(tasks) {
     const statusLabel = _taskStatusLabel(task.status);
     const timeStr = _taskTimeDisplay(task);
     const tName = (_lang === "en" ? task.name_en : task.name_zh) || task.name_zh || task.task_id;
+    const canRun = task.status === "planned" || task.status === "failed" || task.status === "pending_catchup";
+    const runBtn = canRun
+      ? `<button class="task-run-btn" onclick="triggerTask('${_escAttr(task.task_id)}')" title="${t("tasks.runNow")}">▶</button>`
+      : task.status === "running"
+        ? `<span class="task-running-indicator">⏳</span>`
+        : "";
     html += `<div class="task-item" title="${_escAttr(tName)}">
       <span class="task-item-icon">${task.icon || "🤖"}</span>
       <div class="task-item-body">
@@ -4759,9 +4532,29 @@ function _renderTaskPanel(tasks) {
           <span>${timeStr}</span>
         </div>
       </div>
+      ${runBtn}
     </div>`;
   }
   body.innerHTML = html;
+}
+
+async function triggerTask(taskId) {
+  const btn = document.querySelector(`.task-run-btn[onclick*="${taskId}"]`);
+  if (btn) { btn.disabled = true; btn.textContent = "⏳"; }
+  try {
+    const res = await api(`/api/scheduler/trigger/${encodeURIComponent(taskId)}`, "POST");
+    if (res.success) {
+      toast(t("tasks.triggered") || "已触发执行", "success");
+      _setTaskPollSpeed(true);
+      setTimeout(_fetchTasks, 1000);
+    } else {
+      toast(res.error || t("tasks.triggerFail"), "error");
+      if (btn) { btn.disabled = false; btn.textContent = "▶"; }
+    }
+  } catch (e) {
+    toast(e.message, "error");
+    if (btn) { btn.disabled = false; btn.textContent = "▶"; }
+  }
 }
 
 function _taskStatusLabel(status) {

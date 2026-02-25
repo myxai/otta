@@ -45,11 +45,6 @@ _FALLBACK_DECLARATIONS: dict[str, dict] = {
         "min_mode": "Assistant",
         "capabilities": ["net.http_get", "notify.push"],
     },
-    "focus_timer": {
-        "source": "official",
-        "min_mode": "Observer",
-        "capabilities": ["fs.read", "fs.write", "notify.push"],
-    },
 }
 
 CUSTOM_APP_DEFAULT_CAPABILITIES = ["search.web", "net.http_get", "notify.push", "fs.read"]
@@ -59,7 +54,6 @@ _OFFICIAL_ID_MAP: dict[str, str] = {
     "daily_digest": "daily_briefing",
     "email_summary": "email_briefing",
     "web_monitor": "web_monitor",
-    "focus_timer": "focus_timer",
 }
 
 

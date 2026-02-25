@@ -159,6 +159,30 @@ def get_running_tasks() -> list[dict]:
     )
 
 
+def cleanup_stale_running() -> int:
+    """Mark any leftover 'running' records as 'failed'.
+
+    This handles cases where the app was killed mid-execution.
+    Should be called once at startup before the scheduler begins ticking.
+    Returns the number of records cleaned up.
+    """
+    _ensure_task_runs_table()
+    stale = db.execute(
+        "SELECT idempotency_key FROM task_runs WHERE status = 'running'",
+        readonly=True,
+    )
+    if not stale:
+        return 0
+    now_iso = datetime.now(timezone.utc).isoformat()
+    db.execute(
+        "UPDATE task_runs SET status = 'failed', finished_at = ?, "
+        "error = 'interrupted (app restart)' WHERE status = 'running'",
+        (now_iso,),
+    )
+    log.info("[scheduler] cleaned up %d stale running records", len(stale))
+    return len(stale)
+
+
 # ── Idempotency key generation ─────────────────────────────────────────
 
 def make_idempotency_key(task_id: str, due: datetime, mode: str) -> str:
@@ -457,6 +481,22 @@ class SchedulerService:
                 task_lock.release()
 
         threading.Thread(target=_run, daemon=True, name=f"sched-{task.task_id}").start()
+
+    def trigger_now(self, task_id: str) -> tuple[bool, str]:
+        """Manually trigger a task by its ID. Returns (success, message)."""
+        tasks = self._load_all_tasks()
+        task = next((t for t in tasks if t.task_id == task_id), None)
+        if task is None:
+            return False, f"task {task_id} not found"
+
+        now = datetime.now()
+        slot = DueSlot(
+            task_id=task_id,
+            scheduled_for=now,
+            idempotency_key=f"manual_{task_id}_{now.strftime('%Y%m%d_%H%M%S')}",
+        )
+        self._dispatch(task, slot, trigger="manual")
+        return True, "triggered"
 
 
 # Module-level singleton

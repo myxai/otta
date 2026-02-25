@@ -31,8 +31,6 @@ CUSTOM_APPS_DIR: Path = APPS_DIR / "custom"
 DAILY_DIGEST_DIR: Path = APPS_DIR / "daily_digest"
 EMAIL_SUMMARY_DIR: Path = APPS_DIR / "email_summary"
 WEB_MONITOR_DIR: Path = APPS_DIR / "web_monitor"
-FOCUS_TIMER_DIR: Path = APPS_DIR / "focus_timer"
-
 MARKETPLACE_USER_DIR: Path = APPS_DIR / "user"
 MARKETPLACE_THIRD_PARTY_DIR: Path = APPS_DIR / "third_party"
 
