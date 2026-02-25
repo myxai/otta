@@ -50,14 +50,6 @@ except ImportError:
 flask_app = Flask(__name__, static_folder="frontend", static_url_path="/static")
 flask_app.config["JSON_AS_ASCII"] = False
 
-# Governance routes are canonically defined in myxai_desk/gateway/api.py.
-# During the migration period, the inline routes below in app.py remain
-# active.  To complete the migration, register the governance_bp Blueprint
-# and remove the inline route blocks marked [MIGRATED].
-# >>> from myxai_desk.gateway.api import governance_bp
-# >>> flask_app.register_blueprint(governance_bp)
-_governance_bp_loaded = False
-
 # ---------------------------------------------------------------------------
 # Global state
 # ---------------------------------------------------------------------------
@@ -1238,8 +1230,6 @@ def api_save_config():
 
 # ---------------------------------------------------------------------------
 # Security / Profile / Marketplace / Plan / Audit API
-# [MIGRATED] canonical implementation → myxai_desk/gateway/api.py
-# These inline routes will be removed once Blueprint registration is enabled.
 # ---------------------------------------------------------------------------
 
 @flask_app.route("/api/security/mode")
