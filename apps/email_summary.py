@@ -36,16 +36,42 @@ def _ensure_dirs():
     _REPORTS_DIR.mkdir(exist_ok=True)
 
 
+_READ_FILE = _APP_DIR / "read_reports.json"
+
+
+def _load_read_set() -> set[str]:
+    try:
+        if _READ_FILE.exists():
+            return set(json.loads(_READ_FILE.read_text(encoding="utf-8")))
+    except Exception:
+        pass
+    return set()
+
+
+def _save_read_set(s: set[str]):
+    _APP_DIR.mkdir(parents=True, exist_ok=True)
+    _READ_FILE.write_text(json.dumps(list(s), ensure_ascii=False), encoding="utf-8")
+
+
+def mark_report_read(key: str):
+    s = _load_read_set()
+    s.add(key)
+    _save_read_set(s)
+
+
 def list_reports() -> list[dict]:
     _ensure_dirs()
+    read_set = _load_read_set()
     reports = []
     for fp in sorted(_REPORTS_DIR.glob("*.json"), reverse=True):
         try:
             meta = json.loads(fp.read_text(encoding="utf-8"))
+            key = fp.stem
             reports.append({
-                "date": fp.stem,
+                "date": key,
                 "email_count": meta.get("email_count", 0),
                 "generated_at": meta.get("generated_at", ""),
+                "read": key in read_set,
             })
         except Exception:
             pass

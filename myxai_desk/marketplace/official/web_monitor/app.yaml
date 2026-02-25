@@ -1,0 +1,38 @@
+id: "web_monitor"
+name: "网页监控"
+name_en: "Web Monitor"
+version: "1.0.0"
+source: "official"
+entry: "prompt"
+prompt_file: "prompt.md"
+description: "监控指定网页变化，有更新时自动提醒"
+description_en: "Monitor web pages for changes, notify on updates"
+author: "MyxAI"
+
+triggers:
+  - type: "cron"
+    cron: "*/30 * * * *"
+
+permissions:
+  - "net.http_get"
+  - "notify.push"
+  - "fs.read"
+  - "fs.write"
+
+budgets:
+  tokens_per_day: 30000
+  search_calls_per_day: 0
+
+mode_requirements:
+  min_mode: "Assistant"
+
+data_policy:
+  allow_raw_history: false
+  allow_network_exfiltration: false
+
+outputs:
+  - type: "notification"
+
+ui:
+  icon: "🔍"
+  category: "tools"

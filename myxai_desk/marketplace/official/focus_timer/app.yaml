@@ -1,0 +1,36 @@
+id: "focus_timer"
+name: "专注计时"
+name_en: "Focus Timer"
+version: "1.0.0"
+source: "official"
+entry: "prompt"
+prompt_file: "prompt.md"
+description: "番茄钟工作法，自动记录专注时间并统计"
+description_en: "Pomodoro timer with automatic focus time tracking"
+author: "MyxAI"
+
+triggers:
+  - type: "manual"
+
+permissions:
+  - "notify.push"
+  - "fs.read"
+  - "fs.write"
+
+budgets:
+  tokens_per_day: 10000
+  search_calls_per_day: 0
+
+mode_requirements:
+  min_mode: "Observer"
+
+data_policy:
+  allow_raw_history: false
+  allow_network_exfiltration: false
+
+outputs:
+  - type: "notification"
+
+ui:
+  icon: "⏱️"
+  category: "productivity"

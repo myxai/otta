@@ -1,0 +1,37 @@
+id: "email_briefing"
+name: "邮件简报"
+name_en: "Email Briefing"
+version: "1.0.0"
+source: "official"
+entry: "prompt"
+prompt_file: "prompt.md"
+description: "连接邮箱，AI 分类归纳生成每日邮件简报"
+description_en: "Connect your inbox, AI categorises and summarises into a daily briefing"
+author: "MyxAI"
+
+triggers:
+  - type: "cron"
+    cron: "0 8 * * *"
+
+permissions:
+  - "net.http_get"
+  - "notify.push"
+
+budgets:
+  tokens_per_day: 60000
+  search_calls_per_day: 0
+
+mode_requirements:
+  min_mode: "Assistant"
+
+data_policy:
+  allow_raw_history: false
+  allow_network_exfiltration: false
+
+outputs:
+  - type: "report.html"
+    path: "reports/{{date}}.html"
+
+ui:
+  icon: "📧"
+  category: "productivity"

@@ -7,6 +7,7 @@
 const I18N = {
   zh: {
     "nav.newChat":"新对话","nav.settings":"设置","nav.status":"状态","nav.gateway":"网关",
+    "tasks.btn":"任务","tasks.today":"今日任务","tasks.planned":"待执行","tasks.running":"执行中","tasks.success":"已完成","tasks.failed":"失败","tasks.pendingCatchup":"待补偿","tasks.noTasks":"今日无任务","tasks.catchupNote":"补偿",
     "setup.welcome":"欢迎使用 MyxAI Desk",
     "setup.install.title":"安装 nanobot","setup.install.desc":"在终端运行以下命令：",
     "setup.onboard.title":"初始化配置","setup.onboard.desc":"点击下方按钮自动初始化。","setup.onboard.btn":"初始化 nanobot",
@@ -54,12 +55,59 @@ const I18N = {
     "common.onboardOk":"初始化成功！","common.onboardFail":"初始化失败",
     "voice.ttsToggle":"语音提醒","voice.listening":"正在聆听…","voice.unsupported":"浏览器不支持语音输入",
     "voice.ttsOn":"语音提醒已开启","voice.ttsOff":"语音提醒已关闭",
+    "security.mode":"安全模式:","security.switched":"安全模式已切换为","security.switchFail":"切换失败",
+    "security.modeName.Observer":"观察模式","security.modeName.Assistant":"协作模式",
+    "security.modeName.Operator":"操作模式","security.modeName.Developer":"开发模式",
+    "security.Observer":"观察模式 — 可自动新增","security.Assistant":"协作模式 — 可自动修改",
+    "security.Operator":"操作模式 — 可删除/恢复","security.Developer":"开发模式 — 可执行所有操作（高风险）",
+    "security.opt.Observer":"观察模式 — 可自动新增","security.opt.Assistant":"协作模式 — 可自动修改",
+    "security.opt.Operator":"操作模式 — 可删除/恢复","security.opt.Developer":"开发模式 — 可执行所有操作（高风险）",
+    "security.shortDesc.Observer":"可自动新增","security.shortDesc.Assistant":"可自动修改",
+    "security.shortDesc.Operator":"可删除/恢复","security.shortDesc.Developer":"可执行所有操作（高风险）",
+    "security.devRequired":"开发模式只能通过系统设置开启",
+    "security.devEnable":"启用开发模式","security.devDisable":"关闭开发模式",
+    "security.devExpiry":"失效策略","security.devExpiry.on_app_close":"关闭应用后失效",
+    "security.devExpiry.duration_1h":"1小时后失效","security.devExpiry.duration_24h":"24小时后失效",
+    "security.devActive":"开发模式已启用","security.devExpired":"开发模式已过期",
+    "security.devRemaining":"剩余时间",
+    "settings.auditDesc":"查看操作审计记录和可撤销操作历史。",
+    "settings.auditOpen":"打开审计日志",
+    "security.devCard.title":"🛡️ 开发模式 — 可执行所有操作（高风险）",
+    "security.devCard.desc":"开发模式可执行所有操作，包括文件删除、命令执行、网络外传等高风险操作。仅限受信任环境使用，必须设置失效策略。",
+    "security.devCard.btn":"⚙️ 配置开发模式",
+    "security.devCard.warning":"开发模式 — 可执行所有操作（高风险），包括文件删除、系统命令、数据外传等。请选择失效策略以控制风险。",
+    "security.devClose":"关闭","security.devUnit.min":"分钟","security.devDisabled":"开发模式已关闭",
+    "nav.audit":"审计","audit.title":"审计日志","audit.verify":"验证链完整性","audit.export":"导出",
+    "audit.recentActions":"最近可撤销操作","audit.empty":"暂无审计记录","audit.chainValid":"审计链完整性验证通过",
+    "audit.chainInvalid":"审计链验证失败","audit.undoSuccess":"撤销成功","audit.undoFail":"撤销失败",
+    "audit.noUndo":"暂无可撤销操作",
+    "privacy.title":"隐私与个性化","privacy.subtitle":"你掌控数据，我负责更贴合的结果。",
+    "privacy.dataTitle":"用这些信息，让结果更顺手",
+    "privacy.browserHistory":"浏览记录","privacy.browserHint":"更贴近你最近关注的内容",
+    "privacy.chatHistory":"对话记录","privacy.chatHint":"更贴近你正在思考的问题",
+    "privacy.fileHistory":"文件变更","privacy.fileHint":"更贴近你当前的工作进展",
+    "privacy.watchPaths":"监控文件夹","privacy.watchPathsHelp":"输入要监控的文件夹路径，每行一个。例如：D:\\Projects",
+    "privacy.retention":"保留天数","privacy.generate":"生成个性化","privacy.clear":"清空个性化",
+    "privacy.localNote":"所有数据默认仅在本地处理。",
+    "privacy.effectTitle":"当前个性化效果",
+    "privacy.chatStyle":"对话风格","privacy.recDirection":"推荐方向",
+    "privacy.statusOff":"当前处于标准模式，不使用历史信息。",
+    "privacy.statusOn":"个性化已启用，会随着使用逐步优化。",
+    "privacy.advanced":"高级设置",
+    "privacy.generating":"正在生成...","privacy.generated":"个性化已生成","privacy.cleared":"个性化已清空","privacy.saved":"设置已保存",
+    "privacy.copied":"已复制","privacy.editSaved":"已保存",
+    "ollama.title":"本地模型（Ollama）","ollama.enable":"启用本地模型（隐私模式）","ollama.model":"本地模型",
+    "ollama.selectModel":"-- 选择模型 --","ollama.hint":"启动 Ollama 后自动识别本地模型。启用后所有对话数据仅在本地处理，不上传到任何服务器。",
+    "ollama.checking":"检测中…","ollama.detected":"已检测到 Ollama","ollama.notDetected":"未检测到 Ollama",
+    "ollama.notDetectedHint":"请先安装并启动 Ollama","ollama.refresh":"刷新",
+    "ollama.modelCount":"个模型可用","ollama.privacyBadge":"🔒 隐私模式（本地）","ollama.inferring":"本地推理中…",
     "nav.reports":"报告","nav.apps":"应用",
     "reports.title":"报告","reports.unread":"未读","reports.24h":"24小时","reports.3d":"3天","reports.7d":"7天","reports.30d":"30天","reports.all":"全部",
     "reports.empty":"暂无报告","reports.allRead":"全部已读，去看看其他时间段吧","reports.viewReport":"查看",
     "reports.markAllRead":"全部已读","reports.delete":"删除","reports.deleteOk":"已删除","reports.deleteFail":"删除失败",
     "nav.stats":"统计","stats.todayPrefix":"今日","stats.tokenTitle":"Token 消耗","stats.searchTitle":"搜索 API 调用",
     "stats.rangeTotal":"累计","stats.tokenTip":"今日 LLM Token 消耗量","stats.searchTip":"今日各搜索引擎用量 / 额度",
+    "stats.categoryTitle":"分类消耗","stats.categoryPieTitle":"消耗构成","stats.categoryBarTitle":"平均单次消耗","stats.catChat":"对话","stats.avgTokens":"平均 Token","stats.noData":"暂无数据，使用后自动生成",
     "apps.title":"应用中心","apps.search":"搜索应用…","apps.back":"返回",
     "apps.sortRecommended":"推荐","apps.sortFrequency":"使用频率","apps.sortCreated":"创建时间","apps.sortName":"名称",
     "apps.installed":"已安装","apps.notInstalled":"未安装","apps.comingSoon":"即将推出",
@@ -121,13 +169,32 @@ const I18N = {
     "custom.name":"应用名称","custom.icon":"图标","custom.template":"任务描述",
     "custom.templateHelp":"用 {{变量名}} 标记可变部分，如：搜索{{关键词}}的最新资讯",
     "custom.appType":"应用类型","custom.type.search":"网络搜索","custom.type.content":"内容生成",
-    "custom.safetyNote":"自定义应用仅支持网络搜索和内容生成，不可执行本地操作",
+    "custom.safetyNote":"应用可用能力由其安全模式决定",
+    "custom.safetyModeHint":"当前模式: ",
+    "custom.securityMode":"应用安全模式",
+    "custom.securityModeInherit":"继承全局模式",
+    "custom.securityModeHint":"选择高于全局的模式将获得更多能力，但也伴随更高风险",
+    "custom.injectProfile":"注入个人画像","custom.injectProfileHelp":"自动附加您的兴趣话题、项目上下文到 Prompt 中，让应用更懂你",
+    "custom.escalation.title":"安全模式升级确认",
+    "custom.escalation.from":"当前全局模式",
+    "custom.escalation.to":"应用请求模式",
+    "custom.escalation.gained":"将获得的额外能力",
+    "custom.escalation.warnings":"风险提示",
+    "custom.escalation.confirm":"我已了解风险，确认升级",
+    "custom.escalation.cancel":"取消",
+    "custom.escalation.noEsc":"{target} 不超过全局 {global}，无需额外确认",
+    "custom.escalation.risk.low":"低","custom.escalation.risk.medium":"中",
+    "custom.escalation.risk.high":"高","custom.escalation.risk.critical":"极高",
     "custom.searchEngine":"搜索引擎",
     "custom.outputFmt":"输出格式","custom.fmt.report":"HTML报告","custom.fmt.notification":"通知","custom.fmt.text":"纯文本",
     "custom.schedule":"定时任务","custom.scheduleTime":"执行时间","custom.scheduleEnabled":"启用定时",
     "custom.schedMode":"频率","custom.sched.daily":"每天","custom.sched.weekly":"每周","custom.sched.monthly":"每月","custom.sched.interval":"间隔(天)",
     "custom.schedDow":"星期","custom.schedDom":"几号","custom.schedInterval":"间隔天数",
     "custom.weekdays":"周一,周二,周三,周四,周五,周六,周日",
+    "custom.catchup":"智能补偿","custom.catchup.none":"不补偿（错过就算了）","custom.catchup.latest":"只补最近一次（推荐）","custom.catchup.all":"补齐错过的",
+    "custom.catchup.noneHelp":"错过就算了，适合提醒类任务","custom.catchup.latestHelp":"下次打开应用会补执行一次","custom.catchup.allHelp":"适合日报/监控类任务，避免漏掉多天",
+    "custom.catchup.window":"补偿窗口","custom.catchup.window24":"过去 24 小时","custom.catchup.window168":"过去 7 天",
+    "custom.catchup.maxRuns":"一次最多补偿次数","custom.catchup.advanced":"高级选项",
     "custom.summary":"总结功能","custom.summaryEnabled":"启用总结","custom.summaryPrompt":"总结要求",
     "custom.summaryPromptHelp":"描述你希望如何总结历史数据，留空则使用默认总结",
     "custom.summaryRun":"生成总结","custom.summarySchedule":"定时总结",
@@ -145,6 +212,7 @@ const I18N = {
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
+    "tasks.btn":"Tasks","tasks.today":"Today's Tasks","tasks.planned":"Planned","tasks.running":"Running","tasks.success":"Done","tasks.failed":"Failed","tasks.pendingCatchup":"Catch-up","tasks.noTasks":"No tasks today","tasks.catchupNote":"catch-up",
     "setup.welcome":"Welcome to MyxAI Desk",
     "setup.install.title":"Install nanobot","setup.install.desc":"Run the following command in terminal:",
     "setup.onboard.title":"Initialize","setup.onboard.desc":"Click the button below to auto-initialize.","setup.onboard.btn":"Initialize nanobot",
@@ -192,12 +260,59 @@ const I18N = {
     "common.onboardOk":"Initialization successful!","common.onboardFail":"Initialization failed",
     "voice.ttsToggle":"Voice alerts","voice.listening":"Listening…","voice.unsupported":"Voice input not supported",
     "voice.ttsOn":"Voice alerts enabled","voice.ttsOff":"Voice alerts disabled",
+    "security.mode":"Mode:","security.switched":"Security mode switched to","security.switchFail":"Switch failed",
+    "security.modeName.Observer":"Observer","security.modeName.Assistant":"Assistant",
+    "security.modeName.Operator":"Operator","security.modeName.Developer":"Developer",
+    "security.Observer":"Observer — Auto-create only","security.Assistant":"Assistant — Auto-modify",
+    "security.Operator":"Operator — Delete / restore","security.Developer":"Developer — All operations (high risk)",
+    "security.opt.Observer":"Observer — Auto-create only","security.opt.Assistant":"Assistant — Auto-modify",
+    "security.opt.Operator":"Operator — Delete / restore","security.opt.Developer":"Developer — All operations (high risk)",
+    "security.shortDesc.Observer":"Auto-create only","security.shortDesc.Assistant":"Auto-modify",
+    "security.shortDesc.Operator":"Delete / restore","security.shortDesc.Developer":"All operations (high risk)",
+    "security.devRequired":"Developer mode requires system configuration",
+    "security.devEnable":"Enable Developer Mode","security.devDisable":"Disable Developer Mode",
+    "security.devExpiry":"Expiry Policy","security.devExpiry.on_app_close":"Expire on app close",
+    "security.devExpiry.duration_1h":"Expire after 1 hour","security.devExpiry.duration_24h":"Expire after 24 hours",
+    "security.devActive":"Developer mode is active","security.devExpired":"Developer mode expired",
+    "security.devRemaining":"Time remaining",
+    "settings.auditDesc":"View operation audit trail and undoable action history.",
+    "settings.auditOpen":"Open Audit Log",
+    "security.devCard.title":"🛡️ Developer — All operations (high risk)",
+    "security.devCard.desc":"Developer mode enables all operations including file deletion, command execution, and network exfiltration. Use only in trusted environments with an expiry policy.",
+    "security.devCard.btn":"⚙️ Configure Developer Mode",
+    "security.devCard.warning":"Developer — All operations (high risk), including file deletion, system commands, data exfiltration. Choose an expiry policy to limit risk.",
+    "security.devClose":"Close","security.devUnit.min":"minutes","security.devDisabled":"Developer mode disabled",
+    "nav.audit":"Audit","audit.title":"Audit Log","audit.verify":"Verify Chain","audit.export":"Export",
+    "audit.recentActions":"Recent Undoable Actions","audit.empty":"No audit entries yet","audit.chainValid":"Audit chain integrity verified",
+    "audit.chainInvalid":"Audit chain verification failed","audit.undoSuccess":"Undo successful","audit.undoFail":"Undo failed",
+    "audit.noUndo":"No undoable actions",
+    "privacy.title":"Privacy & Personalization","privacy.subtitle":"You control the data. I deliver better results.",
+    "privacy.dataTitle":"Use these to tailor your experience",
+    "privacy.browserHistory":"Browsing history","privacy.browserHint":"Stay closer to what you've been exploring",
+    "privacy.chatHistory":"Conversations","privacy.chatHint":"Stay closer to what you're thinking about",
+    "privacy.fileHistory":"File changes","privacy.fileHint":"Stay closer to your current work",
+    "privacy.watchPaths":"Watch Folders","privacy.watchPathsHelp":"Enter folder paths to monitor, one per line. e.g.: D:\\Projects",
+    "privacy.retention":"Retention (days)","privacy.generate":"Generate personalization","privacy.clear":"Clear personalization",
+    "privacy.localNote":"All data is processed locally by default.",
+    "privacy.effectTitle":"Current personalization effect",
+    "privacy.chatStyle":"Conversation style","privacy.recDirection":"Recommendation focus",
+    "privacy.statusOff":"Standard mode — not using history data.",
+    "privacy.statusOn":"Personalization enabled — improves over time.",
+    "privacy.advanced":"Advanced settings",
+    "privacy.generating":"Generating...","privacy.generated":"Personalization generated","privacy.cleared":"Personalization cleared","privacy.saved":"Settings saved",
+    "privacy.copied":"Copied","privacy.editSaved":"Saved",
+    "ollama.title":"Local Model (Ollama)","ollama.enable":"Enable local model (Privacy Mode)","ollama.model":"Local Model",
+    "ollama.selectModel":"-- Select model --","ollama.hint":"Models are auto-detected when Ollama is running. All data stays on your device.",
+    "ollama.checking":"Detecting…","ollama.detected":"Ollama detected","ollama.notDetected":"Ollama not detected",
+    "ollama.notDetectedHint":"Please install and start Ollama first","ollama.refresh":"Refresh",
+    "ollama.modelCount":"models available","ollama.privacyBadge":"🔒 Privacy Mode (Local)","ollama.inferring":"Local inference…",
     "nav.reports":"Reports","nav.apps":"Apps",
     "reports.title":"Reports","reports.unread":"Unread","reports.24h":"24h","reports.3d":"3 Days","reports.7d":"7 Days","reports.30d":"30 Days","reports.all":"All",
     "reports.empty":"No reports yet","reports.allRead":"All caught up! Try another time range","reports.viewReport":"View",
     "reports.markAllRead":"Mark all read","reports.delete":"Delete","reports.deleteOk":"Deleted","reports.deleteFail":"Delete failed",
     "nav.stats":"Statistics","stats.todayPrefix":"Today","stats.tokenTitle":"Token Usage","stats.searchTitle":"Search API Calls",
     "stats.rangeTotal":"Total","stats.tokenTip":"Today's LLM token usage","stats.searchTip":"Today's search usage / quota per engine",
+    "stats.categoryTitle":"Category Usage","stats.categoryPieTitle":"Usage Breakdown","stats.categoryBarTitle":"Avg. per Task","stats.catChat":"Chat","stats.avgTokens":"Avg Tokens","stats.noData":"No data yet",
     "apps.title":"App Center","apps.search":"Search apps…","apps.back":"Back",
     "apps.sortRecommended":"Recommended","apps.sortFrequency":"Most used","apps.sortCreated":"Newest","apps.sortName":"Name",
     "apps.installed":"Installed","apps.notInstalled":"Not installed","apps.comingSoon":"Coming Soon",
@@ -259,13 +374,32 @@ const I18N = {
     "custom.name":"App Name","custom.icon":"Icon","custom.template":"Task Description",
     "custom.templateHelp":"Use {{variable}} for dynamic parts, e.g.: Search {{keywords}} for latest news",
     "custom.appType":"App Type","custom.type.search":"Web Search","custom.type.content":"Content Generation",
-    "custom.safetyNote":"Custom apps only support web search and content generation — no local operations",
+    "custom.safetyNote":"App capabilities are determined by its security mode",
+    "custom.safetyModeHint":"Current mode: ",
+    "custom.securityMode":"App Security Mode",
+    "custom.securityModeInherit":"Inherit global mode",
+    "custom.securityModeHint":"Selecting a higher mode grants more capabilities but increases risk",
+    "custom.injectProfile":"Inject Personal Profile","custom.injectProfileHelp":"Automatically attach your interests, topics, and project context to the prompt for personalized results",
+    "custom.escalation.title":"Security Mode Escalation",
+    "custom.escalation.from":"Current global mode",
+    "custom.escalation.to":"Requested app mode",
+    "custom.escalation.gained":"Additional capabilities gained",
+    "custom.escalation.warnings":"Risk warnings",
+    "custom.escalation.confirm":"I understand the risks, confirm",
+    "custom.escalation.cancel":"Cancel",
+    "custom.escalation.noEsc":"{target} does not exceed global {global}, no confirmation needed",
+    "custom.escalation.risk.low":"Low","custom.escalation.risk.medium":"Medium",
+    "custom.escalation.risk.high":"High","custom.escalation.risk.critical":"Critical",
     "custom.searchEngine":"Search Engine",
     "custom.outputFmt":"Output Format","custom.fmt.report":"HTML Report","custom.fmt.notification":"Notification","custom.fmt.text":"Plain Text",
     "custom.schedule":"Schedule","custom.scheduleTime":"Run Time","custom.scheduleEnabled":"Enable Schedule",
     "custom.schedMode":"Frequency","custom.sched.daily":"Daily","custom.sched.weekly":"Weekly","custom.sched.monthly":"Monthly","custom.sched.interval":"Interval (days)",
     "custom.schedDow":"Weekday","custom.schedDom":"Day of Month","custom.schedInterval":"Interval Days",
     "custom.weekdays":"Mon,Tue,Wed,Thu,Fri,Sat,Sun",
+    "custom.catchup":"Smart Catch-up","custom.catchup.none":"No catch-up (skip missed)","custom.catchup.latest":"Catch up latest only (recommended)","custom.catchup.all":"Catch up all missed",
+    "custom.catchup.noneHelp":"Skip missed runs, suitable for reminders","custom.catchup.latestHelp":"Will compensate one run next time you open the app","custom.catchup.allHelp":"Suitable for daily reports / monitoring, avoid missing days",
+    "custom.catchup.window":"Catch-up Window","custom.catchup.window24":"Past 24 hours","custom.catchup.window168":"Past 7 days",
+    "custom.catchup.maxRuns":"Max catch-up runs","custom.catchup.advanced":"Advanced Options",
     "custom.summary":"Summary","custom.summaryEnabled":"Enable Summary","custom.summaryPrompt":"Summary Requirements",
     "custom.summaryPromptHelp":"Describe how to summarize historical data. Leave empty for default.",
     "custom.summaryRun":"Generate Summary","custom.summarySchedule":"Scheduled Summary",
@@ -302,21 +436,42 @@ function setLanguage(val) {
   const radio = document.querySelector(`input[name="lang-radio"][value="${val}"]`);
   if (radio) radio.checked = true;
   applyLanguage();
+  fetch("/api/desk/lang", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({lang: _lang})}).catch(()=>{});
 }
 
 function applyLanguage() {
   document.querySelectorAll("[data-i18n]").forEach((el) => {
     const key = el.dataset.i18n;
     if (el.tagName === "INPUT" || el.tagName === "TEXTAREA") return;
+    if (el.tagName === "OPTION") {
+      el.textContent = t(key);
+      return;
+    }
     el.textContent = t(key);
   });
   document.querySelectorAll("[data-i18n-ph]").forEach((el) => {
     el.placeholder = t(el.dataset.i18nPh);
   });
+  _refreshSecurityModeLabels();
   renderChatFromHistory();
   renderSessionList();
   const chatInput = document.getElementById("chat-input");
   if (chatInput) chatInput.placeholder = t("chat.placeholder");
+}
+
+function _refreshSecurityModeLabels() {
+  const sel = document.getElementById("security-mode-select");
+  if (sel) {
+    sel.querySelectorAll("option[data-i18n]").forEach(opt => {
+      opt.textContent = t(opt.dataset.i18n);
+    });
+    const devOpt = sel.querySelector('option[value="Developer"]');
+    if (devOpt) devOpt.textContent = t("security.opt.Developer");
+  }
+  const hint = document.getElementById("security-mode-hint");
+  if (hint && currentSecurityMode) {
+    hint.textContent = t(`security.${currentSecurityMode}`) || "";
+  }
 }
 
 // ── State ─────────────────────────────────────────────────────────────
@@ -339,8 +494,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   _lang = detectLang();
   const sel = document.getElementById("lang-select");
   if (sel) sel.value = localStorage.getItem("nanobot_lang") || "auto";
+  fetch("/api/desk/lang", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({lang: _lang})}).catch(()=>{});
   setupInput();
-  setTimeout(hideSplash, 6000);
 
   // Intercept all link clicks — open external URLs in system browser
   document.body.addEventListener("click", (e) => {
@@ -352,7 +507,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     window.open(href, "_blank");
   });
 
-  await checkSystem();
+  const splashMinReady = new Promise(r => setTimeout(r, 3000));
+
+  let _initDone = false;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      await checkSystem(/* delaySplash */ true);
+      _initDone = true;
+      break;
+    } catch (_) {
+      await new Promise(r => setTimeout(r, 1000 + attempt * 500));
+    }
+  }
+
+  await splashMinReady;
+  hideSplash();
 });
 
 function hideSplash() {
@@ -362,35 +531,42 @@ function hideSplash() {
   if (app) app.style.opacity = "1";
 }
 
-async function checkSystem() {
+async function checkSystem(delaySplash) {
+  const timeout = (ms) => new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms));
+  const splash = delaySplash ? () => {} : hideSplash;
   try {
     const [res] = await Promise.all([
-      api("/api/check"),
+      Promise.race([api("/api/check"), timeout(8000)]),
       window.__libsReady || Promise.resolve(),
     ]);
     if (!res.nanobot_installed) {
-      hideSplash();
+      splash();
       applyLanguage();
       showSetup("install");
       return;
     }
     if (!res.config_exists) {
-      hideSplash();
+      splash();
       applyLanguage();
       showSetup("onboard");
       return;
     }
-    await Promise.all([loadSessionList(), loadConfig()]);
+    await Promise.race([
+      Promise.all([loadSessionList(), loadConfig()]),
+      timeout(10000),
+    ]);
     await loadLastSessionOrNew();
     switchPage("chat");
     applyLanguage();
-    hideSplash();
+    splash();
+    _initOllamaBadge();
     startNotificationPoll();
     updateUnreadBadges();
     updateSidebarStats();
+    updateTaskPanel();
     _startBadgePoll();
   } catch (e) {
-    hideSplash();
+    splash();
     applyLanguage();
     showSetup("install");
   }
@@ -448,11 +624,12 @@ function switchPage(page) {
     n.classList.toggle("active", np === page || (np === "apps" && page === "app-detail"));
   });
   if (page === "settings") { loadConfig(); _syncGwSettings(); }
-  if (page === "stats") { loadTokenChart(); loadSearchChart(); }
+  if (page === "stats") { loadTokenChart(); loadSearchChart(); loadCategoryCharts(); }
   if (page === "status") loadStatus();
   if (page === "gateway") loadGatewayStatus();
   if (page === "apps") loadApps();
   if (page === "reports") loadReportsPage();
+  if (page === "audit") loadAuditPage();
 }
 
 // ── Session list (sidebar) ────────────────────────────────────────────
@@ -597,6 +774,7 @@ async function sendMessage() {
   const thinkingId = appendThinking();
 
   let finalContent = null;
+  let finalUsage = null;
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
@@ -624,6 +802,7 @@ async function sendMessage() {
             else updateMessageContent(progressEl, "↳ " + data.content);
           } else if (data.type === "done") {
             finalContent = data.content;
+            if (data.usage) finalUsage = data.usage;
           } else if (data.type === "error") {
             removeElement(thinkingId);
             if (progressEl) removeElement(progressEl);
@@ -638,7 +817,8 @@ async function sendMessage() {
     if (progressEl) removeElement(progressEl);
     if (finalContent !== null) {
       chatMessages.push({ role: "bot", content: finalContent, markdown: true, feedback: null });
-      appendMessageDOM("bot", finalContent, true, chatMessages.length - 1, null);
+      const msgEl = appendMessageDOM("bot", finalContent, true, chatMessages.length - 1, null);
+      if (finalUsage && msgEl) appendUsageBadge(msgEl, finalUsage);
     }
   } catch (e) {
     removeElement(thinkingId);
@@ -685,7 +865,24 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
 
   const avatar = isUser ? "👤" : "🌀";
   const sender = isUser ? t("chat.you") : "nanobot";
-  const rendered = renderMd ? renderMarkdown(content) : escapeHtml(content);
+
+  let rendered;
+  if (!isUser && typeof content === "string" && content.includes("[BLOCKED]")) {
+    const lines = content.split("\n").filter(Boolean);
+    rendered = `<div class="risk-card risk-card-blocked">
+      <div class="risk-card-header"><span class="risk-icon">🛑</span> 操作已拦截</div>
+      <div class="risk-card-body">${escapeHtml(lines.slice(0).join("\n"))}</div>
+    </div>`;
+  } else if (!isUser && typeof content === "string" && content.includes("[NEEDS CONFIRM]")) {
+    const lines = content.split("\n").filter(Boolean);
+    rendered = `<div class="risk-card risk-card-confirm">
+      <div class="risk-card-header"><span class="risk-icon">⚠️</span> 需要确认</div>
+      <div class="risk-card-body">${escapeHtml(lines.slice(0).join("\n"))}</div>
+      <div class="risk-card-hint">请在弹出的确认窗口中批准或拒绝此操作。</div>
+    </div>`;
+  } else {
+    rendered = renderMd ? renderMarkdown(content) : escapeHtml(content);
+  }
 
   let feedbackHtml = "";
   if (isBotFinal && msgIndex >= 0) {
@@ -713,6 +910,21 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
   container.scrollTop = container.scrollHeight;
   if (renderMd) highlightCode(div);
   return id;
+}
+
+function appendUsageBadge(msgElId, usage) {
+  const msgEl = document.getElementById(msgElId);
+  if (!msgEl) return;
+  const body = msgEl.querySelector(".message-body");
+  if (!body) return;
+  const inp = (usage.input || 0).toLocaleString();
+  const out = (usage.output || 0).toLocaleString();
+  const badge = document.createElement("div");
+  badge.className = "message-usage";
+  let html = `<span>tokens: ${inp} in / ${out} out</span>`;
+  if (usage.search) html += `<span class="message-usage-sep">|</span><span>search: ${usage.search}</span>`;
+  badge.innerHTML = html;
+  body.appendChild(badge);
 }
 
 async function handleFeedback(btn) {
@@ -760,6 +972,7 @@ async function regenerateMessage(botMsgIndex) {
   const thinkingId = appendThinking();
 
   let finalContent = null;
+  let finalUsage = null;
   try {
     const response = await fetch("/api/chat", {
       method: "POST",
@@ -787,6 +1000,7 @@ async function regenerateMessage(botMsgIndex) {
             else updateMessageContent(progressEl, "↳ " + data.content);
           } else if (data.type === "done") {
             finalContent = data.content;
+            if (data.usage) finalUsage = data.usage;
           } else if (data.type === "error") {
             removeElement(thinkingId);
             if (progressEl) removeElement(progressEl);
@@ -801,7 +1015,8 @@ async function regenerateMessage(botMsgIndex) {
     if (progressEl) removeElement(progressEl);
     if (finalContent !== null) {
       chatMessages.push({ role: "bot", content: finalContent, markdown: true, feedback: null });
-      appendMessageDOM("bot", finalContent, true, chatMessages.length - 1, null);
+      const msgEl = appendMessageDOM("bot", finalContent, true, chatMessages.length - 1, null);
+      if (finalUsage && msgEl) appendUsageBadge(msgEl, finalUsage);
     }
   } catch (e) {
     removeElement(thinkingId);
@@ -819,7 +1034,10 @@ function appendThinking() {
   const id = "thinking-" + Date.now();
   const div = document.createElement("div");
   div.className = "message bot"; div.id = id;
-  div.innerHTML = `<div class="message-avatar">🌀</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div></div></div>`;
+  const ollamaBadge = document.getElementById("ollama-mode-badge");
+  const isLocal = ollamaBadge && ollamaBadge.style.display !== "none";
+  const hint = isLocal ? `<span class="thinking-hint">${t("ollama.inferring")}</span>` : "";
+  div.innerHTML = `<div class="message-avatar">🌀</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div>${hint}</div></div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return id;
@@ -907,6 +1125,24 @@ function fillConfigForm(cfg) {
   });
 
   renderMcpServers(cfg);
+
+  // Ollama config
+  const oll = get(cfg, ["ollama"]) || {};
+  document.getElementById("cfg-ollama-enabled").checked = !!oll.enabled;
+  document.getElementById("cfg-ollama-host").value = oll.host || "";
+  document.getElementById("cfg-ollama-port").value = oll.port || "";
+  if (oll.model) {
+    const sel = document.getElementById("cfg-ollama-model");
+    if (!Array.from(sel.options).some(o => o.value === oll.model)) {
+      const opt = document.createElement("option");
+      opt.value = oll.model;
+      opt.textContent = oll.model;
+      sel.appendChild(opt);
+    }
+    sel.value = oll.model;
+  }
+  checkOllamaStatus();
+
   document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
 }
 
@@ -1087,7 +1323,92 @@ function collectConfigForm() {
   document.querySelectorAll("[data-channel]").forEach((input) => { set(cfg, ["channels", input.dataset.channel, "enabled"], input.checked); });
   if (!cfg.tools) cfg.tools = {};
   cfg.tools.mcpServers = collectMcpServers();
+
+  // Ollama config
+  const ollamaEnabled = document.getElementById("cfg-ollama-enabled").checked;
+  const ollamaModel = document.getElementById("cfg-ollama-model").value;
+  const ollamaHost = document.getElementById("cfg-ollama-host").value.trim();
+  const ollamaPort = parseInt(document.getElementById("cfg-ollama-port").value) || 0;
+  if (ollamaEnabled || ollamaModel || ollamaHost || ollamaPort) {
+    cfg.ollama = {
+      enabled: ollamaEnabled,
+      model: ollamaModel,
+    };
+    if (ollamaHost) cfg.ollama.host = ollamaHost;
+    if (ollamaPort) cfg.ollama.port = ollamaPort;
+  } else {
+    delete cfg.ollama;
+  }
+
   return cfg;
+}
+
+// ── Ollama / Local Model ──────────────────────────────────────────────
+
+let _ollamaModels = [];
+
+async function checkOllamaStatus() {
+  const indicator = document.getElementById("ollama-indicator");
+  const statusText = document.getElementById("ollama-status-text");
+  const modelSelect = document.getElementById("cfg-ollama-model");
+  indicator.className = "ollama-indicator off";
+  statusText.textContent = t("ollama.checking");
+
+  try {
+    const data = await api("/api/ollama/status");
+    if (data.available) {
+      indicator.className = "ollama-indicator on";
+      _ollamaModels = data.models || [];
+      statusText.textContent = `${t("ollama.detected")} — ${_ollamaModels.length} ${t("ollama.modelCount")}`;
+
+      const prev = modelSelect.value;
+      modelSelect.innerHTML = `<option value="">${t("ollama.selectModel")}</option>`;
+      _ollamaModels.forEach(m => {
+        const opt = document.createElement("option");
+        opt.value = m.name;
+        opt.textContent = m.full_name || m.name;
+        modelSelect.appendChild(opt);
+      });
+      if (prev && Array.from(modelSelect.options).some(o => o.value === prev)) {
+        modelSelect.value = prev;
+      } else if (data.selected_model) {
+        modelSelect.value = data.selected_model;
+      }
+      modelSelect.disabled = false;
+    } else {
+      indicator.className = "ollama-indicator off";
+      statusText.textContent = t("ollama.notDetected");
+      _ollamaModels = [];
+    }
+    _syncOllamaBadge();
+  } catch (_) {
+    indicator.className = "ollama-indicator error";
+    statusText.textContent = t("ollama.notDetected");
+  }
+}
+
+function onOllamaToggle() {
+  const enabled = document.getElementById("cfg-ollama-enabled").checked;
+  document.getElementById("cfg-ollama-model").disabled = !enabled && _ollamaModels.length === 0;
+  _syncOllamaBadge();
+}
+
+function _syncOllamaBadge() {
+  const badge = document.getElementById("ollama-mode-badge");
+  if (!badge) return;
+  const enabled = document.getElementById("cfg-ollama-enabled").checked;
+  const model = document.getElementById("cfg-ollama-model").value;
+  badge.style.display = (enabled && model) ? "inline-flex" : "none";
+}
+
+async function _initOllamaBadge() {
+  try {
+    const data = await api("/api/ollama/status");
+    const badge = document.getElementById("ollama-mode-badge");
+    if (badge && data.enabled && data.selected_model) {
+      badge.style.display = "inline-flex";
+    }
+  } catch (_) {}
 }
 
 async function saveConfig() {
@@ -1098,6 +1419,7 @@ async function saveConfig() {
       configCache = cfg;
       document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
       toast(t("settings.saved"), "success");
+      _syncOllamaBadge();
     } else { toast(res.error || t("settings.saveFail"), "error"); }
   } catch (e) { toast(t("settings.saveFail") + ": " + e.message, "error"); }
 }
@@ -1186,6 +1508,95 @@ async function loadSearchChart(days) {
   } catch (_) {
     container.innerHTML = `<span style="color:var(--text-dim);font-size:12px">—</span>`;
   }
+}
+
+// ── Category charts (Chart.js) ────────────────────────────────────────
+
+let _categoryPieChart = null;
+let _categoryBarChart = null;
+let _catDays = 7;
+
+const _CHART_COLORS = [
+  '#89b4fa', '#a6e3a1', '#f9e2af', '#f38ba8', '#cba6f7',
+  '#fab387', '#94e2d5', '#74c7ec', '#f5c2e7', '#b4befe',
+];
+
+function _catLabel(key) {
+  if (key === 'chat') return t('stats.catChat');
+  if (key.startsWith('app_')) return key.slice(4);
+  return key;
+}
+
+function _emptyCanvas(canvas) {
+  const ctx2d = canvas.getContext('2d');
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+  ctx2d.fillStyle = '#6c7086';
+  ctx2d.font = '13px sans-serif';
+  ctx2d.textAlign = 'center';
+  ctx2d.fillText(t('stats.noData') || '暂无数据', canvas.width / 2, canvas.height / 2);
+}
+
+async function loadCategoryCharts(days) {
+  _catDays = days || _catDays;
+  document.querySelectorAll('#category-chart-tabs .token-chart-tab').forEach(btn => {
+    btn.classList.toggle('active', Number(btn.dataset.days) === _catDays);
+  });
+  const pieCanvas = document.getElementById('category-pie-chart');
+  const barCanvas = document.getElementById('category-bar-chart');
+  if (!pieCanvas && !barCanvas) return;
+  try {
+    const data = await api(`/api/usage/categories?days=${_catDays}`);
+    const cats = data.categories || {};
+    const labels = [], values = [], avgValues = [], colors = [];
+    let ci = 0;
+    for (const [k, v] of Object.entries(cats)) {
+      labels.push(_catLabel(k));
+      const total = (v.input || 0) + (v.output || 0);
+      values.push(total);
+      avgValues.push(Math.round(total / (v.count || 1)));
+      colors.push(_CHART_COLORS[ci % _CHART_COLORS.length]);
+      ci++;
+    }
+    const isDark = document.documentElement.classList.contains('dark') ||
+                   getComputedStyle(document.body).getPropertyValue('--bg-base').trim() === '#1e1e2e';
+    if (_categoryPieChart) _categoryPieChart.destroy();
+    _categoryPieChart = null;
+    if (pieCanvas) {
+      if (!labels.length) { _emptyCanvas(pieCanvas); }
+      else {
+        _categoryPieChart = new Chart(pieCanvas, {
+          type: 'doughnut',
+          data: { labels, datasets: [{ data: values, backgroundColor: colors, borderWidth: 0 }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom', labels: { color: isDark ? '#cdd6f4' : '#333', font: { size: 11 }, boxWidth: 12 } },
+              tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()} tokens` } },
+            },
+          },
+        });
+      }
+    }
+    if (_categoryBarChart) _categoryBarChart.destroy();
+    _categoryBarChart = null;
+    if (barCanvas) {
+      if (!labels.length) { _emptyCanvas(barCanvas); }
+      else {
+        _categoryBarChart = new Chart(barCanvas, {
+          type: 'bar',
+          data: { labels, datasets: [{ label: t('stats.avgTokens'), data: avgValues, backgroundColor: colors, borderRadius: 4 }] },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${t('stats.avgTokens')}: ${ctx.parsed.y.toLocaleString()}` } } },
+            scales: {
+              x: { ticks: { color: isDark ? '#a6adc8' : '#666', font: { size: 11 } }, grid: { display: false } },
+              y: { ticks: { color: isDark ? '#a6adc8' : '#666', font: { size: 11 } }, grid: { color: isDark ? 'rgba(69,71,90,0.4)' : 'rgba(0,0,0,0.1)' } },
+            },
+          },
+        });
+      }
+    }
+  } catch (e) { console.warn('loadCategoryCharts error:', e); }
 }
 
 // ── Gateway settings sync ─────────────────────────────────────────────
@@ -1816,6 +2227,17 @@ function filterApps(query) {
 function _appName(a) { return _lang === "en" ? (a.name_en || a.name) : a.name; }
 function _appDesc(a) { return _lang === "en" ? (a.description_en || a.description) : a.description; }
 
+function renderPermTags(permissions) {
+  if (!permissions || !permissions.length) return "";
+  const permClass = (p) => {
+    const cap = p.split(".")[0];
+    return `perm-tag perm-${cap}`;
+  };
+  return `<div class="perm-tags">${permissions.slice(0, 6).map(p =>
+    `<span class="${permClass(p)}" title="${p}">${p}</span>`
+  ).join("")}${permissions.length > 6 ? `<span class="perm-tag">+${permissions.length - 6}</span>` : ""}</div>`;
+}
+
 function renderApps(apps) {
   const grid = document.getElementById("apps-grid");
   if (!apps.length) {
@@ -1884,7 +2306,10 @@ function renderApps(apps) {
         <p class="app-card-desc">${desc}</p>
         <div class="app-card-meta">
           <span>${isCustom ? t("custom.badge") : t("apps.version") + " " + ver}</span>
+          ${a.source ? `<span class="source-badge source-${a.source}">${a.source}</span>` : ""}
+          ${_renderModeBadge(a.security_mode || a.min_mode || (isCustom ? "Observer" : ""))}
         </div>
+        ${renderPermTags(a.permissions)}
       </div>
       <div class="app-card-actions">${actions}</div>
     </div>`;
@@ -1998,6 +2423,7 @@ async function openDigestDetail() {
     <div class="app-detail-section">
       <div class="digest-status-bar">
         <div class="digest-status-left">
+          ${_renderModeBadge("Observer")}
           <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
           <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
         </div>
@@ -2289,6 +2715,7 @@ async function openMonitorDetail() {
     <div class="app-detail-section">
       <div class="digest-status-bar">
         <div class="digest-status-left">
+          ${_renderModeBadge("Observer")}
           <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
           <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
         </div>
@@ -2518,6 +2945,7 @@ async function openEmailDetail() {
     <div class="app-detail-section">
       <div class="digest-status-bar">
         <div class="digest-status-left">
+          ${_renderModeBadge("Assistant")}
           <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
           <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
         </div>
@@ -2716,6 +3144,7 @@ async function openFocusDetail() {
     <div class="app-detail-section">
       <div class="digest-status-bar">
         <div class="digest-status-left">
+          ${_renderModeBadge("Observer")}
           <span class="digest-status-dot ${isEnabled ? 'on' : 'off'}"></span>
           <span>${t("digest.status")}: <strong>${isEnabled ? t("apps.enabled") : t("apps.disabled")}</strong></span>
         </div>
@@ -3145,7 +3574,7 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
       <div class="wizard-body">
         <!-- Step 1: Task -->
         <div class="wizard-page" id="wizard-page-1">
-          <div class="safety-hint" style="margin-bottom:12px">🔒 ${t("custom.safetyNote")}</div>
+          <div class="safety-hint safety-hint-dynamic" style="margin-bottom:12px">🛡️ ${t("custom.safetyNote")}<span id="wizard-mode-badge" class="mode-badge"></span></div>
           <label>${t("custom.template")}</label>
           <p class="wizard-help">${t("custom.templateHelp")}</p>
           <textarea id="wizard-template" class="wizard-textarea" rows="5">${escapeHtml(tpl)}</textarea>
@@ -3186,6 +3615,46 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
                 <label>${t("custom.schedInterval")}</label>
                 <input type="number" id="wizard-sched-interval" min="1" value="${sched.interval_days||1}" />
               </div>
+            </div>
+            <div style="margin-top:12px;">
+              <label style="font-weight:600;font-size:13px;">${t("custom.catchup")}</label>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px;">
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <input type="radio" name="wizard-catchup-policy" value="LATEST_ONLY" ${(sched.catchup_policy||'LATEST_ONLY')==='LATEST_ONLY'?'checked':''} />
+                  <span>${t("custom.catchup.latest")}</span>
+                  <span style="color:var(--text-muted);font-size:12px;margin-left:4px;">${t("custom.catchup.latestHelp")}</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <input type="radio" name="wizard-catchup-policy" value="ALL_MISSED" ${sched.catchup_policy==='ALL_MISSED'?'checked':''} />
+                  <span>${t("custom.catchup.all")}</span>
+                  <span style="color:var(--text-muted);font-size:12px;margin-left:4px;">${t("custom.catchup.allHelp")}</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                  <input type="radio" name="wizard-catchup-policy" value="NONE" ${sched.catchup_policy==='NONE'?'checked':''} />
+                  <span>${t("custom.catchup.none")}</span>
+                  <span style="color:var(--text-muted);font-size:12px;margin-left:4px;">${t("custom.catchup.noneHelp")}</span>
+                </label>
+              </div>
+              <details style="margin-top:8px;">
+                <summary style="cursor:pointer;font-size:12px;color:var(--text-muted);">${t("custom.catchup.advanced")}</summary>
+                <div class="digest-config-grid" style="margin-top:6px;">
+                  <div class="form-group">
+                    <label>${t("custom.catchup.window")}</label>
+                    <select id="wizard-catchup-window" class="digest-select">
+                      <option value="24" ${(sched.catchup_window_hours||24)===24?'selected':''}>${t("custom.catchup.window24")}</option>
+                      <option value="168" ${sched.catchup_window_hours===168?'selected':''}>${t("custom.catchup.window168")}</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label>${t("custom.catchup.maxRuns")}</label>
+                    <select id="wizard-catchup-max" class="digest-select">
+                      <option value="1" ${(sched.max_catchup_runs||1)===1?'selected':''}>1</option>
+                      <option value="2" ${sched.max_catchup_runs===2?'selected':''}>2</option>
+                      <option value="3" ${sched.max_catchup_runs===3?'selected':''}>3</option>
+                    </select>
+                  </div>
+                </div>
+              </details>
             </div>
           </div>
           <hr style="border:0;border-top:1px solid var(--bg-surface1);margin:16px 0;" />
@@ -3231,10 +3700,28 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
             </div>
           </div>
         </div>
-        <!-- Step 3: Info -->
+        <!-- Step 3: Info + Security Mode -->
         <div class="wizard-page" id="wizard-page-3" style="display:none;">
           <div class="form-group"><label>${t("custom.name")}</label><input type="text" id="wizard-name" value="${escapeAttr(ed.name || '')}" placeholder="${_lang === "zh" ? "例：每日AI新闻" : "e.g. Daily AI News"}" /></div>
           <div class="form-group"><label>${t("custom.icon")}</label><input type="text" id="wizard-icon" value="${escapeAttr(ed.icon || '🤖')}" maxlength="4" style="width:60px;font-size:24px;text-align:center;" /></div>
+          <hr style="border:0;border-top:1px solid var(--bg-surface1);margin:16px 0;" />
+          <div class="form-group form-group-checkbox">
+            <label><input type="checkbox" id="wizard-inject-profile" ${ed.inject_profile?'checked':''} />
+            <span>💡 ${t("custom.injectProfile")}</span></label>
+            <p class="wizard-help" style="margin-left:20px;margin-top:4px;font-size:11px;color:var(--text-dim);">${t("custom.injectProfileHelp")}</p>
+          </div>
+          <hr style="border:0;border-top:1px solid var(--bg-surface1);margin:16px 0;" />
+          <div class="form-group">
+            <label>🛡️ ${t("custom.securityMode")}</label>
+            <p class="wizard-help">${t("custom.securityModeHint")}</p>
+            <select id="wizard-security-mode" class="digest-select" onchange="_wizardSecurityModeChange()">
+              <option value="inherit" ${!ed.security_mode ? 'selected' : ''}>${t("custom.securityModeInherit")}</option>
+              <option value="Observer" ${ed.security_mode==='Observer' ? 'selected' : ''}>${_modeWithDesc("Observer")}</option>
+              <option value="Assistant" ${ed.security_mode==='Assistant' ? 'selected' : ''}>${_modeWithDesc("Assistant")}</option>
+              <option value="Operator" ${ed.security_mode==='Operator' ? 'selected' : ''}>${_modeWithDesc("Operator")}</option>
+            </select>
+            <div id="wizard-mode-escalation" class="escalation-info" style="display:none;"></div>
+          </div>
         </div>
       </div>
       <div class="wizard-footer">
@@ -3247,6 +3734,95 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
   overlay._step = 1;
   overlay._editId = ed.id || "";
   document.body.appendChild(overlay);
+  _loadSecurityModeBadge("wizard-mode-badge");
+}
+
+async function _loadSecurityModeBadge(elementId) {
+  try {
+    const data = await api("/api/security/mode");
+    const mode = data.mode || data.name || "Unknown";
+    const desc = _modeShortDesc(mode);
+    const name = _modeName(mode);
+    const label = desc ? `${name}·${desc}` : name;
+    const modeColors = { Observer: "#6c757d", Assistant: "#0d6efd", Operator: "#fd7e14", Developer: "#dc3545" };
+    const color = modeColors[mode] || "#6c757d";
+    const els = elementId
+      ? [document.getElementById(elementId)]
+      : document.querySelectorAll(".detail-mode-badge");
+    els.forEach(el => {
+      if (!el) return;
+      el.textContent = label;
+      el.style.cssText = `display:inline-block;margin-left:8px;padding:2px 8px;border-radius:10px;font-size:12px;color:#fff;background:${color}`;
+    });
+  } catch (_) {}
+}
+
+async function _wizardSecurityModeChange() {
+  const sel = document.getElementById("wizard-security-mode");
+  const infoDiv = document.getElementById("wizard-mode-escalation");
+  if (!sel || !infoDiv) return;
+
+  const target = sel.value;
+  if (target === "inherit") {
+    infoDiv.style.display = "none";
+    infoDiv.innerHTML = "";
+    return;
+  }
+
+  try {
+    const globalData = await api("/api/security/mode");
+    const globalMode = globalData.mode;
+    const modeOrder = ["Observer", "Assistant", "Operator", "Developer"];
+    const isEsc = modeOrder.indexOf(target) > modeOrder.indexOf(globalMode);
+
+    if (!isEsc) {
+      infoDiv.style.display = "block";
+      infoDiv.className = "escalation-info escalation-ok";
+      const noEscMsg = t("custom.escalation.noEsc")
+        .replace("{target}", _modeWithDesc(target))
+        .replace("{global}", _modeWithDesc(globalMode));
+      infoDiv.innerHTML = `<span class="escalation-icon">✅</span> ${noEscMsg}`;
+      return;
+    }
+
+    const res = await api(`/api/security/app/_preview/mode`, "POST", { mode: target, confirmed: false });
+    const assess = res.assessment || res;
+
+    const riskColors = { low: "#198754", medium: "#fd7e14", high: "#dc3545", critical: "#6f42c1" };
+    const riskLabels = { low: t("custom.escalation.risk.low"), medium: t("custom.escalation.risk.medium"),
+                         high: t("custom.escalation.risk.high"), critical: t("custom.escalation.risk.critical") };
+    const riskColor = riskColors[assess.risk_level] || "#6c757d";
+    const riskLabel = riskLabels[assess.risk_level] || assess.risk_level;
+
+    let warningsHtml = "";
+    if (assess.warnings && assess.warnings.length) {
+      warningsHtml = `<div class="escalation-warnings"><strong>⚠️ ${t("custom.escalation.warnings")}:</strong><ul>${
+        assess.warnings.map(w => `<li>${w}</li>`).join("")}</ul></div>`;
+    }
+    let gainedHtml = "";
+    if (assess.capabilities_gained && assess.capabilities_gained.length) {
+      gainedHtml = `<div class="escalation-gained"><strong>${t("custom.escalation.gained")}:</strong> ${
+        assess.capabilities_gained.join("、")}</div>`;
+    }
+
+    infoDiv.style.display = "block";
+    infoDiv.className = "escalation-info escalation-warn";
+    infoDiv.innerHTML = `
+      <div class="escalation-header">
+        <span class="escalation-icon">⚠️</span>
+        <strong>${t("custom.escalation.title")}</strong>
+        <span class="escalation-risk-badge" style="background:${riskColor}">${riskLabel}</span>
+      </div>
+      <div class="escalation-detail">
+        ${t("custom.escalation.from")}: <strong>${_modeWithDesc(globalMode)}</strong>
+        <br/>→ ${t("custom.escalation.to")}: <strong>${_modeWithDesc(target)}</strong>
+      </div>
+      ${gainedHtml}
+      ${warningsHtml}
+    `;
+  } catch (_) {
+    infoDiv.style.display = "none";
+  }
 }
 
 function _rangeToDU(days) {
@@ -3315,6 +3891,76 @@ function _wizardPrev() {
   if (overlay._step > 1) _wizardGoTo(overlay._step - 1);
 }
 
+function _modeName(mode) {
+  return t("security.modeName." + mode) || mode;
+}
+function _modeShortDesc(mode) {
+  return t("security.shortDesc." + mode) || "";
+}
+function _modeWithDesc(mode) {
+  const name = _modeName(mode);
+  const desc = _modeShortDesc(mode);
+  return desc ? `${name} — ${desc}` : name;
+}
+const _MODE_COLORS = { Observer: "#40a02b", Assistant: "#1e66f5", Operator: "#df8e1d", Developer: "#dc3545" };
+function _renderModeBadge(mode) {
+  if (!mode) return "";
+  const name = _modeName(mode);
+  const color = _MODE_COLORS[mode] || "#6c757d";
+  return `<span class="security-mode-badge" style="color:${color};border-color:${color};">🛡️ ${name}</span>`;
+}
+
+function _showEscalationConfirm(fromMode, toMode) {
+  return new Promise(async (resolve) => {
+    let assess = {};
+    try {
+      const res = await api("/api/security/app/_preview/mode", "POST", { mode: toMode });
+      assess = res.assessment || {};
+    } catch (_) {}
+
+    const riskColors = { low: "#198754", medium: "#fd7e14", high: "#dc3545", critical: "#6f42c1" };
+    const riskLabels = { low: t("custom.escalation.risk.low"), medium: t("custom.escalation.risk.medium"),
+                         high: t("custom.escalation.risk.high"), critical: t("custom.escalation.risk.critical") };
+    const rc = riskColors[assess.risk_level] || "#6c757d";
+    const rl = riskLabels[assess.risk_level] || "";
+
+    const gained = (assess.capabilities_gained || []).map(c => `<li>${c}</li>`).join("");
+    const warns = (assess.warnings || []).map(w => `<li>${w}</li>`).join("");
+
+    const modal = document.createElement("div");
+    modal.className = "modal-overlay";
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width:480px;">
+        <h3 style="margin:0 0 12px;display:flex;align-items:center;gap:8px;">
+          <span style="font-size:24px;">⚠️</span>
+          ${t("custom.escalation.title")}
+          <span style="background:${rc};color:#fff;padding:2px 10px;border-radius:10px;font-size:13px;">${rl}</span>
+        </h3>
+        <div style="margin-bottom:12px;">
+          ${t("custom.escalation.from")}: <strong>${_modeWithDesc(fromMode)}</strong>
+          <br/>→ ${t("custom.escalation.to")}: <strong>${_modeWithDesc(toMode)}</strong>
+        </div>
+        ${gained ? `<div style="margin-bottom:12px;">
+          <strong>${t("custom.escalation.gained")}:</strong>
+          <ul style="margin:4px 0 0 20px;padding:0;">${gained}</ul>
+        </div>` : ""}
+        ${warns ? `<div style="margin-bottom:12px;color:var(--text-danger,#dc3545);">
+          <strong>${t("custom.escalation.warnings")}:</strong>
+          <ul style="margin:4px 0 0 20px;padding:0;">${warns}</ul>
+        </div>` : ""}
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+          <button class="btn" id="esc-cancel-btn">${t("custom.escalation.cancel")}</button>
+          <button class="btn btn-danger" id="esc-confirm-btn">${t("custom.escalation.confirm")}</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.querySelector("#esc-cancel-btn").onclick = () => { modal.remove(); resolve(false); };
+    modal.querySelector("#esc-confirm-btn").onclick = () => { modal.remove(); resolve(true); };
+    modal.onclick = (e) => { if (e.target === modal) { modal.remove(); resolve(false); } };
+  });
+}
+
 async function _wizardSave() {
   const overlay = document.getElementById("custom-app-wizard");
   if (!overlay) return;
@@ -3325,6 +3971,7 @@ async function _wizardSave() {
   if (!template) { toast(_lang === "zh" ? "任务描述不能为空" : "Task description required", "error"); return; }
   if (!name) { toast(_lang === "zh" ? "请输入应用名称" : "Name required", "error"); return; }
 
+  const catchupPolicyEl = document.querySelector('input[name="wizard-catchup-policy"]:checked');
   const schedule = {
     enabled: document.getElementById("wizard-sched-enabled").checked,
     mode: document.getElementById("wizard-sched-mode").value,
@@ -3332,6 +3979,9 @@ async function _wizardSave() {
     day_of_week: parseInt(document.getElementById("wizard-sched-dow").value) || 0,
     day_of_month: parseInt(document.getElementById("wizard-sched-dom").value) || 1,
     interval_days: parseInt(document.getElementById("wizard-sched-interval").value) || 1,
+    catchup_policy: catchupPolicyEl ? catchupPolicyEl.value : "LATEST_ONLY",
+    catchup_window_hours: parseInt(document.getElementById("wizard-catchup-window")?.value) || 24,
+    max_catchup_runs: parseInt(document.getElementById("wizard-catchup-max")?.value) || 1,
   };
 
   const summRangeVal = parseInt(document.getElementById("wizard-summ-range-val")?.value) || 7;
@@ -3352,26 +4002,56 @@ async function _wizardSave() {
   btn.disabled = true;
   btn.textContent = t("custom.saving");
 
+  const securityModeSel = document.getElementById("wizard-security-mode");
+  const securityModeVal = securityModeSel ? securityModeSel.value : "inherit";
+  const securityMode = securityModeVal === "inherit" ? null : securityModeVal;
+
+  const injectProfile = document.getElementById("wizard-inject-profile")?.checked || false;
+
   const payload = {
     name, icon,
     prompt_template: template, output_format: outputFormat,
-    schedule, summary,
+    schedule, summary, security_mode: securityMode,
+    inject_profile: injectProfile,
   };
 
   try {
+    if (securityMode) {
+      const globalData = await api("/api/security/mode");
+      const globalMode = globalData.mode;
+      const modeOrder = ["Observer", "Assistant", "Operator", "Developer"];
+      if (modeOrder.indexOf(securityMode) > modeOrder.indexOf(globalMode)) {
+        const confirmed = await _showEscalationConfirm(globalMode, securityMode);
+        if (!confirmed) {
+          btn.disabled = false;
+          btn.textContent = t("custom.save");
+          return;
+        }
+      }
+    }
+
     let res;
-    if (overlay._editId) {
-      res = await api(`/api/apps/custom/${overlay._editId}`, "PUT", payload);
+    const appId = overlay._editId;
+    if (appId) {
+      res = await api(`/api/apps/custom/${appId}`, "PUT", payload);
     } else {
       res = await api("/api/apps/custom", "POST", payload);
     }
     if (res.error) { toast(res.error, "error"); btn.disabled = false; btn.textContent = t("custom.save"); return; }
+
+    const savedAppId = appId || res.id;
+    if (securityMode && savedAppId) {
+      try {
+        await api(`/api/security/app/${savedAppId}/mode`, "POST",
+                  { mode: securityMode, confirmed: true });
+      } catch (_) {}
+    }
+
     toast(t("custom.saved"), "success");
-    const editId = overlay._editId;
     overlay.remove();
     await loadApps();
-    if (editId) {
-      openCustomAppDetail(editId);
+    if (appId) {
+      openCustomAppDetail(appId);
     } else {
       switchPage("apps");
     }
@@ -3398,11 +4078,20 @@ function _scheduleDesc(sched) {
   const mode = sched.mode || "daily";
   const time = sched.time || "--:--";
   const weekdays = t("custom.weekdays").split(",");
-  if (mode === "daily") return `${t("custom.sched.daily")} ${time}`;
-  if (mode === "weekly") return `${t("custom.sched.weekly")} ${weekdays[sched.day_of_week||0]} ${time}`;
-  if (mode === "monthly") return `${t("custom.sched.monthly")} ${sched.day_of_month||1}${_lang==="zh"?"号":"th"} ${time}`;
-  if (mode === "interval") return `${_lang==="zh"?"每":"Every "}${sched.interval_days||1}${_lang==="zh"?"天":"d"} ${time}`;
-  return time;
+  let desc;
+  if (mode === "daily") desc = `${t("custom.sched.daily")} ${time}`;
+  else if (mode === "weekly") desc = `${t("custom.sched.weekly")} ${weekdays[sched.day_of_week||0]} ${time}`;
+  else if (mode === "monthly") desc = `${t("custom.sched.monthly")} ${sched.day_of_month||1}${_lang==="zh"?"号":"th"} ${time}`;
+  else if (mode === "interval") desc = `${_lang==="zh"?"每":"Every "}${sched.interval_days||1}${_lang==="zh"?"天":"d"} ${time}`;
+  else desc = time;
+  const policy = sched.catchup_policy || "LATEST_ONLY";
+  if (policy !== "NONE") {
+    const tag = policy === "ALL_MISSED"
+      ? (_lang === "zh" ? "补齐" : "catch-up:all")
+      : (_lang === "zh" ? "智能补偿" : "catch-up");
+    desc += ` <span style="font-size:11px;color:var(--accent);opacity:0.85;">[${tag}]</span>`;
+  }
+  return desc;
 }
 
 async function openCustomAppDetail(appId) {
@@ -3463,6 +4152,7 @@ async function openCustomAppDetail(appId) {
       <div class="digest-status-bar">
         <div class="digest-status-left">
           ${fmtBadge}
+          ${_renderModeBadge(capp.security_mode || "Observer")}
           <span class="digest-status-dot ${sched.enabled ? 'on' : 'off'}"></span>
           <span>${t("custom.schedule")}: <strong>${_scheduleDesc(sched)}</strong></span>
         </div>
@@ -3474,7 +4164,7 @@ async function openCustomAppDetail(appId) {
     </div>
 
     <div class="app-detail-section">
-      <div class="safety-hint" style="margin-bottom:8px">🔒 ${t("custom.safetyNote")}</div>
+      <div class="safety-hint safety-hint-dynamic" style="margin-bottom:8px">🛡️ ${t("custom.safetyNote")}<span class="mode-badge detail-mode-badge"></span></div>
       <h3>${t("custom.template")}</h3>
       <div class="custom-template-preview">${escapeHtml(capp.prompt_template)}</div>
     </div>
@@ -3515,6 +4205,7 @@ async function openCustomAppDetail(appId) {
       <div class="digest-report-content" id="capp-report-content"></div>
     </div>
   `;
+  _loadSecurityModeBadge(null);
 }
 
 // ── Param group helpers ────────────────────────────────────────────
@@ -4010,8 +4701,12 @@ async function deleteReport(appId, key) {
 let _unreadCounts = {};
 
 async function updateUnreadBadges() {
+  let total = 0;
+  try {
+    const data = await api("/api/reports/unread_count");
+    total = data.total || 0;
+  } catch (_) {}
   try { _unreadCounts = await api("/api/apps/custom/unread"); } catch (_) { _unreadCounts = {}; }
-  const total = Object.values(_unreadCounts).reduce((s, n) => s + n, 0);
   let navBadge = document.getElementById("nav-reports-badge");
   if (!navBadge) {
     const navItem = document.querySelector('.nav-item[data-page="reports"]');
@@ -4036,6 +4731,7 @@ let _badgePollTimer = null;
 function _startBadgePoll() {
   if (_badgePollTimer) return;
   _badgePollTimer = setInterval(() => { updateUnreadBadges(); updateSidebarStats(); }, 30000);
+  _startTaskPanelPoll();
 }
 
 async function updateSidebarStats() {
@@ -4068,9 +4764,853 @@ async function updateSidebarStats() {
   } catch (_) {}
 }
 
+// ── Task Panel (floating popover) ─────────────────────────────────
+let _taskPollTimer = null;
+let _taskPollFast = false;
+let _lastTasksJson = "";
+let _taskPanelOpen = false;
+let _cachedTasks = [];
+
+function _startTaskPanelPoll() {
+  if (_taskPollTimer) return;
+  _fetchTasks();
+  _taskPollTimer = setInterval(_fetchTasks, 15000);
+}
+
+function _setTaskPollSpeed(fast) {
+  if (fast === _taskPollFast) return;
+  _taskPollFast = fast;
+  if (_taskPollTimer) clearInterval(_taskPollTimer);
+  _taskPollTimer = setInterval(_fetchTasks, fast ? 5000 : 15000);
+}
+
+async function _fetchTasks() {
+  try {
+    const data = await api("/api/scheduler/today");
+    if (!data || !data.tasks) return;
+    const tasks = data.tasks;
+    const json = JSON.stringify(tasks);
+    if (json === _lastTasksJson) return;
+    _lastTasksJson = json;
+    _cachedTasks = tasks;
+    _updateTaskBadge(tasks);
+    if (_taskPanelOpen) _renderTaskPanel(tasks);
+    const hasActive = tasks.some(t => t.status === "running" || t.status === "pending_catchup");
+    _setTaskPollSpeed(hasActive);
+  } catch (_) {}
+}
+
+function _updateTaskBadge(tasks) {
+  const badge = document.getElementById("task-badge");
+  const btn = document.getElementById("task-nav-btn");
+  if (!badge) return;
+  const running = tasks.filter(t => t.status === "running").length;
+  const pending = tasks.filter(t => t.status === "pending_catchup").length;
+  const active = running + pending;
+  const done = tasks.filter(t => t.status === "success").length;
+  const total = tasks.length;
+  if (total === 0) {
+    badge.style.display = "none";
+    badge.removeAttribute("data-count");
+    if (btn) btn.classList.remove("has-active");
+    return;
+  }
+  if (active > 0) {
+    badge.setAttribute("data-count", String(active));
+    badge.setAttribute("data-has-running", "true");
+    badge.textContent = String(active);
+    badge.style.display = "";
+    if (btn) btn.classList.add("has-active");
+  } else if (done < total) {
+    badge.setAttribute("data-count", String(total - done));
+    badge.removeAttribute("data-has-running");
+    badge.textContent = String(total - done);
+    badge.style.display = "";
+    if (btn) btn.classList.remove("has-active");
+  } else {
+    badge.setAttribute("data-count", "");
+    badge.removeAttribute("data-has-running");
+    badge.style.display = "none";
+    if (btn) btn.classList.remove("has-active");
+  }
+}
+
+function toggleTaskPanel() {
+  const panel = document.getElementById("task-panel");
+  if (!panel) return;
+  _taskPanelOpen = !_taskPanelOpen;
+  panel.style.display = _taskPanelOpen ? "" : "none";
+  if (_taskPanelOpen) {
+    _fetchTasks();
+    _renderTaskPanel(_cachedTasks);
+  }
+}
+
+function _renderTaskPanel(tasks) {
+  const body = document.getElementById("task-panel-body");
+  const countEl = document.getElementById("task-panel-count");
+  if (!body) return;
+
+  if (!tasks || tasks.length === 0) {
+    body.innerHTML = `<div class="task-panel-empty">${t("tasks.noTasks")}</div>`;
+    if (countEl) countEl.textContent = "";
+    return;
+  }
+
+  const done = tasks.filter(t => t.status === "success").length;
+  if (countEl) countEl.textContent = `${done}/${tasks.length}`;
+
+  let html = "";
+  for (const task of tasks) {
+    const statusLabel = _taskStatusLabel(task.status);
+    const timeStr = _taskTimeDisplay(task);
+    const tName = (_lang === "en" ? task.name_en : task.name_zh) || task.name_zh || task.task_id;
+    html += `<div class="task-item" title="${_escAttr(tName)}">
+      <span class="task-item-icon">${task.icon || "🤖"}</span>
+      <div class="task-item-body">
+        <span class="task-item-name">${_escHtml(tName)}</span>
+        <div class="task-item-meta">
+          <span class="task-item-dot" data-status="${task.status}"></span>
+          <span class="task-item-status-text" data-status="${task.status}">${statusLabel}</span>
+          <span>${timeStr}</span>
+        </div>
+      </div>
+    </div>`;
+  }
+  body.innerHTML = html;
+}
+
+function _taskStatusLabel(status) {
+  const map = {
+    planned: t("tasks.planned"),
+    pending_catchup: t("tasks.pendingCatchup"),
+    running: t("tasks.running"),
+    success: t("tasks.success"),
+    failed: t("tasks.failed"),
+  };
+  return map[status] || status;
+}
+
+function _taskTimeDisplay(task) {
+  if (task.status === "success" && task.finished_at) {
+    try {
+      const d = new Date(task.finished_at);
+      const hh = String(d.getHours()).padStart(2, "0");
+      const mm = String(d.getMinutes()).padStart(2, "0");
+      let label = `${hh}:${mm} ✓`;
+      if (task.trigger === "startup" || task.trigger === "resume") {
+        label += ` (${t("tasks.catchupNote")})`;
+      }
+      return label;
+    } catch (_) {}
+  }
+  if (task.status === "running") {
+    return task.scheduled_time ? `${task.scheduled_time} →` : "→";
+  }
+  if (task.status === "failed") {
+    return task.scheduled_time || "";
+  }
+  if (task.status === "pending_catchup") {
+    return task.scheduled_time ? `${task.scheduled_time} ⏎` : "⏎";
+  }
+  return task.scheduled_time || "";
+}
+
+function _escHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function _escAttr(s) { return String(s).replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+
+function updateTaskPanel() { _fetchTasks(); }
+
+document.addEventListener("click", (e) => {
+  if (!_taskPanelOpen) return;
+  const panel = document.getElementById("task-panel");
+  const btn = document.getElementById("task-nav-btn");
+  if (panel && !panel.contains(e.target) && btn && !btn.contains(e.target)) {
+    _taskPanelOpen = false;
+    panel.style.display = "none";
+  }
+});
+
 async function openCustomAppWizardEdit(appId) {
   let capp;
   try { capp = await api(`/api/apps/custom/${appId}`); } catch (_) {}
   if (!capp || capp.error) { toast("App not found", "error"); return; }
   openCustomAppWizard(null, null, capp);
 }
+
+// ── Security Mode ────────────────────────────────────────────────
+let currentSecurityMode = "Assistant";
+
+async function loadSecurityMode() {
+  try {
+    const data = await api("/api/security/mode");
+    if (data && data.mode) {
+      currentSecurityMode = data.mode;
+      const sel = document.getElementById("security-mode-select");
+      if (sel) {
+        if (data.mode === "Developer") {
+          _ensureDevOption(sel);
+        }
+        sel.value = data.mode;
+      }
+      updateSecurityModeHint(data.mode);
+    }
+    _updateDevModeIndicator();
+  } catch (_) {}
+}
+
+function _ensureDevOption(sel) {
+  if (!sel.querySelector('option[value="Developer"]')) {
+    const opt = document.createElement("option");
+    opt.value = "Developer";
+    opt.dataset.i18n = "security.opt.Developer";
+    opt.textContent = t("security.opt.Developer");
+    sel.appendChild(opt);
+  }
+}
+
+async function switchSecurityMode(mode) {
+  if (mode === "Developer") {
+    toast(t("security.devRequired"), "error");
+    const sel = document.getElementById("security-mode-select");
+    if (sel) sel.value = currentSecurityMode;
+    return;
+  }
+  try {
+    const data = await api("/api/security/mode", "POST", { mode });
+    if (data && data.mode) {
+      currentSecurityMode = data.mode;
+      updateSecurityModeHint(data.mode);
+      toast(`${t("security.switched")} ${_modeName(data.mode)}`, "success");
+    } else if (data && data.error) {
+      toast(data.error, "error");
+      const sel = document.getElementById("security-mode-select");
+      if (sel) sel.value = currentSecurityMode;
+    } else {
+      toast(t("security.switchFail"), "error");
+    }
+  } catch (e) {
+    toast(`${t("security.switchFail")}: ${e}`, "error");
+    const sel = document.getElementById("security-mode-select");
+    if (sel) sel.value = currentSecurityMode;
+  }
+}
+
+function updateSecurityModeHint(mode) {
+  const hint = document.getElementById("security-mode-hint");
+  if (hint) hint.textContent = t(`security.${mode}`) || "";
+  const bar = document.getElementById("security-mode-bar");
+  if (bar) {
+    bar.className = "security-mode-bar security-mode-" + mode.toLowerCase();
+  }
+}
+
+async function _updateDevModeIndicator() {
+  const indicator = document.getElementById("dev-mode-indicator");
+  if (!indicator) return;
+  try {
+    const data = await api("/api/security/dev/status");
+    if (data.enabled && !data.is_expired) {
+      indicator.style.display = "inline-flex";
+      const remaining = data.remaining_seconds;
+      if (remaining !== null && remaining !== undefined) {
+        const mins = Math.ceil(remaining / 60);
+        indicator.textContent = `🔓 ${_modeName("Developer")} (${mins}m)`;
+        indicator.className = "dev-mode-indicator dev-active";
+      } else {
+        indicator.textContent = `🔓 ${_modeName("Developer")}`;
+        indicator.className = "dev-mode-indicator dev-active";
+      }
+    } else {
+      indicator.style.display = "none";
+    }
+  } catch (_) {
+    indicator.style.display = "none";
+  }
+}
+
+async function openDevModeSettings() {
+  let status;
+  try { status = await api("/api/security/dev/status"); } catch (_) { status = {}; }
+
+  const isActive = status.enabled && !status.is_expired;
+  const remaining = status.remaining_seconds;
+  const policy = status.expiry_policy || "on_app_close";
+
+  const modal = document.createElement("div");
+  modal.className = "modal-overlay";
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+
+  if (isActive) {
+    const remStr = remaining !== null && remaining !== undefined
+      ? `${Math.ceil(remaining / 60)} ${t("security.devUnit.min")}`
+      : t("security.devExpiry.on_app_close");
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width:400px;">
+        <h3 style="margin:0 0 12px;">🔓 ${t("security.devActive")}</h3>
+        <div style="margin-bottom:8px;">
+          <strong>${t("security.devExpiry")}:</strong> ${t("security.devExpiry." + policy)}
+        </div>
+        <div style="margin-bottom:16px;">
+          <strong>${t("security.devRemaining")}:</strong> ${remStr}
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button class="btn" onclick="this.closest('.modal-overlay').remove()">${t("security.devClose")}</button>
+          <button class="btn btn-danger" onclick="_disableDevMode(this)">${t("security.devDisable")}</button>
+        </div>
+      </div>
+    `;
+  } else {
+    modal.innerHTML = `
+      <div class="modal-card" style="max-width:420px;">
+        <h3 style="margin:0 0 12px;">⚙️ ${t("security.devEnable")}</h3>
+        <div style="margin-bottom:8px;color:var(--text-danger,#dc3545);">
+          ⚠️ ${t("security.devCard.warning")}
+        </div>
+        <div class="form-group" style="margin:12px 0;">
+          <label>${t("security.devExpiry")}</label>
+          <select id="dev-expiry-select" class="digest-select">
+            <option value="on_app_close">${t("security.devExpiry.on_app_close")}</option>
+            <option value="duration_1h">${t("security.devExpiry.duration_1h")}</option>
+            <option value="duration_24h">${t("security.devExpiry.duration_24h")}</option>
+          </select>
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;">
+          <button class="btn" onclick="this.closest('.modal-overlay').remove()">${t("custom.escalation.cancel")}</button>
+          <button class="btn btn-danger" onclick="_enableDevMode(this)">${t("security.devEnable")}</button>
+        </div>
+      </div>
+    `;
+  }
+  document.body.appendChild(modal);
+}
+
+async function _enableDevMode(btn) {
+  const modal = btn.closest(".modal-overlay");
+  const sel = modal.querySelector("#dev-expiry-select");
+  const policy = sel ? sel.value : "on_app_close";
+  btn.disabled = true;
+  try {
+    const res = await api("/api/security/dev/enable", "POST", { expiry_policy: policy });
+    if (res.success) {
+      toast(t("security.devActive"), "success");
+      modal.remove();
+      const globalSel = document.getElementById("security-mode-select");
+      if (globalSel) {
+        _ensureDevOption(globalSel);
+        globalSel.value = "Developer";
+      }
+      await api("/api/security/mode", "POST", { mode: "Developer" });
+      currentSecurityMode = "Developer";
+      updateSecurityModeHint("Developer");
+      _updateDevModeIndicator();
+    } else {
+      toast(res.error || t("security.switchFail"), "error");
+      btn.disabled = false;
+    }
+  } catch (e) {
+    toast(e.message, "error");
+    btn.disabled = false;
+  }
+}
+
+async function _disableDevMode(btn) {
+  btn.disabled = true;
+  try {
+    const res = await api("/api/security/dev/disable", "POST");
+    if (res.success) {
+      toast(t("security.devDisabled"), "info");
+      btn.closest(".modal-overlay").remove();
+      currentSecurityMode = res.reverted_to || "Operator";
+      const sel = document.getElementById("security-mode-select");
+      if (sel) {
+        const devOpt = sel.querySelector('option[value="Developer"]');
+        if (devOpt) devOpt.remove();
+        sel.value = currentSecurityMode;
+      }
+      updateSecurityModeHint(currentSecurityMode);
+      _updateDevModeIndicator();
+    }
+  } catch (e) {
+    toast(e.message, "error");
+    btn.disabled = false;
+  }
+}
+
+// Load security mode on startup
+document.addEventListener("DOMContentLoaded", () => { loadSecurityMode(); });
+
+// ── Plan Confirmation ────────────────────────────────────────────
+
+let _pendingPollTimer = null;
+
+function startPendingPoll() {
+  // Confirmation is now handled inline in the chat conversation.
+  // No modal polling needed.
+}
+
+function stopPendingPoll() {
+  if (_pendingPollTimer) { clearInterval(_pendingPollTimer); _pendingPollTimer = null; }
+}
+
+async function checkPendingActions() {
+  // No-op: confirmation handled via chat.
+}
+
+function showPlanConfirmModal(action) {
+  const modal = document.getElementById("plan-confirm-modal");
+  if (!modal) return;
+
+  const riskBadge = document.getElementById("plan-risk-badge");
+  const explainEl = document.getElementById("plan-explain");
+  const detailEl = document.getElementById("plan-detail");
+  const evidenceEl = document.getElementById("plan-evidence");
+
+  const risk = action.risk || 0;
+  let riskClass = "plan-risk-low";
+  let riskLabel = "Low Risk";
+  if (risk > 70) { riskClass = "plan-risk-critical"; riskLabel = "Critical Risk"; }
+  else if (risk > 50) { riskClass = "plan-risk-high"; riskLabel = "High Risk"; }
+  else if (risk > 30) { riskClass = "plan-risk-medium"; riskLabel = "Medium Risk"; }
+
+  riskBadge.className = "plan-risk-badge " + riskClass;
+  riskBadge.textContent = `${riskLabel} (${risk}/100)`;
+  explainEl.textContent = action.explain || "";
+  detailEl.textContent = `${action.tool_name}(${JSON.stringify(action.tool_args || {}).substring(0, 200)})`;
+
+  const ev = action.evidence || {};
+  evidenceEl.innerHTML = [
+    ev.mode ? `Mode: ${ev.mode}` : "",
+    ev.capability ? `Capability: ${ev.capability}.${ev.op || ""}` : "",
+    ev.matched_rule ? `Rule: ${ev.matched_rule}` : "",
+  ].filter(Boolean).map(s => `<div>${s}</div>`).join("");
+
+  const confirmBtn = document.getElementById("plan-confirm-btn");
+  const rejectBtn = document.getElementById("plan-reject-btn");
+  confirmBtn.onclick = () => confirmPendingAction(action.action_id);
+  rejectBtn.onclick = () => rejectPendingAction(action.action_id);
+
+  modal.style.display = "flex";
+}
+
+function closePlanConfirmModal() {
+  const modal = document.getElementById("plan-confirm-modal");
+  if (modal) modal.style.display = "none";
+}
+
+async function confirmPendingAction(actionId) {
+  closePlanConfirmModal();
+  try {
+    const result = await api(`/api/plan/confirm/${actionId}`, "POST");
+    if (result.success) {
+      toast(t("plan.confirmed") || "操作已确认并执行", "success");
+      if (result.cooldown_seconds) {
+        showCooldownToast(actionId, result.cooldown_seconds, result.capability || "");
+      }
+    } else {
+      toast(`${t("plan.confirmFail") || "执行失败"}: ${result.error}`, "error");
+    }
+  } catch (e) {
+    toast(`Error: ${e}`, "error");
+  }
+}
+
+async function rejectPendingAction(actionId) {
+  closePlanConfirmModal();
+  try {
+    await api(`/api/plan/reject/${actionId}`, "POST");
+    toast(t("plan.rejected") || "操作已拒绝", "info");
+  } catch (e) {
+    toast(`Error: ${e}`, "error");
+  }
+}
+
+// Start polling when chat page is active
+document.addEventListener("DOMContentLoaded", () => { startPendingPoll(); });
+
+// ── Cooldown Toast ───────────────────────────────────────────────
+
+function showCooldownToast(actionId, seconds, capability) {
+  const container = document.getElementById("cooldown-container");
+  if (!container) return;
+
+  const toast = document.createElement("div");
+  toast.className = "cooldown-toast";
+  toast.id = `cooldown-${actionId}`;
+
+  let remaining = seconds;
+  toast.innerHTML = `
+    <div class="cooldown-timer" id="cd-timer-${actionId}">${remaining}</div>
+    <div class="cooldown-info">
+      <div class="cooldown-action">${capability || "操作"}</div>
+      <div style="color:var(--text-dim);font-size:0.8rem">冷静期内可撤销</div>
+    </div>
+    <button class="btn-cooldown-undo" onclick="cooldownUndo('${actionId}')">撤销</button>
+  `;
+  container.appendChild(toast);
+
+  const timerEl = document.getElementById(`cd-timer-${actionId}`);
+  const interval = setInterval(() => {
+    remaining--;
+    if (timerEl) timerEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(interval);
+      toast.remove();
+    }
+  }, 1000);
+}
+
+async function cooldownUndo(actionId) {
+  const el = document.getElementById(`cooldown-${actionId}`);
+  try {
+    const result = await api(`/api/undo/${actionId}`, "POST");
+    if (result.success) {
+      toast(t("audit.undoSuccess") || "撤销成功", "success");
+    } else {
+      toast(`${t("audit.undoFail") || "撤销失败"}: ${result.error}`, "error");
+    }
+  } catch (e) {
+    toast(`Error: ${e}`, "error");
+  }
+  if (el) el.remove();
+}
+
+// ── Audit & Undo ─────────────────────────────────────────────────
+
+async function loadAuditPage() {
+  const listEl = document.getElementById("audit-list");
+  const undoEl = document.getElementById("undo-list");
+  if (!listEl) return;
+
+  try {
+    const [entries, actions] = await Promise.all([
+      api("/api/audit/recent?n=50"),
+      api("/api/undo/actions?undoable=true"),
+    ]);
+
+    if (!entries || entries.length === 0) {
+      listEl.innerHTML = `<div class="empty-hint">${t("audit.empty")}</div>`;
+    } else {
+      listEl.innerHTML = entries.map(e => `
+        <div class="audit-entry">
+          <div class="audit-entry-header">
+            <span class="audit-cap">${e.capability || ""}</span>
+            <span class="audit-mode">${e.mode || ""}</span>
+            <span class="audit-ts">${e.ts ? new Date(e.ts).toLocaleString() : ""}</span>
+          </div>
+          <div class="audit-entry-detail">
+            <span class="audit-risk">risk: ${e.decision?.risk ?? "?"}</span>
+            <span class="audit-hash" title="${e.entry_hash || ""}">#${(e.entry_hash || "").slice(0, 8)}</span>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    if (!actions || actions.length === 0) {
+      undoEl.innerHTML = `<div class="empty-hint">${t("audit.noUndo")}</div>`;
+    } else {
+      const now = Date.now() / 1000;
+      undoEl.innerHTML = actions.map(a => {
+        const inCooldown = a.cooldown_until && a.cooldown_until > now;
+        const cooldownLeft = inCooldown ? Math.ceil(a.cooldown_until - now) : 0;
+        return `
+          <div class="undo-entry${inCooldown ? " undo-cooldown" : ""}">
+            <div class="undo-info">
+              <span class="undo-cap">${a.capability}.${a.op}</span>
+              <span class="undo-ts">${new Date(a.ts * 1000).toLocaleString()}</span>
+              ${inCooldown ? `<span class="cooldown-badge">冷静期 ${cooldownLeft}s</span>` : ""}
+            </div>
+            <button class="btn-undo" onclick="undoAction('${a.action_id}')"${a.undone ? " disabled" : ""}>
+              ${a.undone ? "已撤销" : "撤销"}
+            </button>
+          </div>`;
+      }).join("");
+    }
+  } catch (e) {
+    listEl.innerHTML = `<div class="empty-hint">Error: ${e}</div>`;
+  }
+}
+
+async function verifyAuditChain() {
+  const statusEl = document.getElementById("audit-chain-status");
+  try {
+    const result = await api("/api/audit/verify");
+    if (result.valid) {
+      statusEl.innerHTML = `<div class="audit-valid">${t("audit.chainValid")} (${result.entries_checked} entries)</div>`;
+    } else {
+      statusEl.innerHTML = `<div class="audit-invalid">${t("audit.chainInvalid")}: ${result.error}</div>`;
+    }
+  } catch (e) {
+    statusEl.innerHTML = `<div class="audit-invalid">Error: ${e}</div>`;
+  }
+}
+
+async function exportAuditChain() {
+  try {
+    const resp = await fetch("/api/audit/export");
+    const blob = await resp.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "audit_chain.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    toast(`Export failed: ${e}`, "error");
+  }
+}
+
+async function undoAction(actionId) {
+  try {
+    const result = await api(`/api/undo/${actionId}`, "POST");
+    if (result.success) {
+      toast(t("audit.undoSuccess"), "success");
+      loadAuditPage();
+    } else {
+      toast(`${t("audit.undoFail")}: ${result.error}`, "error");
+    }
+  } catch (e) {
+    toast(`${t("audit.undoFail")}: ${e}`, "error");
+  }
+}
+
+// ── Privacy & Personalization ────────────────────────────────────
+
+async function loadPrivacySettings() {
+  try {
+    const data = await api("/api/profile/collection");
+    if (data) {
+      const br = document.getElementById("privacy-browser");
+      const ch = document.getElementById("privacy-chat");
+      const fi = document.getElementById("privacy-file");
+      const ret = document.getElementById("privacy-retention");
+      const paths = document.getElementById("privacy-watch-paths");
+      if (br) br.checked = data.browser_history !== false;
+      if (ch) ch.checked = data.chat_history !== false;
+      if (fi) fi.checked = !!data.file_history;
+      if (ret) ret.value = data.retention_days || 90;
+      if (paths && data.watch_paths) paths.value = (data.watch_paths || []).join("\n");
+      toggleFileWatchPaths();
+    }
+  } catch (_) {}
+  updatePersonaStatusBanner();
+  loadPersonaEffect();
+}
+
+function toggleFileWatchPaths() {
+  const fi = document.getElementById("privacy-file");
+  const item = document.getElementById("file-watch-paths-item");
+  if (item) item.style.display = fi?.checked ? "" : "none";
+}
+
+function updatePersonaStatusBanner() {
+  const br = document.getElementById("privacy-browser")?.checked;
+  const ch = document.getElementById("privacy-chat")?.checked;
+  const fi = document.getElementById("privacy-file")?.checked;
+  const banner = document.getElementById("persona-status-banner");
+  const text = document.getElementById("persona-status-text");
+  if (!banner || !text) return;
+
+  const anyOn = br || ch || fi;
+  if (!anyOn) {
+    banner.style.display = "";
+    text.textContent = t("privacy.statusOff");
+    banner.style.borderLeftColor = "var(--yellow)";
+  } else {
+    banner.style.display = "";
+    text.textContent = t("privacy.statusOn");
+    banner.style.borderLeftColor = "var(--green)";
+  }
+}
+
+async function savePrivacySettings() {
+  const pathsText = document.getElementById("privacy-watch-paths")?.value || "";
+  const watchPaths = pathsText.split("\n").map(p => p.trim()).filter(p => p.length > 0);
+  const settings = {
+    browser_history: document.getElementById("privacy-browser")?.checked ?? true,
+    chat_history: document.getElementById("privacy-chat")?.checked ?? true,
+    file_history: document.getElementById("privacy-file")?.checked ?? false,
+    watch_paths: watchPaths,
+    retention_days: parseInt(document.getElementById("privacy-retention")?.value || "90", 10),
+  };
+  try {
+    await api("/api/profile/collection", "POST", settings);
+    toast(t("privacy.saved"), "success");
+  } catch (e) {
+    toast(`Error: ${e}`, "error");
+  }
+  updatePersonaStatusBanner();
+}
+
+async function generatePersona() {
+  const btn = event?.target;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = t("privacy.generating");
+  }
+  try {
+    await api("/api/profile/persona/update", "POST", { force: true });
+    toast(t("privacy.generated"), "success");
+    loadPersonaEffect();
+  } catch (e) {
+    toast(`Error: ${e}`, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = t("privacy.generate");
+    }
+  }
+}
+
+async function loadPersonaEffect() {
+  const section = document.getElementById("persona-effect-section");
+  const styleText = document.getElementById("persona-style-text");
+  const directionText = document.getElementById("persona-direction-text");
+  if (!section) return;
+
+  try {
+    const persona = await api("/api/profile/persona");
+    if (!persona || persona.confidence_score < 0.05) {
+      section.style.display = "none";
+      return;
+    }
+
+    const zh = _lang === "zh";
+    let styleParts = [];
+    const dec = persona.decision || {};
+    if (dec.structure_preference) styleParts.push(dec.structure_preference);
+    if (dec.noise_tolerance) styleParts.push((zh ? "噪声容忍" : "noise tolerance") + ": " + dec.noise_tolerance);
+    if (dec.execution_bias) styleParts.push(dec.execution_bias);
+    if (dec.risk_preference) styleParts.push((zh ? "风险偏好" : "risk") + ": " + dec.risk_preference);
+
+    if (styleParts.length === 0) {
+      styleParts.push(zh
+        ? "结构清晰、结论优先、少废话，优先给可落地步骤。"
+        : "Clear structure, conclusions first, actionable steps.");
+    }
+
+    if (styleText) styleText.textContent = styleParts.join("；");
+
+    let dirParts = [];
+    const interests = persona.interests || {};
+    const weights = interests.topic_weight || {};
+    const topTopics = Object.entries(weights)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([k]) => k);
+    if (topTopics.length) {
+      dirParts.push((zh ? "更关注" : "Focus on") + " " + topTopics.join("、"));
+    }
+    const rising = interests.trend_shift || {};
+    const risingKeys = Object.entries(rising)
+      .filter(([, v]) => v > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([k]) => k);
+    if (risingKeys.length) {
+      dirParts.push((zh ? "上升趋势" : "Rising") + ": " + risingKeys.join("、"));
+    }
+
+    if (dirParts.length === 0) {
+      dirParts.push(zh
+        ? "暂无推荐方向数据，点击「生成个性化」开始。"
+        : "No direction data yet. Click 'Generate' to start.");
+    }
+
+    if (directionText) directionText.textContent = dirParts.join("；\n");
+    section.style.display = "";
+  } catch (_) {
+    section.style.display = "none";
+  }
+}
+
+function copyPersonaBlock(which) {
+  let text = "";
+  if (which === "style") {
+    text = document.getElementById("persona-style-text")?.textContent || "";
+  } else if (which === "direction") {
+    text = document.getElementById("persona-direction-text")?.textContent || "";
+  }
+  if (text) {
+    navigator.clipboard.writeText(text).then(() => {
+      toast(t("privacy.copied"), "success");
+    });
+  }
+}
+
+function editPersonaBlock(layerName) {
+  const cardId = layerName === "decision" ? "persona-effect-style" : "persona-effect-direction";
+  const textId = layerName === "decision" ? "persona-style-text" : "persona-direction-text";
+  const card = document.getElementById(cardId);
+  const textEl = document.getElementById(textId);
+  if (!card || !textEl) return;
+
+  if (card.querySelector(".persona-edit-textarea")) return;
+
+  const current = textEl.textContent;
+  textEl.style.display = "none";
+
+  const textarea = document.createElement("textarea");
+  textarea.className = "persona-edit-textarea";
+  textarea.value = current;
+  card.appendChild(textarea);
+
+  const actions = document.createElement("div");
+  actions.className = "persona-edit-actions";
+  actions.innerHTML = `<button class="btn-secondary" data-action="cancel">${_lang === "zh" ? "取消" : "Cancel"}</button>
+    <button class="btn btn-primary" data-action="save">${_lang === "zh" ? "保存" : "Save"}</button>`;
+  card.appendChild(actions);
+
+  textarea.focus();
+
+  actions.addEventListener("click", async (e) => {
+    const action = e.target.dataset?.action;
+    if (action === "cancel") {
+      textarea.remove();
+      actions.remove();
+      textEl.style.display = "";
+    } else if (action === "save") {
+      const newVal = textarea.value.trim();
+      try {
+        const patch = {};
+        if (layerName === "decision") {
+          patch.structure_preference = newVal;
+        } else {
+          // Not directly editable as a single field — update via manual layer edit as text
+        }
+        await api(`/api/profile/persona/layer/${layerName}`, "POST", patch);
+        toast(t("privacy.editSaved"), "success");
+        textEl.textContent = newVal;
+      } catch (err) {
+        toast(`Error: ${err}`, "error");
+      }
+      textarea.remove();
+      actions.remove();
+      textEl.style.display = "";
+    }
+  });
+}
+
+async function clearProfile() {
+  const zh = _lang === "zh";
+  if (!confirm(zh ? "确定要清空所有个性化数据？" : "Clear all personalization data?")) return;
+  try {
+    await api("/api/profile/clear", "POST");
+    toast(t("privacy.cleared"), "success");
+    const section = document.getElementById("persona-effect-section");
+    if (section) section.style.display = "none";
+  } catch (e) {
+    toast(`Clear failed: ${e}`, "error");
+  }
+}
+
+// Load privacy settings when opening settings page
+const _origLoadConfig = typeof loadConfig === "function" ? loadConfig : null;
+if (_origLoadConfig) {
+  const _wrappedLoadConfig = loadConfig;
+  loadConfig = function() {
+    _wrappedLoadConfig.apply(this, arguments);
+    loadPrivacySettings();
+  };
+}
+

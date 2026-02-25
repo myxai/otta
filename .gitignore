@@ -1,1 +1,5 @@
-__pycache__/app.cpython-311.pyc
+__pycache__/
+apps/__pycache__/
+*.pyc
+*.pyo
+*.pyd

@@ -1,0 +1,44 @@
+id: "custom_app"
+name: "自定义应用引擎"
+name_en: "Custom App Engine"
+version: "2.0.0"
+source: "official"
+entry: "prompt"
+prompt_file: "prompt.md"
+description: "用户自建 Prompt 模板应用——定义模板、参数、输出格式和调度，一切委托给 Agent 执行。"
+description_en: "User-defined prompt template apps with parameters, output formats, and scheduling."
+author: "MyxAI"
+
+triggers:
+  - type: "manual"
+  - type: "cron"
+    cron: ""
+
+permissions:
+  - "fs.read"
+  - "fs.write"
+  - "search.web"
+  - "net.http_get"
+  - "notify.push"
+  - "profile.read.summary"
+
+budgets:
+  tokens_per_day: 200000
+  search_calls_per_day: 100
+
+mode_requirements:
+  min_mode: "Observer"
+
+data_policy:
+  allow_raw_history: false
+  allow_network_exfiltration: false
+
+outputs:
+  - type: "report.html"
+    path: "reports/{{date}}_{{app_id}}.html"
+  - type: "notification"
+  - type: "text"
+
+ui:
+  icon: "🤖"
+  category: "custom"

@@ -1264,16 +1264,42 @@ def _extract_prev_titles(date_str: str) -> list[str]:
     return [re.sub(r"<[^>]+>", "", t).strip() for t in titles if t.strip()]
 
 
+_READ_FILE = _DIGEST_DIR / "read_reports.json"
+
+
+def _load_read_set() -> set[str]:
+    try:
+        if _READ_FILE.exists():
+            return set(json.loads(_READ_FILE.read_text(encoding="utf-8")))
+    except Exception:
+        pass
+    return set()
+
+
+def _save_read_set(s: set[str]):
+    _DIGEST_DIR.mkdir(parents=True, exist_ok=True)
+    _READ_FILE.write_text(json.dumps(list(s), ensure_ascii=False), encoding="utf-8")
+
+
+def mark_report_read(key: str):
+    s = _load_read_set()
+    s.add(key)
+    _save_read_set(s)
+
+
 def list_reports(limit: int = 30) -> list[dict]:
     if not _REPORTS_DIR.exists():
         return []
+    read_set = _load_read_set()
     reports = []
     for f in sorted(_REPORTS_DIR.glob("*.json"), reverse=True)[:limit]:
         try:
             d = json.loads(f.read_text(encoding="utf-8"))
+            key = d.get("date", f.stem)
             reports.append({
-                "date": d.get("date", f.stem),
+                "date": key,
                 "generated_at": d.get("generated_at", ""),
+                "read": key in read_set,
             })
         except Exception:
             pass
