@@ -191,79 +191,6 @@ def _push_notification(title: str, content: str, level: str = "info"):
 
 import re as _re
 
-
-# ---------------------------------------------------------------------------
-# OllamaProvider: lightweight wrapper for local Ollama with better compat
-# ---------------------------------------------------------------------------
-class _OllamaProvider:
-    """OpenAI-compatible provider tuned for Ollama quirks.
-
-    Differences from CustomProvider:
-    - Does NOT send tool_choice (many Ollama models choke on it)
-    - Logs errors instead of silently returning them as text
-    - Supports optional request timeout
-    """
-
-    def __init__(self, api_key: str, api_base: str, default_model: str,
-                 timeout: float = 300.0):
-        from openai import AsyncOpenAI
-        self.default_model = default_model
-        self._client = AsyncOpenAI(
-            api_key=api_key, base_url=api_base, timeout=timeout,
-        )
-
-    async def chat(self, messages, tools=None, model=None,
-                   max_tokens: int = 4096, temperature: float = 0.7):
-        from nanobot.providers.base import LLMResponse, ToolCallRequest
-        import json_repair
-
-        kwargs = {
-            "model": model or self.default_model,
-            "messages": messages,
-            "max_tokens": max(1, max_tokens),
-            "temperature": temperature,
-        }
-        if tools:
-            kwargs["tools"] = tools
-        try:
-            resp = await self._client.chat.completions.create(**kwargs)
-        except Exception as e:
-            print(f"[ollama] LLM call error: {e}")
-            return LLMResponse(content=f"Error: {e}", finish_reason="error")
-
-        choice = resp.choices[0]
-        msg = choice.message
-        tc_list = []
-        for tc in (msg.tool_calls or []):
-            try:
-                args = (json_repair.loads(tc.function.arguments)
-                        if isinstance(tc.function.arguments, str)
-                        else tc.function.arguments)
-            except Exception:
-                args = {}
-                print(f"[ollama] bad tool args for {tc.function.name}: "
-                      f"{tc.function.arguments!r}")
-            tc_list.append(ToolCallRequest(
-                id=tc.id, name=tc.function.name, arguments=args,
-            ))
-
-        u = resp.usage
-        return LLMResponse(
-            content=msg.content,
-            tool_calls=tc_list,
-            finish_reason=choice.finish_reason or "stop",
-            usage={
-                "prompt_tokens": u.prompt_tokens,
-                "completion_tokens": u.completion_tokens,
-                "total_tokens": u.total_tokens,
-            } if u else {},
-            reasoning_content=getattr(msg, "reasoning_content", None),
-        )
-
-    def get_default_model(self) -> str:
-        return self.default_model
-
-
 _EXEC_TRIGGER = _re.compile(
     r"提醒|定时|闹钟|计划|取消|删除|清除|移除|搜索|查找|查询|"
     r"打开|访问|下载|安装|执行|运行|创建|新建|添加|设置|修改|"
@@ -506,12 +433,6 @@ def _patch_agent_tool_history(agent):
                 + style_hint
             )
 
-        _oll = _load_ollama_cfg()
-        if _oll.get("enabled") and not _oll.get("thinking", False):
-            _model_name = (_oll.get("model") or "").lower()
-            if "qwen3" in _model_name or "qwen2.5" in _model_name:
-                mode_hint += "\n/no_think"
-
         return base + mode_hint
 
     agent.context.build_system_prompt = _enhanced_system_prompt
@@ -593,13 +514,10 @@ def _patch_agent_tool_history(agent):
         _turn_input = 0
         _turn_output = 0
         _turn_search = 0
-        _is_ollama = bool(_load_ollama_cfg().get("enabled"))
 
         try:
             while iteration < self.max_iterations:
                 iteration += 1
-                if progress and _is_ollama and iteration == 1:
-                    await progress("🔒 本地推理中…")
                 response = await self.provider.chat(
                     messages=messages,
                     tools=tool_defs,
@@ -800,26 +718,8 @@ def _get_or_create_agent():
         config = load_config()
         bus = MessageBus()
 
-        # Ollama / privacy-mode override
-        _ollama_cfg = _load_ollama_cfg()
-        _ollama_active = bool(
-            _ollama_cfg.get("enabled") and _ollama_cfg.get("model")
-        )
-
-        if _ollama_active:
-            _ohost = _ollama_cfg.get("host", "127.0.0.1")
-            _oport = _ollama_cfg.get("port", 11434)
-            _ollama_model = _ollama_cfg["model"]
-            provider = _OllamaProvider(
-                api_key="ollama",
-                api_base=f"http://{_ohost}:{_oport}/v1",
-                default_model=_ollama_model,
-            )
-            _agent_model = _ollama_model
-            print(f"[ollama] Privacy mode: {_ollama_model} via {_ohost}:{_oport}")
-        else:
-            provider = _make_provider(config)
-            _agent_model = config.agents.defaults.model
+        provider = _make_provider(config)
+        _agent_model = config.agents.defaults.model
 
         cron_store = get_data_dir() / "cron" / "jobs.json"
         cron = CronService(cron_store)
@@ -1267,100 +1167,6 @@ def api_onboard():
 
 
 # ---------------------------------------------------------------------------
-# Ollama config — stored separately to avoid nanobot Pydantic validation
-# ---------------------------------------------------------------------------
-
-_OLLAMA_CFG_FILE = Path.home() / ".nanobot" / "ollama.json"
-
-
-def _load_ollama_cfg() -> dict:
-    """Read ollama config from its dedicated file."""
-    try:
-        if _OLLAMA_CFG_FILE.exists():
-            return json.loads(_OLLAMA_CFG_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        pass
-    return {}
-
-
-def _save_ollama_cfg(cfg: dict) -> None:
-    """Write ollama config to its dedicated file."""
-    _OLLAMA_CFG_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _OLLAMA_CFG_FILE.write_text(
-        json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8",
-    )
-
-
-def _migrate_ollama_from_main_config() -> None:
-    """One-time migration: extract ``ollama`` from config.json if present."""
-    if _OLLAMA_CFG_FILE.exists():
-        return
-    try:
-        if not NANOBOT_AVAILABLE:
-            return
-        from nanobot.config.loader import get_config_path
-        cp = get_config_path()
-        if not cp.exists():
-            return
-        raw = json.loads(cp.read_text(encoding="utf-8"))
-        if "ollama" not in raw:
-            return
-        _save_ollama_cfg(raw.pop("ollama"))
-        cp.write_text(json.dumps(raw, indent=2, ensure_ascii=False), encoding="utf-8")
-        print("[ollama] Migrated ollama config to separate file")
-    except Exception as exc:
-        print(f"[ollama] Migration skipped: {exc}")
-
-
-_migrate_ollama_from_main_config()
-
-
-# ---------------------------------------------------------------------------
-# Routes — Ollama (local model) detection
-# ---------------------------------------------------------------------------
-
-@flask_app.route("/api/ollama/status")
-def api_ollama_status():
-    """Probe local Ollama instance and return available models."""
-    import urllib.request
-
-    ollama_cfg = _load_ollama_cfg()
-    host = ollama_cfg.get("host", "127.0.0.1")
-    port = ollama_cfg.get("port", 11434)
-
-    try:
-        url = f"http://{host}:{port}/api/tags"
-        req = urllib.request.Request(url, method="GET")
-        with urllib.request.urlopen(req, timeout=3) as resp:
-            data = json.loads(resp.read())
-        models = [
-            {
-                "name": m.get("name", ""),
-                "size": m.get("size", 0),
-                "modified": m.get("modified_at", ""),
-            }
-            for m in data.get("models", [])
-        ]
-        return jsonify({
-            "available": True,
-            "models": models,
-            "host": host,
-            "port": port,
-            "enabled": ollama_cfg.get("enabled", False),
-            "selected_model": ollama_cfg.get("model", ""),
-        })
-    except Exception:
-        return jsonify({
-            "available": False,
-            "models": [],
-            "host": host,
-            "port": port,
-            "enabled": ollama_cfg.get("enabled", False),
-            "selected_model": ollama_cfg.get("model", ""),
-        })
-
-
-# ---------------------------------------------------------------------------
 # Routes — config
 # ---------------------------------------------------------------------------
 
@@ -1375,10 +1181,6 @@ def api_get_config():
             return jsonify({"error": "配置文件不存在，请先初始化"}), 404
         with open(cp, "r", encoding="utf-8") as f:
             cfg = json.load(f)
-        # Merge ollama config from its separate file
-        ollama_cfg = _load_ollama_cfg()
-        if ollama_cfg:
-            cfg["ollama"] = ollama_cfg
         return jsonify(cfg)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -1392,10 +1194,6 @@ def api_save_config():
         from nanobot.config.loader import get_config_path
         cp = get_config_path()
         data = request.json
-        # Extract ollama config to its own file (nanobot rejects extra fields)
-        ollama_data = data.pop("ollama", None)
-        if ollama_data is not None:
-            _save_ollama_cfg(ollama_data)
         with open(cp, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
         _reset_agent()
@@ -2035,15 +1833,7 @@ def api_status():
         with _mcp_log_lock:
             mcp_log_copy = list(_mcp_log)
 
-        # Ollama status for the status page
-        _oll = _load_ollama_cfg()
-        _ollama_info = {
-            "enabled": bool(_oll.get("enabled")),
-            "model": _oll.get("model", ""),
-        }
         _display_model = config.agents.defaults.model
-        if _ollama_info["enabled"] and _ollama_info["model"]:
-            _display_model = f"{_ollama_info['model']} (local/Ollama)"
 
         return jsonify({
             "config_path": str(cp),
@@ -2058,7 +1848,6 @@ def api_status():
             "mcp_tool_count": mcp_tool_count,
             "mcp_tool_names": mcp_tool_names,
             "mcp_log": mcp_log_copy,
-            "ollama": _ollama_info,
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -2308,8 +2097,7 @@ def api_chat():
     _ensure_loop()
     asyncio.run_coroutine_threadsafe(_process(), _async_loop)
 
-    # Longer timeout for local/Ollama models (first token may be slow)
-    _sse_timeout = 600 if _load_ollama_cfg().get("enabled") else 300
+    _sse_timeout = 300
 
     def generate():
         while True:

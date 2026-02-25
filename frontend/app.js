@@ -96,11 +96,6 @@ const I18N = {
     "privacy.advanced":"高级设置",
     "privacy.generating":"正在生成...","privacy.generated":"个性化已生成","privacy.cleared":"个性化已清空","privacy.saved":"设置已保存",
     "privacy.copied":"已复制","privacy.editSaved":"已保存",
-    "ollama.title":"本地模型（Ollama）","ollama.enable":"启用本地模型（隐私模式）","ollama.model":"本地模型",
-    "ollama.selectModel":"-- 选择模型 --","ollama.hint":"启动 Ollama 后自动识别本地模型。启用后所有对话数据仅在本地处理，不上传到任何服务器。",
-    "ollama.checking":"检测中…","ollama.detected":"已检测到 Ollama","ollama.notDetected":"未检测到 Ollama",
-    "ollama.notDetectedHint":"请先安装并启动 Ollama","ollama.refresh":"刷新",
-    "ollama.modelCount":"个模型可用","ollama.privacyBadge":"🔒 隐私模式（本地）","ollama.inferring":"本地推理中…","ollama.thinking":"启用深度思考（较慢）",
     "nav.reports":"报告","nav.apps":"应用",
     "reports.title":"报告","reports.unread":"未读","reports.24h":"24小时","reports.3d":"3天","reports.7d":"7天","reports.30d":"30天","reports.all":"全部",
     "reports.empty":"暂无报告","reports.allRead":"全部已读，去看看其他时间段吧","reports.viewReport":"查看",
@@ -301,11 +296,6 @@ const I18N = {
     "privacy.advanced":"Advanced settings",
     "privacy.generating":"Generating...","privacy.generated":"Personalization generated","privacy.cleared":"Personalization cleared","privacy.saved":"Settings saved",
     "privacy.copied":"Copied","privacy.editSaved":"Saved",
-    "ollama.title":"Local Model (Ollama)","ollama.enable":"Enable local model (Privacy Mode)","ollama.model":"Local Model",
-    "ollama.selectModel":"-- Select model --","ollama.hint":"Models are auto-detected when Ollama is running. All data stays on your device.",
-    "ollama.checking":"Detecting…","ollama.detected":"Ollama detected","ollama.notDetected":"Ollama not detected",
-    "ollama.notDetectedHint":"Please install and start Ollama first","ollama.refresh":"Refresh",
-    "ollama.modelCount":"models available","ollama.privacyBadge":"🔒 Privacy Mode (Local)","ollama.inferring":"Local inference…","ollama.thinking":"Enable deep thinking (slower)",
     "nav.reports":"Reports","nav.apps":"Apps",
     "reports.title":"Reports","reports.unread":"Unread","reports.24h":"24h","reports.3d":"3 Days","reports.7d":"7 Days","reports.30d":"30 Days","reports.all":"All",
     "reports.empty":"No reports yet","reports.allRead":"All caught up! Try another time range","reports.viewReport":"View",
@@ -559,7 +549,6 @@ async function checkSystem(delaySplash) {
     switchPage("chat");
     applyLanguage();
     splash();
-    _initOllamaBadge();
     startNotificationPoll();
     updateUnreadBadges();
     updateSidebarStats();
@@ -1034,10 +1023,7 @@ function appendThinking() {
   const id = "thinking-" + Date.now();
   const div = document.createElement("div");
   div.className = "message bot"; div.id = id;
-  const ollamaBadge = document.getElementById("ollama-mode-badge");
-  const isLocal = ollamaBadge && ollamaBadge.style.display !== "none";
-  const hint = isLocal ? `<span class="thinking-hint">${t("ollama.inferring")}</span>` : "";
-  div.innerHTML = `<div class="message-avatar">🌀</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div>${hint}</div></div>`;
+  div.innerHTML = `<div class="message-avatar">🌀</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div></div></div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return id;
@@ -1125,24 +1111,6 @@ function fillConfigForm(cfg) {
   });
 
   renderMcpServers(cfg);
-
-  // Ollama config
-  const oll = get(cfg, ["ollama"]) || {};
-  document.getElementById("cfg-ollama-enabled").checked = !!oll.enabled;
-  document.getElementById("cfg-ollama-thinking").checked = !!oll.thinking;
-  document.getElementById("cfg-ollama-host").value = oll.host || "";
-  document.getElementById("cfg-ollama-port").value = oll.port || "";
-  if (oll.model) {
-    const sel = document.getElementById("cfg-ollama-model");
-    if (!Array.from(sel.options).some(o => o.value === oll.model)) {
-      const opt = document.createElement("option");
-      opt.value = oll.model;
-      opt.textContent = oll.model;
-      sel.appendChild(opt);
-    }
-    sel.value = oll.model;
-  }
-  checkOllamaStatus();
 
   document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
 }
@@ -1325,93 +1293,7 @@ function collectConfigForm() {
   if (!cfg.tools) cfg.tools = {};
   cfg.tools.mcpServers = collectMcpServers();
 
-  // Ollama config
-  const ollamaEnabled = document.getElementById("cfg-ollama-enabled").checked;
-  const ollamaModel = document.getElementById("cfg-ollama-model").value;
-  const ollamaThinking = document.getElementById("cfg-ollama-thinking").checked;
-  const ollamaHost = document.getElementById("cfg-ollama-host").value.trim();
-  const ollamaPort = parseInt(document.getElementById("cfg-ollama-port").value) || 0;
-  if (ollamaEnabled || ollamaModel || ollamaHost || ollamaPort) {
-    cfg.ollama = {
-      enabled: ollamaEnabled,
-      model: ollamaModel,
-      thinking: ollamaThinking,
-    };
-    if (ollamaHost) cfg.ollama.host = ollamaHost;
-    if (ollamaPort) cfg.ollama.port = ollamaPort;
-  } else {
-    delete cfg.ollama;
-  }
-
   return cfg;
-}
-
-// ── Ollama / Local Model ──────────────────────────────────────────────
-
-let _ollamaModels = [];
-
-async function checkOllamaStatus() {
-  const indicator = document.getElementById("ollama-indicator");
-  const statusText = document.getElementById("ollama-status-text");
-  const modelSelect = document.getElementById("cfg-ollama-model");
-  indicator.className = "ollama-indicator off";
-  statusText.textContent = t("ollama.checking");
-
-  try {
-    const data = await api("/api/ollama/status");
-    if (data.available) {
-      indicator.className = "ollama-indicator on";
-      _ollamaModels = data.models || [];
-      statusText.textContent = `${t("ollama.detected")} — ${_ollamaModels.length} ${t("ollama.modelCount")}`;
-
-      const prev = modelSelect.value;
-      modelSelect.innerHTML = `<option value="">${t("ollama.selectModel")}</option>`;
-      _ollamaModels.forEach(m => {
-        const opt = document.createElement("option");
-        opt.value = m.name;
-        opt.textContent = m.name;
-        modelSelect.appendChild(opt);
-      });
-      if (prev && Array.from(modelSelect.options).some(o => o.value === prev)) {
-        modelSelect.value = prev;
-      } else if (data.selected_model) {
-        modelSelect.value = data.selected_model;
-      }
-      modelSelect.disabled = false;
-    } else {
-      indicator.className = "ollama-indicator off";
-      statusText.textContent = t("ollama.notDetected");
-      _ollamaModels = [];
-    }
-    _syncOllamaBadge();
-  } catch (_) {
-    indicator.className = "ollama-indicator error";
-    statusText.textContent = t("ollama.notDetected");
-  }
-}
-
-function onOllamaToggle() {
-  const enabled = document.getElementById("cfg-ollama-enabled").checked;
-  document.getElementById("cfg-ollama-model").disabled = !enabled && _ollamaModels.length === 0;
-  _syncOllamaBadge();
-}
-
-function _syncOllamaBadge() {
-  const badge = document.getElementById("ollama-mode-badge");
-  if (!badge) return;
-  const enabled = document.getElementById("cfg-ollama-enabled").checked;
-  const model = document.getElementById("cfg-ollama-model").value;
-  badge.style.display = (enabled && model) ? "inline-flex" : "none";
-}
-
-async function _initOllamaBadge() {
-  try {
-    const data = await api("/api/ollama/status");
-    const badge = document.getElementById("ollama-mode-badge");
-    if (badge && data.enabled && data.selected_model) {
-      badge.style.display = "inline-flex";
-    }
-  } catch (_) {}
 }
 
 async function saveConfig() {
@@ -1422,7 +1304,6 @@ async function saveConfig() {
       configCache = cfg;
       document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
       toast(t("settings.saved"), "success");
-      _syncOllamaBadge();
     } else { toast(res.error || t("settings.saveFail"), "error"); }
   } catch (e) { toast(t("settings.saveFail") + ": " + e.message, "error"); }
 }

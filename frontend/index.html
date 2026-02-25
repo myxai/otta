@@ -128,7 +128,6 @@
             </select>
             <span class="security-mode-hint" id="security-mode-hint"></span>
             <span id="dev-mode-indicator" class="dev-mode-indicator" style="display:none;" onclick="openDevModeSettings()"></span>
-            <span id="ollama-mode-badge" class="ollama-mode-badge" style="display:none;" data-i18n="ollama.privacyBadge">🔒 隐私模式（本地）</span>
           </div>
           <div class="chat-messages" id="chat-messages">
             <div class="welcome-message">
@@ -212,48 +211,6 @@
                 <input type="number" id="cfg-memory-window" placeholder="50" />
               </div>
             </div>
-          </div>
-
-          <!-- Local Model (Ollama) -->
-          <div class="settings-card" id="ollama-card">
-            <h2>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 0-7 7c0 3 2 5.5 4 7l3 3 3-3c2-1.5 4-4 4-7a7 7 0 0 0-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg>
-              <span data-i18n="ollama.title">本地模型（Ollama）</span>
-            </h2>
-            <div class="ollama-status-row" id="ollama-status-row">
-              <div class="ollama-indicator off" id="ollama-indicator"></div>
-              <span id="ollama-status-text" data-i18n="ollama.checking">检测中…</span>
-              <button class="btn btn-sm" onclick="checkOllamaStatus()" data-i18n="ollama.refresh">刷新</button>
-            </div>
-            <div class="form-grid">
-              <div class="form-group form-group-checkbox">
-                <label>
-                  <input type="checkbox" id="cfg-ollama-enabled" onchange="onOllamaToggle()" />
-                  <span data-i18n="ollama.enable">启用本地模型（隐私模式）</span>
-                </label>
-              </div>
-              <div class="form-group">
-                <label data-i18n="ollama.model">本地模型</label>
-                <select id="cfg-ollama-model" disabled>
-                  <option value="" data-i18n="ollama.selectModel">-- 选择模型 --</option>
-                </select>
-              </div>
-              <div class="form-group form-group-checkbox">
-                <label>
-                  <input type="checkbox" id="cfg-ollama-thinking" />
-                  <span data-i18n="ollama.thinking">启用深度思考（较慢）</span>
-                </label>
-              </div>
-              <div class="form-group">
-                <label>Host</label>
-                <input type="text" id="cfg-ollama-host" placeholder="127.0.0.1" />
-              </div>
-              <div class="form-group">
-                <label>Port</label>
-                <input type="number" id="cfg-ollama-port" placeholder="11434" />
-              </div>
-            </div>
-            <p class="ollama-hint" data-i18n="ollama.hint">启动 Ollama 后自动识别本地模型。启用后所有对话数据仅在本地处理，不上传到任何服务器。</p>
           </div>
 
           <!-- Provider API Keys -->
