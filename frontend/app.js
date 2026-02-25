@@ -100,7 +100,7 @@ const I18N = {
     "ollama.selectModel":"-- 选择模型 --","ollama.hint":"启动 Ollama 后自动识别本地模型。启用后所有对话数据仅在本地处理，不上传到任何服务器。",
     "ollama.checking":"检测中…","ollama.detected":"已检测到 Ollama","ollama.notDetected":"未检测到 Ollama",
     "ollama.notDetectedHint":"请先安装并启动 Ollama","ollama.refresh":"刷新",
-    "ollama.modelCount":"个模型可用","ollama.privacyBadge":"🔒 隐私模式（本地）","ollama.inferring":"本地推理中…",
+    "ollama.modelCount":"个模型可用","ollama.privacyBadge":"🔒 隐私模式（本地）","ollama.inferring":"本地推理中…","ollama.thinking":"启用深度思考（较慢）",
     "nav.reports":"报告","nav.apps":"应用",
     "reports.title":"报告","reports.unread":"未读","reports.24h":"24小时","reports.3d":"3天","reports.7d":"7天","reports.30d":"30天","reports.all":"全部",
     "reports.empty":"暂无报告","reports.allRead":"全部已读，去看看其他时间段吧","reports.viewReport":"查看",
@@ -305,7 +305,7 @@ const I18N = {
     "ollama.selectModel":"-- Select model --","ollama.hint":"Models are auto-detected when Ollama is running. All data stays on your device.",
     "ollama.checking":"Detecting…","ollama.detected":"Ollama detected","ollama.notDetected":"Ollama not detected",
     "ollama.notDetectedHint":"Please install and start Ollama first","ollama.refresh":"Refresh",
-    "ollama.modelCount":"models available","ollama.privacyBadge":"🔒 Privacy Mode (Local)","ollama.inferring":"Local inference…",
+    "ollama.modelCount":"models available","ollama.privacyBadge":"🔒 Privacy Mode (Local)","ollama.inferring":"Local inference…","ollama.thinking":"Enable deep thinking (slower)",
     "nav.reports":"Reports","nav.apps":"Apps",
     "reports.title":"Reports","reports.unread":"Unread","reports.24h":"24h","reports.3d":"3 Days","reports.7d":"7 Days","reports.30d":"30 Days","reports.all":"All",
     "reports.empty":"No reports yet","reports.allRead":"All caught up! Try another time range","reports.viewReport":"View",
@@ -1129,6 +1129,7 @@ function fillConfigForm(cfg) {
   // Ollama config
   const oll = get(cfg, ["ollama"]) || {};
   document.getElementById("cfg-ollama-enabled").checked = !!oll.enabled;
+  document.getElementById("cfg-ollama-thinking").checked = !!oll.thinking;
   document.getElementById("cfg-ollama-host").value = oll.host || "";
   document.getElementById("cfg-ollama-port").value = oll.port || "";
   if (oll.model) {
@@ -1327,12 +1328,14 @@ function collectConfigForm() {
   // Ollama config
   const ollamaEnabled = document.getElementById("cfg-ollama-enabled").checked;
   const ollamaModel = document.getElementById("cfg-ollama-model").value;
+  const ollamaThinking = document.getElementById("cfg-ollama-thinking").checked;
   const ollamaHost = document.getElementById("cfg-ollama-host").value.trim();
   const ollamaPort = parseInt(document.getElementById("cfg-ollama-port").value) || 0;
   if (ollamaEnabled || ollamaModel || ollamaHost || ollamaPort) {
     cfg.ollama = {
       enabled: ollamaEnabled,
       model: ollamaModel,
+      thinking: ollamaThinking,
     };
     if (ollamaHost) cfg.ollama.host = ollamaHost;
     if (ollamaPort) cfg.ollama.port = ollamaPort;
@@ -1366,7 +1369,7 @@ async function checkOllamaStatus() {
       _ollamaModels.forEach(m => {
         const opt = document.createElement("option");
         opt.value = m.name;
-        opt.textContent = m.full_name || m.name;
+        opt.textContent = m.name;
         modelSelect.appendChild(opt);
       });
       if (prev && Array.from(modelSelect.options).some(o => o.value === prev)) {

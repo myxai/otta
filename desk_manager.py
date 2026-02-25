@@ -247,8 +247,15 @@ class DeskManager:
             PBT_APMRESUMEAUTOMATIC = 0x0012
             PBT_APMRESUMESUSPEND = 0x0007
 
+            LRESULT = ctypes.c_ssize_t
+
+            user32.DefWindowProcW.argtypes = [
+                wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM,
+            ]
+            user32.DefWindowProcW.restype = LRESULT
+
             WNDPROC = ctypes.WINFUNCTYPE(
-                ctypes.c_long, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM,
+                LRESULT, wt.HWND, wt.UINT, wt.WPARAM, wt.LPARAM,
             )
 
             def wnd_proc(hwnd, msg, wparam, lparam):
