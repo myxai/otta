@@ -104,6 +104,43 @@ def read_chat_history(hours: int = 72) -> list[dict]:
     return sessions
 
 
+def collect_chat_events(hours: int = 72) -> list[dict]:
+    """Read chat history and return as event dicts (no persistence).
+    
+    Returns list of chat_message event dicts for in-memory analysis only.
+    """
+    sessions = read_chat_history(hours=hours)
+    events: list[dict] = []
+    for sess in sessions:
+        for msg in sess["messages"]:
+            content = msg.get("content", "")
+            role = msg.get("role", "")
+            if not content or role == "system":
+                continue
+            digest = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+            ts = msg.get("ts", sess.get("updated_at", ""))
+
+            out_pref = ""
+            depth_pref = ""
+            goal_kws: list[str] = []
+            if role == "user":
+                out_pref = _detect_output_preference(content)
+                depth_pref = _detect_depth_preference(content)
+                goal_kws = _extract_goal_keywords(content)
+
+            events.append({
+                "event_type": "chat_message",
+                "role": role,
+                "text_digest": digest,
+                "ts": ts,
+                "session": sess["session_title"],
+                "output_preference": out_pref,
+                "depth_preference": depth_pref,
+                "goal_keywords": goal_kws or None,
+            })
+    return events
+
+
 def collect_to_events(hours: int = 72,
                       store: EventStore | None = None) -> int:
     """Read chat history and record as profile events with structural signals."""

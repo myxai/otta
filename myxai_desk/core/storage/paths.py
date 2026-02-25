@@ -38,11 +38,10 @@ PROFILE_EVENTS_FILE: Path = PROFILE_DIR / "events.jsonl"
 PROFILE_SUMMARY_FILE: Path = PROFILE_DIR / "summary.json"
 PROFILE_PREFS_FILE: Path = PROFILE_DIR / "preferences.json"
 
-# ── Persona Engine ────────────────────────────────────────────────
+# ── Persona Engine (simplified: two-file output) ─────────────────
 
-PERSONA_PROFILE_FILE: Path = PROFILE_DIR / "persona_profile.json"
-PERSONA_VERSIONS_DIR: Path = PROFILE_DIR / "versions"
-PERSONA_AUDIT_FILE: Path = PROFILE_DIR / "persona_update.log"
+PERSONA_STABLE_FILE: Path = PROFILE_DIR / "persona_stable.json"
+PERSONA_RECENT_FILE: Path = PROFILE_DIR / "persona_recent.json"
 
 # ── Security / Policy ──────────────────────────────────────────────
 

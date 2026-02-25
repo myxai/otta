@@ -18,32 +18,12 @@ from typing import Any
 
 
 def enrich_with_profile(message: str, *, max_tokens: int = 500) -> str:
-    """Prepend a concise persona summary to the user's message.
+    """No-op — persona is never injected into regular conversations.
 
-    Uses the Prompt Builder to generate a task-aware persona block
-    instead of a raw keyword list.
+    Persona data is only used explicitly in daily digest explore prompts,
+    controlled by the user's privacy settings.
     """
-    try:
-        from myxai_desk.core.profile.prompt_builder import build_prompt
-        persona_text = build_prompt("general")
-        if not persona_text:
-            return message
-        return f"[用户画像]\n{persona_text}\n\n{message}"
-    except Exception:
-        pass
-
-    try:
-        from myxai_desk.core.capabilities.profile import Profile
-        summary = Profile().get_summary()
-        if not summary or not summary.get("all_topics"):
-            return message
-        topics = ", ".join(
-            t["topic"] for t in summary.get("all_topics", [])[:10]
-        )
-        snippet = f"[用户画像] 近期兴趣: {topics}"
-        return f"{snippet}\n\n{message}"
-    except Exception:
-        return message
+    return message
 
 
 def record_chat_event(role: str, content: str, session_id: str = "") -> None:

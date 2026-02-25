@@ -1,8 +1,7 @@
-"""Feature extraction — backward-compatible wrapper over the Persona Engine.
+"""Feature extraction — backward-compatible wrapper using simplified persona.
 
-Existing code that calls ``extract_topics()`` or ``build_summary()`` keeps
-working.  Internally we now delegate to the layer engines and persona store
-instead of doing standalone rule-based extraction.
+Existing code calling ``extract_topics()`` or ``build_summary()`` keeps working.
+Internally delegates to the new two-file persona model.
 """
 
 from __future__ import annotations
@@ -13,8 +12,6 @@ from pathlib import Path
 
 from myxai_desk.core.profile.events import EventStore
 from myxai_desk.core.storage.paths import PROFILE_SUMMARY_FILE, ensure_dir
-
-# ── Legacy digest paths (still used as a data source) ────────────
 
 _APPS_DIR = Path.home() / ".nanobot" / "apps"
 _DIGEST_DIR = _APPS_DIR / "daily_digest"
@@ -62,26 +59,20 @@ def _load_digest_interests(days: int = 7) -> dict | None:
     return result
 
 
-# ── Public: extract_topics (backward compatible) ─────────────────
-
 def extract_topics(days: int = 7, store: EventStore | None = None) -> list[dict]:
-    """Extract interest topics — now powered by the persona interest layer."""
+    """Extract interest topics — powered by the simplified persona model."""
     try:
         from myxai_desk.core.profile import persona_store
-        from myxai_desk.core.profile.layers import interest_layer
-
-        profile = persona_store.load()
-        if profile.interests.topic_weight:
+        recent = persona_store.load_recent()
+        if recent.core_topics:
             topics = []
-            for i, (topic, weight) in enumerate(
-                sorted(profile.interests.topic_weight.items(),
-                       key=lambda x: x[1], reverse=True)
-            ):
+            for i, t in enumerate(recent.core_topics):
                 topics.append({
-                    "topic": topic,
+                    "topic": t.get("topic", ""),
                     "category": "work",
-                    "count": max(1, int(weight * 20)),
-                    "score": weight,
+                    "count": max(1, 10 - i * 3),
+                    "score": max(0.1, 1.0 - i * 0.2),
+                    "trend": t.get("trend", "稳定"),
                 })
             return topics
     except Exception:
@@ -103,26 +94,24 @@ def extract_topics(days: int = 7, store: EventStore | None = None) -> list[dict]
     return []
 
 
-# ── Public: build_summary (backward compatible) ──────────────────
-
 def build_summary(days: int = 30, store: EventStore | None = None) -> dict:
-    """Build a profile summary — now delegates to persona engine when available."""
+    """Build a profile summary — delegates to simplified persona engine."""
     try:
         from myxai_desk.core.profile import persona_store
         from myxai_desk.core.profile.prompt_builder import build_prompt
 
-        profile = persona_store.load()
-        if profile.overall_confidence() > 0.05:
+        stable = persona_store.load_stable()
+        recent = persona_store.load_recent()
+        if not stable.is_empty() or not recent.is_empty():
             topics = extract_topics(days=days, store=store)
             return {
                 "generated_at": datetime.now(timezone.utc).isoformat(),
                 "source": "persona_engine",
-                "persona_confidence": profile.overall_confidence(),
                 "top_work_interests": [t["topic"] for t in topics if t["category"] == "work"][:10],
                 "top_study_interests": [t["topic"] for t in topics if t["category"] == "study"][:10],
                 "top_life_interests": [t["topic"] for t in topics if t["category"] == "life"][:5],
                 "all_topics": topics[:30],
-                "prompt_summary": build_prompt("general", profile=profile),
+                "prompt_summary": build_prompt(),
             }
     except Exception:
         pass

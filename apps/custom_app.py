@@ -14,6 +14,29 @@ from pathlib import Path
 _BASE_DIR = Path.home() / ".nanobot" / "apps" / "custom"
 _PARAM_RE = re.compile(r"\{\{([^}]+)\}\}")
 
+
+def _schedule_to_cron(schedule: dict) -> str:
+    """Convert custom app schedule dict to a cron expression."""
+    if not schedule.get("enabled"):
+        return ""
+    time_str = schedule.get("time", "")
+    if not time_str or ":" not in time_str:
+        return ""
+    hh, mm = time_str.split(":")[:2]
+    mode = schedule.get("mode", "daily")
+    if mode == "daily":
+        return f"{mm} {hh} * * *"
+    if mode == "weekly":
+        dow = schedule.get("day_of_week", 0)
+        return f"{mm} {hh} * * {dow}"
+    if mode == "monthly":
+        dom = schedule.get("day_of_month", 1)
+        return f"{mm} {hh} {dom} * *"
+    if mode == "interval":
+        return f"{mm} {hh} * * *"
+    return ""
+
+
 # ── Constants ──────────────────────────────────────────────────────────
 
 OUTPUT_FORMATS = {
@@ -215,20 +238,6 @@ def fill_template(template: str, param_values: dict) -> str:
 def build_message(app: dict, param_values: dict) -> str:
     """Build the chat message: filled template + output suffix."""
     msg = fill_template(app["prompt_template"], param_values)
-
-    # Inject profile context if enabled
-    if app.get("inject_profile"):
-        try:
-            from myxai_desk.core.capabilities.profile import Profile
-            profile = Profile()
-            summary = profile.get_summary()
-            if summary and summary.get("top_work_interests"):
-                topics = summary.get("top_work_interests", [])[:5] + summary.get("top_study_interests", [])[:3]
-                if topics:
-                    profile_ctx = "[用户画像] 近期关注: " + ", ".join(topics)
-                    msg = profile_ctx + "\n\n" + msg
-        except Exception:
-            pass
 
     fmt = app.get("output_format", "text")
     suffix = OUTPUT_FORMATS.get(fmt, {}).get("suffix", "")

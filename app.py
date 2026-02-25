@@ -428,7 +428,19 @@ def _patch_agent_tool_history(agent):
                 + style_hint
             )
 
-        return base + mode_hint
+        persona_block = ""
+        try:
+            from myxai_desk.core.capabilities.profile import Profile
+            profile = Profile()
+            settings = profile.get_collection_settings()
+            if settings.get("persona_in_digest", False):
+                persona_text = profile.get_persona_prompt()
+                if persona_text:
+                    persona_block = "\n" + persona_text
+        except Exception:
+            pass
+
+        return base + mode_hint + persona_block
 
     agent.context.build_system_prompt = _enhanced_system_prompt
 
@@ -1522,76 +1534,49 @@ def api_profile_refresh():
 
 
 # ---------------------------------------------------------------------------
-# Persona Engine API
+# Persona Engine API (simplified: stable + recent)
 # ---------------------------------------------------------------------------
 
 @flask_app.route("/api/profile/persona")
 def api_persona_get():
-    """Return the full 6-layer persona profile."""
+    """Return stable + recent persona data."""
     from myxai_desk.core.capabilities.profile import Profile
     return jsonify(Profile().get_persona())
 
 
-@flask_app.route("/api/profile/persona/layer/<layer_name>")
-def api_persona_layer_get(layer_name):
-    """Return a single persona layer."""
-    from myxai_desk.core.capabilities.profile import Profile
-    return jsonify(Profile().get_persona_layer(layer_name))
-
-
-@flask_app.route("/api/profile/persona/layer/<layer_name>", methods=["POST"])
-def api_persona_layer_update(layer_name):
-    """Manually edit fields in a persona layer."""
-    from myxai_desk.core.capabilities.profile import Profile
-    patch = request.get_json(force=True) or {}
-    result = Profile().update_persona_layer(layer_name, patch)
-    return jsonify(result)
-
-
-@flask_app.route("/api/profile/persona/versions")
-def api_persona_versions():
-    """List all stored persona versions."""
-    from myxai_desk.core.capabilities.profile import Profile
-    return jsonify(Profile().get_persona_versions())
-
-
-@flask_app.route("/api/profile/persona/rollback", methods=["POST"])
-def api_persona_rollback():
-    """Rollback persona to a specific version."""
-    from myxai_desk.core.capabilities.profile import Profile
-    data = request.get_json(force=True) or {}
-    version = data.get("version")
-    if not isinstance(version, int):
-        return jsonify({"error": "version (int) is required"}), 400
-    return jsonify(Profile().rollback_persona(version))
-
-
 @flask_app.route("/api/profile/persona/prompt")
 def api_persona_prompt():
-    """Generate a task-aware persona prompt for LLM injection."""
+    """Generate persona-enhanced prompt for LLM injection."""
     from myxai_desk.core.capabilities.profile import Profile
-    from myxai_desk.core.profile.prompt_builder import SUPPORTED_TASK_TYPES
-    task_type = request.args.get("task_type", "general")
-    prompt = Profile().get_persona_prompt(task_type)
-    return jsonify({"task_type": task_type, "prompt": prompt,
-                    "supported_types": SUPPORTED_TASK_TYPES})
+    task_context = request.args.get("task_context", "")
+    prompt = Profile().get_persona_prompt(task_context)
+    return jsonify({"prompt": prompt})
 
 
-@flask_app.route("/api/profile/persona/audit")
-def api_persona_audit():
-    """Return recent persona update audit log entries."""
+@flask_app.route("/api/profile/persona/edit/<part>", methods=["POST"])
+def api_persona_edit(part):
+    """Manually edit stable or recent persona fields."""
     from myxai_desk.core.capabilities.profile import Profile
-    n = request.args.get("n", 50, type=int)
-    return jsonify(Profile().get_persona_audit(n=n))
+    patch = request.get_json(force=True) or {}
+    if part == "stable":
+        result = Profile().edit_persona_stable(patch)
+    elif part == "recent":
+        result = Profile().edit_persona_recent(patch)
+    else:
+        return jsonify({"error": f"Unknown part: {part}, use 'stable' or 'recent'"}), 400
+    return jsonify(result)
 
 
 @flask_app.route("/api/profile/persona/update", methods=["POST"])
 def api_persona_update():
-    """Trigger a full persona engine update cycle."""
+    """Trigger a full persona update cycle."""
     from myxai_desk.core.capabilities.profile import Profile
-    data = request.get_json(force=True) or {}
-    force = data.get("force", False)
-    result = Profile().run_persona_update(force=force)
+    model_cfg = _get_model_config()
+    result = Profile().run_persona_update(
+        model=model_cfg.get("model", ""),
+        api_key=model_cfg.get("api_key", ""),
+        api_base=model_cfg.get("api_base"),
+    )
     return jsonify(result)
 
 
@@ -2239,7 +2224,7 @@ _digest_task_status: dict = {}  # {"status": "idle"|"running"|"done"|"error", ..
 _APP_CATALOG = {
     "daily_digest": {
         "id": "daily_digest",
-        "name": "每日私享会",
+        "name": "每日私享",
         "name_en": "Daily Briefing",
         "icon": "🎯",
         "description": "你的私人资讯策展人——基于浏览和对话，每天精选最值得关注的内容，支持深入探索",
@@ -2549,7 +2534,7 @@ def api_digest_run():
 
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "每日私享会未安装"}), 400
+        return jsonify({"error": "每日私享未安装"}), 400
 
     with _digest_task_lock:
         if _digest_task_status.get("status") == "running":
@@ -2578,7 +2563,7 @@ def api_digest_run():
 
                 stats = result.get("stats", {})
                 _push_notification(
-                    title="🎯 每日私享会已更新",
+                    title="🎯 每日私享已更新",
                     content=(
                         f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
                         f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
@@ -2643,7 +2628,7 @@ def api_digest_preview():
     """
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "每日私享会未安装"}), 400
+        return jsonify({"error": "每日私享未安装"}), 400
 
     from apps.daily_digest import (
         read_browser_history, filter_history,
@@ -2743,7 +2728,7 @@ def _html_to_summary(html: str, max_len: int = 60) -> str:
     for prefix in ("📅", "📧", "🎯"):
         text = text.lstrip(prefix).strip()
     text = _re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", text).strip()
-    for skip in ("每日私享会", "每日资讯", "Daily"):
+    for skip in ("每日私享", "每日资讯", "Daily"):
         if text.startswith(skip):
             text = text[len(skip):].strip()
     return text[:max_len] if text else ""
@@ -2768,7 +2753,7 @@ def api_all_reports():
                 pass
             result.append({
                 "app_id": "daily_digest",
-                "app_name": "每日私享会",
+                "app_name": "每日私享",
                 "app_icon": "🎯",
                 "date": date,
                 "generated_at": r.get("generated_at", ""),
@@ -3483,7 +3468,7 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
     _d_in = _snap_after["input"] - _snap_before["input"]
     _d_out = _snap_after["output"] - _snap_before["output"]
     _d_search = result.get("stats", {}).get("search_results", 0)
-    record_task_usage("app_每日私享会", _d_in, _d_out,
+    record_task_usage("app_每日私享", _d_in, _d_out,
                       min(_d_search, 1) if _d_search else 0)
     if result["status"] == "ok":
         today = slot.scheduled_for.strftime("%Y-%m-%d")
@@ -3496,7 +3481,7 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
         if trigger in ("startup", "resume"):
             catchup_note = f"（补偿执行，原定 {sched_for}）"
         _push_notification(
-            title=f"🎯 每日私享会已更新{catchup_note}",
+            title=f"🎯 每日私享已更新{catchup_note}",
             content=(
                 f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
                 f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
@@ -3724,7 +3709,7 @@ def api_scheduler_status():
 
 # Official app display names / icons
 _OFFICIAL_APP_META = {
-    "daily_digest":  {"name_zh": "每日私享会", "name_en": "Daily Briefing", "icon": "🎯"},
+    "daily_digest":  {"name_zh": "每日私享", "name_en": "Daily Briefing", "icon": "🎯"},
     "email_summary": {"name_zh": "邮件简报",  "name_en": "Email Briefing", "icon": "📧"},
 }
 

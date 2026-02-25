@@ -89,9 +89,13 @@ const I18N = {
     "privacy.fileHistory":"文件变更","privacy.fileHint":"更贴近你当前的工作进展",
     "privacy.watchPaths":"监控文件夹","privacy.watchPathsHelp":"输入要监控的文件夹路径，每行一个。例如：D:\\Projects",
     "privacy.retention":"保留天数","privacy.generate":"生成个性化","privacy.clear":"清空个性化",
+    "privacy.analysisDays":"分析时长（天）","privacy.analysisDaysHelp":"生成画像时分析最近 N 天的数据，不保存历史记录",
     "privacy.localNote":"所有数据默认仅在本地处理。",
+    "privacy.usageTitle":"画像使用范围",
+    "privacy.personaInDigest":"允许画像增强 AI 回复","privacy.personaInDigestHint":"画像仅注入系统提示词，对话内容中不会出现",
+    "privacy.personaUsageNote":"开启后，AI 会根据你的背景和兴趣给出更贴合的回复，但画像内容不会出现在任何对话消息中。",
     "privacy.effectTitle":"当前个性化效果",
-    "privacy.chatStyle":"对话风格","privacy.recDirection":"推荐方向",
+    "privacy.stablePersona":"稳定画像","privacy.recentSnapshot":"近期兴趣",
     "privacy.statusOff":"当前处于标准模式，不使用历史信息。",
     "privacy.statusOn":"个性化已启用，会随着使用逐步优化。",
     "privacy.advanced":"高级设置",
@@ -113,7 +117,7 @@ const I18N = {
     "apps.installOk":"应用安装成功","apps.uninstallOk":"应用已卸载",
     "apps.installFail":"安装失败","apps.uninstallFail":"卸载失败",
     "apps.version":"版本","apps.author":"作者",
-    "digest.title":"每日私享会","digest.subtitle":"你的私人资讯策展人——每天精选最值得关注的内容",
+    "digest.title":"每日私享","digest.subtitle":"你的私人资讯策展人——每天精选最值得关注的内容",
     "digest.privacyNote":"🔒 浏览记录仅在本地读取和分析，不会上传至任何服务器。",
     "digest.status":"状态","digest.config":"配置",
     "digest.browser":"浏览器","digest.browserAuto":"自动检测","digest.browserChrome":"Chrome","digest.browserEdge":"Edge",
@@ -270,9 +274,13 @@ const I18N = {
     "privacy.fileHistory":"File changes","privacy.fileHint":"Stay closer to your current work",
     "privacy.watchPaths":"Watch Folders","privacy.watchPathsHelp":"Enter folder paths to monitor, one per line. e.g.: D:\\Projects",
     "privacy.retention":"Retention (days)","privacy.generate":"Generate personalization","privacy.clear":"Clear personalization",
+    "privacy.analysisDays":"Analysis window (days)","privacy.analysisDaysHelp":"Analyze last N days when generating persona — no history stored",
     "privacy.localNote":"All data is processed locally by default.",
+    "privacy.usageTitle":"Persona Usage Scope",
+    "privacy.personaInDigest":"Allow persona-enhanced AI replies","privacy.personaInDigestHint":"Persona is injected into system prompt only — never visible in conversations",
+    "privacy.personaUsageNote":"When enabled, AI responses are tailored to your background, but persona data never appears in any conversation message.",
     "privacy.effectTitle":"Current personalization effect",
-    "privacy.chatStyle":"Conversation style","privacy.recDirection":"Recommendation focus",
+    "privacy.stablePersona":"Stable Persona","privacy.recentSnapshot":"Recent Interests",
     "privacy.statusOff":"Standard mode — not using history data.",
     "privacy.statusOn":"Personalization enabled — improves over time.",
     "privacy.advanced":"Advanced settings",
@@ -3136,12 +3144,6 @@ function openCustomAppWizard(sourcePrompt, sourceSessionId, editData) {
           <div class="form-group"><label>${t("custom.name")}</label><input type="text" id="wizard-name" value="${escapeAttr(ed.name || '')}" placeholder="${_lang === "zh" ? "例：每日AI新闻" : "e.g. Daily AI News"}" /></div>
           <div class="form-group"><label>${t("custom.icon")}</label><input type="text" id="wizard-icon" value="${escapeAttr(ed.icon || '🤖')}" maxlength="4" style="width:60px;font-size:24px;text-align:center;" /></div>
           <hr style="border:0;border-top:1px solid var(--bg-surface1);margin:16px 0;" />
-          <div class="form-group form-group-checkbox">
-            <label><input type="checkbox" id="wizard-inject-profile" ${ed.inject_profile?'checked':''} />
-            <span>💡 ${t("custom.injectProfile")}</span></label>
-            <p class="wizard-help" style="margin-left:20px;margin-top:4px;font-size:11px;color:var(--text-dim);">${t("custom.injectProfileHelp")}</p>
-          </div>
-          <hr style="border:0;border-top:1px solid var(--bg-surface1);margin:16px 0;" />
           <div class="form-group">
             <label>🛡️ ${t("custom.securityMode")}</label>
             <p class="wizard-help">${t("custom.securityModeHint")}</p>
@@ -3445,13 +3447,10 @@ async function _wizardSave() {
   const securityModeVal = securityModeSel ? securityModeSel.value : "inherit";
   const securityMode = securityModeVal === "inherit" ? null : securityModeVal;
 
-  const injectProfile = document.getElementById("wizard-inject-profile")?.checked || false;
-
   const payload = {
     name, icon,
     prompt_template: template, output_format: outputFormat,
     schedule, summary, security_mode: securityMode,
-    inject_profile: injectProfile,
   };
 
   try {
@@ -4832,13 +4831,15 @@ async function loadPrivacySettings() {
       const br = document.getElementById("privacy-browser");
       const ch = document.getElementById("privacy-chat");
       const fi = document.getElementById("privacy-file");
-      const ret = document.getElementById("privacy-retention");
+      const ad = document.getElementById("privacy-analysis-days");
       const paths = document.getElementById("privacy-watch-paths");
+      const pd = document.getElementById("privacy-persona-digest");
       if (br) br.checked = data.browser_history !== false;
       if (ch) ch.checked = data.chat_history !== false;
       if (fi) fi.checked = !!data.file_history;
-      if (ret) ret.value = data.retention_days || 90;
+      if (ad) ad.value = data.analysis_days || 7;
       if (paths && data.watch_paths) paths.value = (data.watch_paths || []).join("\n");
+      if (pd) pd.checked = !!data.persona_in_digest;
       toggleFileWatchPaths();
     }
   } catch (_) {}
@@ -4880,7 +4881,8 @@ async function savePrivacySettings() {
     chat_history: document.getElementById("privacy-chat")?.checked ?? true,
     file_history: document.getElementById("privacy-file")?.checked ?? false,
     watch_paths: watchPaths,
-    retention_days: parseInt(document.getElementById("privacy-retention")?.value || "90", 10),
+    analysis_days: parseInt(document.getElementById("privacy-analysis-days")?.value || "7", 10),
+    persona_in_digest: document.getElementById("privacy-persona-digest")?.checked ?? false,
   };
   try {
     await api("/api/profile/collection", "POST", settings);
@@ -4898,7 +4900,7 @@ async function generatePersona() {
     btn.textContent = t("privacy.generating");
   }
   try {
-    await api("/api/profile/persona/update", "POST", { force: true });
+    await api("/api/profile/persona/update", "POST");
     toast(t("privacy.generated"), "success");
     loadPersonaEffect();
   } catch (e) {
@@ -4919,54 +4921,25 @@ async function loadPersonaEffect() {
 
   try {
     const persona = await api("/api/profile/persona");
-    if (!persona || persona.confidence_score < 0.05) {
+    if (!persona || !persona.has_data) {
       section.style.display = "none";
       return;
     }
 
     const zh = _lang === "zh";
-    let styleParts = [];
-    const dec = persona.decision || {};
-    if (dec.structure_preference) styleParts.push(dec.structure_preference);
-    if (dec.noise_tolerance) styleParts.push((zh ? "噪声容忍" : "noise tolerance") + ": " + dec.noise_tolerance);
-    if (dec.execution_bias) styleParts.push(dec.execution_bias);
-    if (dec.risk_preference) styleParts.push((zh ? "风险偏好" : "risk") + ": " + dec.risk_preference);
+    const stable = persona.stable || {};
+    const recent = persona.recent || {};
 
-    if (styleParts.length === 0) {
-      styleParts.push(zh
-        ? "结构清晰、结论优先、少废话，优先给可落地步骤。"
-        : "Clear structure, conclusions first, actionable steps.");
+    if (styleText) {
+      styleText.textContent = stable.prompt_text
+        || (zh ? "暂无稳定画像，点击「生成个性化」开始。" : "No stable profile yet. Click 'Generate' to start.");
     }
 
-    if (styleText) styleText.textContent = styleParts.join("；");
-
-    let dirParts = [];
-    const interests = persona.interests || {};
-    const weights = interests.topic_weight || {};
-    const topTopics = Object.entries(weights)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([k]) => k);
-    if (topTopics.length) {
-      dirParts.push((zh ? "更关注" : "Focus on") + " " + topTopics.join("、"));
-    }
-    const rising = interests.trend_shift || {};
-    const risingKeys = Object.entries(rising)
-      .filter(([, v]) => v > 0)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([k]) => k);
-    if (risingKeys.length) {
-      dirParts.push((zh ? "上升趋势" : "Rising") + ": " + risingKeys.join("、"));
+    if (directionText) {
+      directionText.textContent = recent.prompt_text
+        || (zh ? "暂无近期兴趣数据，点击「生成个性化」开始。" : "No recent data yet. Click 'Generate' to start.");
     }
 
-    if (dirParts.length === 0) {
-      dirParts.push(zh
-        ? "暂无推荐方向数据，点击「生成个性化」开始。"
-        : "No direction data yet. Click 'Generate' to start.");
-    }
-
-    if (directionText) directionText.textContent = dirParts.join("；\n");
     section.style.display = "";
   } catch (_) {
     section.style.display = "none";
@@ -4987,9 +4960,9 @@ function copyPersonaBlock(which) {
   }
 }
 
-function editPersonaBlock(layerName) {
-  const cardId = layerName === "decision" ? "persona-effect-style" : "persona-effect-direction";
-  const textId = layerName === "decision" ? "persona-style-text" : "persona-direction-text";
+function editPersonaBlock(part) {
+  const cardId = part === "stable" ? "persona-effect-style" : "persona-effect-direction";
+  const textId = part === "stable" ? "persona-style-text" : "persona-direction-text";
   const card = document.getElementById(cardId);
   const textEl = document.getElementById(textId);
   if (!card || !textEl) return;
@@ -5021,13 +4994,7 @@ function editPersonaBlock(layerName) {
     } else if (action === "save") {
       const newVal = textarea.value.trim();
       try {
-        const patch = {};
-        if (layerName === "decision") {
-          patch.structure_preference = newVal;
-        } else {
-          // Not directly editable as a single field — update via manual layer edit as text
-        }
-        await api(`/api/profile/persona/layer/${layerName}`, "POST", patch);
+        await api(`/api/profile/persona/edit/${part}`, "POST", { prompt_text: newVal });
         toast(t("privacy.editSaved"), "success");
         textEl.textContent = newVal;
       } catch (err) {

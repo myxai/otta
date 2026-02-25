@@ -6,7 +6,7 @@
   <title>MyxAI Desk</title>
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="print" onload="this.media='all'" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="/static/chart.min.js"></script>
 </head>
 <body>
   <!-- Loading splash -->
@@ -357,18 +357,33 @@
               <p class="persona-privacy-note" data-i18n="privacy.localNote">所有数据默认仅在本地处理。</p>
             </div>
 
+            <!-- Persona usage control -->
+            <div class="persona-section">
+              <h3 class="persona-section-title" data-i18n="privacy.usageTitle">画像使用范围</h3>
+              <div class="persona-toggles">
+                <label class="persona-toggle" id="persona-toggle-digest">
+                  <input type="checkbox" id="privacy-persona-digest" onchange="savePrivacySettings()" />
+                  <div class="persona-toggle-content">
+                    <span class="persona-toggle-label" data-i18n="privacy.personaInDigest">允许画像增强 AI 回复</span>
+                    <span class="persona-toggle-hint" data-i18n="privacy.personaInDigestHint">画像仅注入系统提示词，对话内容中不会出现</span>
+                  </div>
+                </label>
+              </div>
+              <p class="persona-privacy-note" data-i18n="privacy.personaUsageNote">开启后，AI 会根据你的背景和兴趣给出更贴合的回复，但画像内容不会出现在任何对话消息中。</p>
+            </div>
+
             <!-- Personalization effect -->
             <div class="persona-section" id="persona-effect-section" style="display:none;">
               <h3 class="persona-section-title" data-i18n="privacy.effectTitle">当前个性化效果</h3>
 
               <div class="persona-effect-card" id="persona-effect-style">
                 <div class="persona-effect-header">
-                  <span class="persona-effect-label" data-i18n="privacy.chatStyle">对话风格</span>
+                  <span class="persona-effect-label" data-i18n="privacy.stablePersona">稳定画像</span>
                   <div class="persona-effect-actions">
                     <button class="persona-action-btn" onclick="copyPersonaBlock('style')" title="复制">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     </button>
-                    <button class="persona-action-btn" onclick="editPersonaBlock('decision')" title="编辑">
+                    <button class="persona-action-btn" onclick="editPersonaBlock('stable')" title="编辑">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
                   </div>
@@ -378,12 +393,12 @@
 
               <div class="persona-effect-card" id="persona-effect-direction">
                 <div class="persona-effect-header">
-                  <span class="persona-effect-label" data-i18n="privacy.recDirection">推荐方向</span>
+                  <span class="persona-effect-label" data-i18n="privacy.recentSnapshot">近期兴趣</span>
                   <div class="persona-effect-actions">
                     <button class="persona-action-btn" onclick="copyPersonaBlock('direction')" title="复制">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     </button>
-                    <button class="persona-action-btn" onclick="editPersonaBlock('interests')" title="编辑">
+                    <button class="persona-action-btn" onclick="editPersonaBlock('recent')" title="编辑">
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                     </button>
                   </div>
@@ -392,13 +407,14 @@
               </div>
             </div>
 
-            <!-- Advanced: retention (collapsed) -->
+            <!-- Advanced: analysis window (collapsed) -->
             <details class="persona-advanced">
               <summary data-i18n="privacy.advanced">高级设置</summary>
               <div class="persona-advanced-content">
                 <div class="form-group" style="max-width:200px;">
-                  <label data-i18n="privacy.retention">保留天数</label>
-                  <input type="number" id="privacy-retention" value="90" min="7" max="365" onchange="savePrivacySettings()" />
+                  <label data-i18n="privacy.analysisDays">分析时长（天）</label>
+                  <input type="number" id="privacy-analysis-days" value="7" min="1" max="30" onchange="savePrivacySettings()" />
+                  <p class="persona-field-help" data-i18n="privacy.analysisDaysHelp">生成画像时分析最近 N 天的数据，不保存历史记录</p>
                 </div>
               </div>
             </details>

@@ -194,6 +194,31 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
     return records
 
 
+def collect_browser_events(
+    hours: int = 24,
+    browser: str = "auto",
+) -> list[dict]:
+    """Read browser history and return as event dicts (no persistence).
+    
+    Returns list of browser_visited event dicts for in-memory analysis only.
+    """
+    records = read_browser_history(hours=hours, browser=browser)
+    events: list[dict] = []
+    for r in records:
+        dt = r.get("dt", datetime.now(timezone.utc))
+        events.append({
+            "event_type": "browser_visited",
+            "domain": r["domain"],
+            "title_keywords": _extract_keywords(r["title"]),
+            "timestamp_bucket": _timestamp_bucket(dt),
+            "dwell_time_bucket": _dwell_bucket(r.get("visit_count", 1)),
+            "category_tag": _categorise(r["domain"], r["title"]),
+            "ts": r["ts"],
+            "visit_count": r.get("visit_count", 1),
+        })
+    return events
+
+
 def collect_to_events(
     hours: int = 24,
     browser: str = "auto",

@@ -1,7 +1,7 @@
 """Profile capability — unified API for Prompt Apps to access user context.
 
 Provides topic summaries, project context, preference management, and
-full persona engine access (CRUD, versioning, prompt generation).
+simplified persona engine access (stable + recent, prompt generation).
 """
 
 from __future__ import annotations
@@ -98,13 +98,16 @@ class Profile:
     def get_collection_settings(self) -> dict:
         """Return current data collection settings."""
         prefs = self.get_preferences()
-        return prefs.get("collection", {
+        defaults = {
             "browser_history": True,
             "chat_history": True,
             "file_history": False,
             "watch_paths": [],
-            "retention_days": 90,
-        })
+            "analysis_days": 7,
+            "persona_in_digest": False,
+        }
+        saved = prefs.get("collection", {})
+        return {**defaults, **saved}
 
     def update_collection_settings(self, settings: dict) -> str:
         """Update data collection settings."""
@@ -114,12 +117,11 @@ class Profile:
 
     def export_all(self) -> dict:
         """Export all profile data for the user."""
-        persona = self.get_persona()
         return {
             "summary": self.get_summary(),
             "topics": self.get_topics(),
             "preferences": self.get_preferences(),
-            "persona": persona,
+            "persona": self.get_persona(),
             "events_count": self._store.count(),
         }
 
@@ -137,77 +139,79 @@ class Profile:
             pass
         return action_id
 
-    # ── Persona Engine API ───────────────────────────────────────
+    # ── Persona Engine API (simplified) ──────────────────────────
 
     def get_persona(self) -> dict:
-        """Return the full 6-layer persona profile as a dict."""
+        """Return both stable + recent persona as a dict."""
         try:
             from myxai_desk.core.profile import persona_store
-            return persona_store.load().to_dict()
+            stable = persona_store.load_stable()
+            recent = persona_store.load_recent()
+            return {
+                "stable": stable.to_dict(),
+                "recent": recent.to_dict(),
+                "has_data": not stable.is_empty() or not recent.is_empty(),
+            }
         except Exception:
-            return {}
+            return {"stable": {}, "recent": {}, "has_data": False}
 
-    def get_persona_layer(self, layer_name: str) -> dict:
-        """Return a single persona layer as a dict."""
-        try:
-            from myxai_desk.core.profile import persona_store
-            from dataclasses import asdict
-            profile = persona_store.load()
-            layer = profile.get_layer(layer_name)
-            return asdict(layer)
-        except Exception as e:
-            return {"error": str(e)}
-
-    def update_persona_layer(self, layer_name: str, patch: dict) -> dict:
-        """Manually update fields in a persona layer."""
-        try:
-            from myxai_desk.core.profile.update_engine import manual_update_layer
-            return manual_update_layer(layer_name, patch)
-        except Exception as e:
-            return {"error": str(e)}
-
-    def run_persona_update(self, *, force: bool = False) -> dict:
-        """Trigger a full persona engine update cycle."""
+    def run_persona_update(
+        self,
+        *,
+        model: str = "",
+        api_key: str = "",
+        api_base: str | None = None,
+    ) -> dict:
+        """Trigger a full persona update cycle."""
         try:
             from myxai_desk.core.profile.update_engine import run_full_update
-            return run_full_update(force=force, store=self._store)
+            return run_full_update(
+                model=model,
+                api_key=api_key,
+                api_base=api_base,
+                store=self._store,
+            )
         except Exception as e:
             return {"error": str(e)}
 
-    def get_persona_versions(self) -> list[dict]:
-        """List all stored persona versions."""
-        try:
-            from myxai_desk.core.profile import persona_store
-            return persona_store.list_versions()
-        except Exception:
-            return []
-
-    def rollback_persona(self, version: int) -> dict:
-        """Rollback persona to a specific version."""
-        try:
-            from myxai_desk.core.profile import persona_store
-            profile = persona_store.rollback(version)
-            return {"success": True, "version": version, "confidence": profile.overall_confidence()}
-        except FileNotFoundError:
-            return {"error": f"Version {version} not found"}
-        except Exception as e:
-            return {"error": str(e)}
-
-    def get_persona_prompt(self, task_type: str = "general") -> str:
-        """Generate a task-aware persona prompt for LLM injection."""
+    def get_persona_prompt(self, task_context: str = "") -> str:
+        """Generate persona-enhanced prompt for LLM injection."""
         try:
             from myxai_desk.core.profile.prompt_builder import build_prompt
-            return build_prompt(task_type)
+            return build_prompt(task_context=task_context)
         except Exception:
             return ""
 
-    def get_persona_audit(self, n: int = 50) -> list[dict]:
-        """Return recent persona audit log entries."""
+    def edit_persona_stable(self, patch: dict) -> dict:
+        """Manually edit fields in the stable persona."""
         try:
-            from myxai_desk.core.profile import persona_audit
-            return persona_audit.recent(n=n)
-        except Exception:
-            return []
+            from myxai_desk.core.profile import persona_store
+            from myxai_desk.core.profile.persona_model import StablePersona
+            stable = persona_store.load_stable()
+            for key, value in patch.items():
+                if hasattr(stable, key) and key not in ("updated_at",):
+                    setattr(stable, key, value)
+            from datetime import datetime, timezone
+            stable.updated_at = datetime.now(timezone.utc).isoformat()
+            persona_store.save_stable(stable)
+            return {"status": "ok", "updated_fields": list(patch.keys())}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def edit_persona_recent(self, patch: dict) -> dict:
+        """Manually edit fields in the recent snapshot."""
+        try:
+            from myxai_desk.core.profile import persona_store
+            recent = persona_store.load_recent()
+            for key, value in patch.items():
+                if hasattr(recent, key) and key not in ("updated_at",):
+                    setattr(recent, key, value)
+            from datetime import datetime, timezone
+            recent.updated_at = datetime.now(timezone.utc).isoformat()
+            persona_store.save_recent(recent)
+            return {"status": "ok", "updated_fields": list(patch.keys())}
+        except Exception as e:
+            return {"error": str(e)}
 
 
 _TECH_KEYWORDS = {

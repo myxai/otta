@@ -1,4 +1,4 @@
-"""Daily Briefing (每日私享会) — personal curator & deep-dive exploration.
+"""Daily Briefing (每日私享) — personal curator & deep-dive exploration.
 
 Your private information curator that understands your interests over time,
 picks the most relevant content, and lets you explore any item in depth.
@@ -1063,7 +1063,7 @@ def _esc(text: str) -> str:
 
 def _json_to_html(data: dict, date_str: str) -> str:
     """Render the structured JSON report into HTML matching existing CSS classes."""
-    parts: list[str] = [f'<h1>\U0001f4c5 {date_str} 每日私享会</h1>']
+    parts: list[str] = [f'<h1>\U0001f4c5 {date_str} 每日私享</h1>']
 
     for sec in data.get("sections", []):
         cat = sec.get("category", "")
@@ -1143,7 +1143,7 @@ def generate_report_fallback(categories: dict[str, list],
                              search_results: dict[str, list[dict]],
                              date_str: str) -> str:
     """HTML report when LLM is unavailable — still uses real search links."""
-    parts: list[str] = [f'<h1>📅 {date_str} 每日私享会</h1>']
+    parts: list[str] = [f'<h1>📅 {date_str} 每日私享</h1>']
 
     for cat in ("work", "study", "life"):
         meta = _CAT_META[cat]
@@ -1339,7 +1339,11 @@ _EXPLORE_PROMPT_TEMPLATE = """\
 
 
 def build_explore_prompt(item: dict, interests: dict | None = None) -> str:
-    """Build a chat prompt for exploring a specific digest content item."""
+    """Build a user-visible chat prompt for exploring a specific digest item.
+
+    Persona data is NEVER included here — it is injected via system prompt
+    only, invisible to the user.
+    """
     title = item.get("title", "")
     description = item.get("description", "")
     url = item.get("url", "")
@@ -1356,7 +1360,7 @@ def build_explore_prompt(item: dict, interests: dict | None = None) -> str:
                 )
                 context_lines.append(f"- {cat_name}兴趣：{kw_text}")
     context_block = (
-        "【用户兴趣画像】\n" + "\n".join(context_lines)
+        "【用户兴趣方向】\n" + "\n".join(context_lines)
         if context_lines else ""
     )
 
@@ -1484,7 +1488,7 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
 
     # ── 6. Generate report ──────────────────────────────────────────
     if progress_cb:
-        progress_cb("正在生成每日私享会…")
+        progress_cb("正在生成每日私享…")
 
     prev_titles = _extract_prev_titles(date_str)
     if prev_titles:

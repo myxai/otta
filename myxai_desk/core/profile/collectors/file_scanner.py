@@ -1,7 +1,12 @@
-"""File scanner collector — privacy-first metadata from file changes.
+"""File scanner collector — metadata from newly created files only.
 
-Records project_prefix (sanitised), file_extension, operation_type, and
-diff_size_bucket.  Never reads file content.
+Collects:
+- File name (not path, for privacy)
+- File extension  
+- Creation time
+
+Filters out: temp files, build artifacts, dependencies, large binaries.
+Never reads file content.
 """
 
 from __future__ import annotations
@@ -10,47 +15,95 @@ import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from myxai_desk.core.profile.events import EventStore, FileTouched
+# Directories to skip entirely
+_SKIP_DIRS = {
+    '.git', '.svn', '.hg',
+    '__pycache__', '.pytest_cache', '.mypy_cache', '.tox',
+    'node_modules', 'venv', '.venv', 'env', '.env',
+    'dist', 'build', '.next', '.nuxt', 'target',
+    '.idea', '.vscode', '.vs',
+    'coverage', 'htmlcov',
+}
 
-_SKIP_PREFIXES = ('.', '~', '__pycache__', 'node_modules', '.git', '.venv', 'venv')
-_SKIP_EXTENSIONS = {'.tmp', '.swp', '.lock', '.bak', '.pyc', '.pyo', '.log'}
+# File extensions to skip (temp, cache, build artifacts)
+_SKIP_EXTENSIONS = {
+    # Temp files
+    '.tmp', '.temp', '.swp', '.swo', '.bak', '.backup', '~',
+    # Lock files
+    '.lock', '.lck', '.pid',
+    # Compiled/binary
+    '.pyc', '.pyo', '.pyd', '.so', '.dll', '.dylib', '.exe', '.bin',
+    '.o', '.obj', '.class', '.jar',
+    # Logs
+    '.log', '.logs',
+    # Database files
+    '.db', '.sqlite', '.sqlite3', '.db-shm', '.db-wal',
+    # Cache
+    '.cache', '.caches',
+    # Archives (usually large)
+    '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar',
+    # Large media
+    '.mp4', '.avi', '.mkv', '.mov', '.wmv',
+    '.mp3', '.wav', '.flac', '.ogg',
+    '.psd', '.ai', '.sketch',
+    # OS files
+    '.DS_Store', 'Thumbs.db', 'desktop.ini',
+}
+
+# File name patterns to skip
+_SKIP_NAME_PATTERNS = {
+    'package-lock.json',
+    'yarn.lock',
+    'pnpm-lock.yaml',
+    'Cargo.lock',
+    'Pipfile.lock',
+    'poetry.lock',
+    '.gitignore',
+    '.gitkeep',
+    '.env',
+    '.env.local',
+}
+
+# Max file size to consider (10MB) — larger files are likely media/binaries
+_MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
-def _sanitise_project_prefix(path: str, watch_root: str) -> str:
-    """Reduce the full path to a project-level prefix for privacy."""
-    try:
-        rel = os.path.relpath(path, watch_root)
-        parts = Path(rel).parts
-        return parts[0] if parts else "root"
-    except (ValueError, TypeError):
-        return "unknown"
+def _should_skip_file(fname: str, fpath: str, fsize: int) -> bool:
+    """Check if file should be filtered out."""
+    # Skip hidden files
+    if fname.startswith('.') or fname.startswith('~'):
+        return True
+    
+    # Skip specific names
+    if fname in _SKIP_NAME_PATTERNS:
+        return True
+    
+    # Skip by extension
+    ext = Path(fpath).suffix.lower()
+    if ext in _SKIP_EXTENSIONS:
+        return True
+    
+    # Skip large files
+    if fsize > _MAX_FILE_SIZE:
+        return True
+    
+    return False
 
 
-def _diff_size_bucket(file_size: int) -> str:
-    if file_size < 1024:
-        return "tiny"
-    if file_size < 10240:
-        return "small"
-    if file_size < 102400:
-        return "medium"
-    return "large"
-
-
-def scan_file_changes(
+def collect_file_events(
     watch_paths: list[str],
     days: int = 7,
-    store: EventStore | None = None,
-) -> int:
-    """Scan specified folders for files created/modified in the last *days* days.
-
-    Returns the number of file events recorded.
+) -> list[dict]:
+    """Scan for newly created files in the last N days (no persistence).
+    
+    Returns list of file event dicts with: filename, extension, created_at.
+    Only newly created files, not modified files.
     """
     if not watch_paths:
-        return 0
+        return []
 
-    store = store or EventStore()
     cutoff = datetime.now(timezone.utc) - timedelta(days=days)
-    count = 0
+    events: list[dict] = []
 
     for watch_path in watch_paths:
         if not os.path.isdir(watch_path):
@@ -58,49 +111,48 @@ def scan_file_changes(
 
         try:
             for root, dirs, files in os.walk(watch_path):
-                dirs[:] = [d for d in dirs if not any(
-                    d.startswith(p) for p in _SKIP_PREFIXES
-                )]
+                # Skip unwanted directories
+                dirs[:] = [d for d in dirs if d not in _SKIP_DIRS]
 
                 for fname in files:
                     fpath = os.path.join(root, fname)
                     try:
-                        if any(fname.startswith(p) for p in ('.', '~')):
+                        # Get file stats
+                        stat = os.stat(fpath)
+                        fsize = stat.st_size
+                        ctime = datetime.fromtimestamp(stat.st_ctime, tz=timezone.utc)
+                        
+                        # Only newly created files
+                        if ctime < cutoff:
                             continue
-
-                        ext = Path(fpath).suffix.lower()
-                        if ext in _SKIP_EXTENSIONS:
+                        
+                        # Apply filters
+                        if _should_skip_file(fname, fpath, fsize):
                             continue
-
-                        mtime = datetime.fromtimestamp(
-                            os.path.getmtime(fpath), tz=timezone.utc
-                        )
-                        if mtime < cutoff:
-                            continue
-
-                        ctime = datetime.fromtimestamp(
-                            os.path.getctime(fpath), tz=timezone.utc
-                        )
-                        op = "create" if ctime >= cutoff else "modify"
-
-                        try:
-                            fsize = os.path.getsize(fpath)
-                        except OSError:
-                            fsize = 0
-
-                        event = FileTouched(
-                            project_prefix=_sanitise_project_prefix(fpath, watch_path),
-                            file_extension=ext or "none",
-                            operation_type=op,
-                            diff_size_bucket=_diff_size_bucket(fsize),
-                            ts=mtime.isoformat(),
-                        )
-                        store.record(event)
-                        count += 1
-
+                        
+                        ext = Path(fpath).suffix.lower() or "none"
+                        
+                        events.append({
+                            "event_type": "file_created",
+                            "filename": fname,
+                            "extension": ext,
+                            "created_at": ctime.isoformat(),
+                            "ts": ctime.isoformat(),
+                        })
+                    
                     except (OSError, PermissionError):
                         continue
         except Exception:
             continue
 
-    return count
+    return events
+
+
+# Keep old function for backward compatibility (stub)
+def scan_file_changes(
+    watch_paths: list[str],
+    days: int = 7,
+    store = None,
+) -> int:
+    """Deprecated — kept for backward compatibility."""
+    return 0
