@@ -67,6 +67,7 @@ from myxai_desk.web.config_routes import bp as config_bp
 from myxai_desk.web.security_routes import bp as security_bp
 from myxai_desk.web.mcp_routes import bp as mcp_bp
 from myxai_desk.web.i18n_routes import bp as i18n_bp
+from myxai_desk.web.profile_routes import bp as profile_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
@@ -74,6 +75,7 @@ flask_app.register_blueprint(config_bp)
 flask_app.register_blueprint(security_bp)
 flask_app.register_blueprint(mcp_bp)
 flask_app.register_blueprint(i18n_bp)
+flask_app.register_blueprint(profile_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -1452,144 +1454,9 @@ def api_onboard():
 #   - api_dev_mode_disable()
 # ---------------------------------------------------------------------------
 
-
 # ---------------------------------------------------------------------------
-# Profile API
+# Profile 路由已迁移到 myxai_desk/web/profile_routes.py (PR-7)
 # ---------------------------------------------------------------------------
-
-
-@flask_app.route("/api/profile/summary")
-def api_profile_summary():
-    """Return the user's profile summary."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    p = Profile()
-    return jsonify(p.get_summary())
-
-
-@flask_app.route("/api/profile/topics")
-def api_profile_topics():
-    """Return extracted interest topics."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    days = request.args.get("days", 30, type=int)
-    p = Profile()
-    return jsonify(p.get_topics(days=days))
-
-
-@flask_app.route("/api/profile/preferences")
-def api_profile_preferences():
-    """Return user preferences."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    return jsonify(Profile().get_preferences())
-
-
-@flask_app.route("/api/profile/preferences", methods=["POST"])
-def api_profile_preferences_update():
-    """Update user preferences."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    p = Profile()
-    action_id = p.update_preferences(request.json or {})
-    return jsonify({"success": True, "action_id": action_id})
-
-
-@flask_app.route("/api/profile/collection")
-def api_profile_collection():
-    """Return data collection settings."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    return jsonify(Profile().get_collection_settings())
-
-
-@flask_app.route("/api/profile/collection", methods=["POST"])
-def api_profile_collection_update():
-    """Update data collection settings."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    p = Profile()
-    settings = request.json or {}
-    action_id = p.update_collection_settings(settings)
-    return jsonify({"success": True, "action_id": action_id})
-
-
-@flask_app.route("/api/profile/export")
-def api_profile_export():
-    """Export all profile data."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    return jsonify(Profile().export_all())
-
-
-@flask_app.route("/api/profile/clear", methods=["POST"])
-def api_profile_clear():
-    """Clear all profile data."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    action_id = Profile().clear_all()
-    return jsonify({"success": True, "action_id": action_id})
-
-
-@flask_app.route("/api/profile/refresh", methods=["POST"])
-def api_profile_refresh():
-    """Force refresh the profile summary."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    summary = Profile().refresh_summary()
-    return jsonify(summary)
-
-
-# ---------------------------------------------------------------------------
-# Persona Engine API (simplified: stable + recent)
-# ---------------------------------------------------------------------------
-
-
-@flask_app.route("/api/profile/persona")
-def api_persona_get():
-    """Return stable + recent persona data."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    return jsonify(Profile().get_persona())
-
-
-@flask_app.route("/api/profile/persona/prompt")
-def api_persona_prompt():
-    """Generate persona-enhanced prompt for LLM injection."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    task_context = request.args.get("task_context", "")
-    prompt = Profile().get_persona_prompt(task_context)
-    return jsonify({"prompt": prompt})
-
-
-@flask_app.route("/api/profile/persona/edit/<part>", methods=["POST"])
-def api_persona_edit(part):
-    """Manually edit stable or recent persona fields."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    patch = request.get_json(force=True) or {}
-    if part == "stable":
-        result = Profile().edit_persona_stable(patch)
-    elif part == "recent":
-        result = Profile().edit_persona_recent(patch)
-    else:
-        return jsonify({"error": f"Unknown part: {part}, use 'stable' or 'recent'"}), 400
-    return jsonify(result)
-
-
-@flask_app.route("/api/profile/persona/update", methods=["POST"])
-def api_persona_update():
-    """Trigger a full persona update cycle."""
-    from myxai_desk.core.capabilities.profile import Profile
-
-    model_cfg = _get_model_config()
-    result = Profile().run_persona_update(
-        model=model_cfg.get("model", ""),
-        api_key=model_cfg.get("api_key", ""),
-        api_base=model_cfg.get("api_base"),
-    )
-    return jsonify(result)
 
 
 # ---------------------------------------------------------------------------
