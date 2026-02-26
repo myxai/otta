@@ -18,7 +18,8 @@ def print_migration_dashboard(app: Flask) -> None:
         ("Config", "/api/config", "[OK] 已迁移"),
         ("Security", "/api/security", "[OK] 已迁移"),
         ("MCP", "/api/mcp", "[OK] 已迁移"),
-        ("Apps", "/api/apps", "[PENDING] 待迁移 (大模块)"),
+        ("Apps", "/api/apps", "[OK] 已迁移 (8a/8b/8c/8d)"),
+        ("Reports", "/api/reports", "[OK] 已迁移"),
         ("Profile", "/api/profile", "[OK] 已迁移"),
     ]
     
@@ -54,5 +55,5 @@ def print_migration_dashboard(app: Flask) -> None:
             print(f"    ... 还有 {len(routes) - 3} 个路由")
     
     print("\n" + "=" * 70)
-    print(f"迁移进度: 6/7 模块已完成 (86%)")
+    print(f"迁移进度: 8/8 模块已完成 (100%)")
     print("=" * 70 + "\n")
