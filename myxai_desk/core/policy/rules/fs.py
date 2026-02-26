@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from myxai_desk.core.policy.modes import ModePolicy
 
-# ── System directory protection (from safe_fs.py) ─────────────────
+# ── System directory protection ──────────────────────────────────
 
 _SYSTEM_DIRS_WIN = {
     "windows",
@@ -27,6 +27,7 @@ _SYSTEM_DIRS_WIN = {
     "boot",
     "perflogs",
 }
+
 _SYSTEM_DIRS_UNIX = {
     "/usr",
     "/etc",
@@ -45,16 +46,53 @@ _SYSTEM_DIRS_UNIX = {
 }
 
 
-def is_safe_path(path: str | Path) -> tuple[bool, str]:
-    """Check if *path* is safe for write/move operations."""
+def is_safe_path_for_read(path: str | Path) -> tuple[bool, str]:
+    """Check if *path* is safe for READ operations (list_dir, read_text, etc.).
+    
+    读操作的安全检查较为宽松，只拦截：
+    1. 磁盘根目录本身（D:\, C:\ 等）
+    2. 明确的系统目录（Windows, Program Files 等）
+    """
     p = Path(path).resolve()
 
+    # 1) 拦截磁盘根目录本身（D:\, C:\）
+    if p == p.anchor or str(p) == p.drive + os.sep:
+        return False, "drive root directory read not allowed"
+
+    # 2) 检查是否在系统目录内
+    name_lower = p.name.lower()
+    if sys.platform == "win32":
+        # 检查路径中是否包含系统目录
+        for part in p.parts:
+            if part.lower() in _SYSTEM_DIRS_WIN:
+                return False, f"system directory '{part}' is protected"
+    else:
+        p_str = str(p)
+        for sd in _SYSTEM_DIRS_UNIX:
+            if p_str == sd or p_str.startswith(sd + "/"):
+                return False, f"system directory '{sd}' is protected"
+
+    return True, ""
+
+
+def is_safe_path(path: str | Path) -> tuple[bool, str]:
+    """Check if *path* is safe for WRITE/DELETE operations.
+    
+    写操作的安全检查较为严格，在 is_safe_path_for_read 的基础上额外拦截：
+    1. Windows 上的磁盘顶级目录（D:\download, D:\data 等）
+    """
+    p = Path(path).resolve()
+
+    # 1) 拦截磁盘根目录本身（D:\, C:\）
     if p == p.anchor or str(p) == p.drive + os.sep:
         return False, "root/drive-root directory operations are forbidden"
 
-    if len(p.parts) <= 2 and sys.platform == "win32":
-        return False, "top-level drive directory operations are forbidden"
+    # 2) Windows 特殊限制：拦截磁盘顶级目录（如 D:\download）
+    #    理由：这些目录通常存储大量数据，误删风险高
+    if len(p.parts) == 2 and sys.platform == "win32":
+        return False, f"top-level drive directory '{p.name}' write/delete not allowed"
 
+    # 3) 检查是否在系统目录内
     name_lower = p.name.lower()
     if sys.platform == "win32":
         if name_lower in _SYSTEM_DIRS_WIN:
@@ -107,14 +145,19 @@ def evaluate(
 
     target = Path(path_str).resolve()
 
+    # 读操作：使用宽松的安全检查（只拦截根目录和系统目录）
+    if op in ("read_text", "list_dir", "read"):
+        safe, reason = is_safe_path_for_read(target)
+        if not safe:
+            return "DENY", 80, f"FS_READ_UNSAFE:{reason}"
+        return "ALLOW", 0, "FS_READ_ALLOWED"
+
+    # 写/删操作：使用严格的安全检查
     safe, reason = is_safe_path(target)
     if not safe:
         return "DENY", 100, f"FS_UNSAFE_PATH:{reason}"
 
-    if op in ("read_text", "list_dir", "read"):
-        return "ALLOW", 0, "FS_READ_ALLOWED"
-
-    # Write operations
+    # Write operations scope check
     if not policy.fs_write_system:
         safe_sys, sys_reason = is_safe_path(target)
         if not safe_sys:

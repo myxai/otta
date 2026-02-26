@@ -60,10 +60,12 @@ if not hasattr(flask_app, 'extensions'):
 from myxai_desk.web.gateway_routes import bp as gateway_bp
 from myxai_desk.web.scheduler_routes import bp as scheduler_bp
 from myxai_desk.web.config_routes import bp as config_bp
+from myxai_desk.web.security_routes import bp as security_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
 flask_app.register_blueprint(config_bp)
+flask_app.register_blueprint(security_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -1393,266 +1395,18 @@ def api_onboard():
 
 
 # ---------------------------------------------------------------------------
-# Security / Profile / Marketplace / Plan / Audit API
+# Security 路由已迁移到 myxai_desk/web/security_routes.py
+# 旧路由定义已删除（PR-5）：
+#   - api_security_mode_get()
+#   - api_security_mode_set()
+#   - api_security_modes_list()
+#   - api_app_mode_get()
+#   - api_app_mode_set()
+#   - api_app_mode_preview()
+#   - api_dev_mode_status()
+#   - api_dev_mode_enable()
+#   - api_dev_mode_disable()
 # ---------------------------------------------------------------------------
-
-
-@flask_app.route("/api/security/mode")
-def api_security_mode_get():
-    """Return current security mode and its policy summary."""
-    from myxai_desk.core.policy.modes import get_current_mode, mode_policy_as_dict
-
-    return jsonify(mode_policy_as_dict(get_current_mode()))
-
-
-@flask_app.route("/api/security/mode", methods=["POST"])
-def api_security_mode_set():
-    """Switch global security mode (levels 1-3 only; Dev requires system config)."""
-    from myxai_desk.core.policy.modes import (
-        USER_SELECTABLE_MODES,
-        SecurityMode,
-        is_dev_mode_valid,
-        mode_policy_as_dict,
-        set_current_mode,
-    )
-
-    data = request.json or {}
-    mode_str = data.get("mode", "")
-    try:
-        mode = SecurityMode(mode_str)
-    except ValueError:
-        return jsonify(
-            {"error": f"Invalid mode: {mode_str}", "valid": [m.value for m in SecurityMode]}
-        ), 400
-
-    if mode == SecurityMode.DEVELOPER and not is_dev_mode_valid():
-        return jsonify(
-            {
-                "error": "Developer 模式只能通过系统配置开启，且需要设置失效策略",
-                "hint": "请使用 /api/security/dev/enable 端点",
-            }
-        ), 403
-
-    if mode not in USER_SELECTABLE_MODES and mode != SecurityMode.DEVELOPER:
-        return jsonify({"error": f"模式 {mode_str} 不可直接选择"}), 400
-
-    set_current_mode(mode)
-    print(f"[security] Global mode switched to {mode.value}")
-    try:
-        from myxai_desk.core.audit.ledger import AuditLedger
-
-        AuditLedger().append_entry(
-            capability="security.mode.switch",
-            args={"mode": mode.value},
-            action_id="",
-            result_summary=f"global → {mode.value}",
-        )
-    except Exception:
-        pass
-    return jsonify(mode_policy_as_dict(mode))
-
-
-@flask_app.route("/api/security/modes")
-def api_security_modes_list():
-    """Return all available modes and their policies."""
-    from myxai_desk.core.policy.modes import (
-        USER_SELECTABLE_MODES,
-        SecurityMode,
-        get_dev_mode_status,
-        mode_policy_as_dict,
-    )
-
-    result = []
-    for m in SecurityMode:
-        d = mode_policy_as_dict(m)
-        d["user_selectable"] = m in USER_SELECTABLE_MODES
-        d["requires_system_config"] = m == SecurityMode.DEVELOPER
-        result.append(d)
-    dev_status = get_dev_mode_status()
-    return jsonify({"modes": result, "dev_mode": dev_status})
-
-
-# ── Per-App Mode ──────────────────────────────────────────────────
-
-
-@flask_app.route("/api/security/app/<app_id>/mode", methods=["GET"])
-def api_app_mode_get(app_id):
-    """Return the per-app mode override (or null if using global)."""
-    from myxai_desk.core.policy.modes import (
-        get_app_mode,
-        get_current_mode,
-        get_effective_mode,
-    )
-
-    app_mode = get_app_mode(app_id)
-    return jsonify(
-        {
-            "app_id": app_id,
-            "app_mode": app_mode.value if app_mode else None,
-            "global_mode": get_current_mode().value,
-            "effective_mode": get_effective_mode(app_id).value,
-        }
-    )
-
-
-@flask_app.route("/api/security/app/<app_id>/mode", methods=["POST"])
-def api_app_mode_set(app_id):
-    """Set a per-app mode override. Requires confirmation if escalating."""
-    from myxai_desk.core.policy.modes import (
-        USER_SELECTABLE_MODES,
-        SecurityMode,
-        assess_escalation,
-        clear_app_mode,
-        get_effective_mode,
-        is_dev_mode_valid,
-        set_app_mode,
-    )
-
-    data = request.json or {}
-    mode_str = data.get("mode", "")
-    confirmed = data.get("confirmed", False)
-
-    if not mode_str or mode_str == "inherit":
-        clear_app_mode(app_id)
-        return jsonify(
-            {
-                "app_id": app_id,
-                "app_mode": None,
-                "effective_mode": get_effective_mode(app_id).value,
-            }
-        )
-
-    try:
-        target = SecurityMode(mode_str)
-    except ValueError:
-        return jsonify({"error": f"无效的模式: {mode_str}"}), 400
-
-    if target == SecurityMode.DEVELOPER and not is_dev_mode_valid():
-        return jsonify(
-            {
-                "error": "Developer 模式未通过系统配置开启",
-                "hint": "请先通过 /api/security/dev/enable 启用 Developer 模式",
-            }
-        ), 403
-
-    if target not in USER_SELECTABLE_MODES and target != SecurityMode.DEVELOPER:
-        return jsonify({"error": f"模式 {mode_str} 不可选择"}), 400
-
-    assessment = assess_escalation(app_id, target)
-
-    if assessment["escalation"] and not confirmed:
-        return jsonify(
-            {
-                "requires_confirm": True,
-                "assessment": assessment,
-            }
-        ), 200
-
-    set_app_mode(app_id, target)
-    try:
-        from myxai_desk.core.audit.ledger import AuditLedger
-
-        AuditLedger().append_entry(
-            capability="security.app_mode.set",
-            args={"app_id": app_id, "mode": target.value, "escalation": assessment["escalation"]},
-            action_id="",
-            result_summary=f"{app_id} → {target.value}",
-        )
-    except Exception:
-        pass
-    return jsonify(
-        {
-            "app_id": app_id,
-            "app_mode": target.value,
-            "effective_mode": get_effective_mode(app_id).value,
-            "assessment": assessment,
-        }
-    )
-
-
-@flask_app.route("/api/security/app/_preview/mode", methods=["POST"])
-def api_app_mode_preview():
-    """Preview escalation assessment without persisting anything."""
-    from myxai_desk.core.policy.modes import SecurityMode, assess_escalation
-
-    data = request.json or {}
-    mode_str = data.get("mode", "")
-    try:
-        target = SecurityMode(mode_str)
-    except ValueError:
-        return jsonify({"error": f"无效的模式: {mode_str}"}), 400
-    assessment = assess_escalation("_preview", target)
-    return jsonify({"assessment": assessment})
-
-
-# ── Developer Mode System Config ──────────────────────────────────
-
-
-@flask_app.route("/api/security/dev/status")
-def api_dev_mode_status():
-    from myxai_desk.core.policy.modes import DEV_EXPIRY_POLICIES, get_dev_mode_status
-
-    return jsonify(
-        {
-            **get_dev_mode_status(),
-            "available_policies": DEV_EXPIRY_POLICIES,
-        }
-    )
-
-
-@flask_app.route("/api/security/dev/enable", methods=["POST"])
-def api_dev_mode_enable():
-    """Enable Developer mode with a mandatory expiry policy."""
-    from myxai_desk.core.policy.modes import enable_dev_mode
-
-    data = request.json or {}
-    expiry_policy = data.get("expiry_policy", "")
-    if not expiry_policy:
-        return jsonify(
-            {
-                "error": "必须选择失效策略",
-                "available_policies": {
-                    "on_app_close": "关闭应用后失效",
-                    "duration_1h": "1 小时后失效",
-                    "duration_24h": "24 小时后失效",
-                },
-            }
-        ), 400
-    result = enable_dev_mode(expiry_policy)
-    if "error" in result:
-        return jsonify(result), 400
-    try:
-        from myxai_desk.core.audit.ledger import AuditLedger
-
-        AuditLedger().append_entry(
-            capability="security.dev_mode.enable",
-            args={"expiry_policy": expiry_policy},
-            action_id="",
-            result_summary=f"dev enabled, policy={expiry_policy}",
-        )
-    except Exception:
-        pass
-    return jsonify(result)
-
-
-@flask_app.route("/api/security/dev/disable", methods=["POST"])
-def api_dev_mode_disable():
-    """Disable Developer mode and revert to Operator."""
-    from myxai_desk.core.policy.modes import disable_dev_mode
-
-    result = disable_dev_mode()
-    try:
-        from myxai_desk.core.audit.ledger import AuditLedger
-
-        AuditLedger().append_entry(
-            capability="security.dev_mode.disable",
-            args={},
-            action_id="",
-            result_summary=f"dev disabled, reverted to {result.get('reverted_to', '')}",
-        )
-    except Exception:
-        pass
-    return jsonify(result)
 
 
 # ---------------------------------------------------------------------------
@@ -4324,6 +4078,11 @@ def main():
     except RuntimeError as e:
         print(f"[Migration Guard] ✗ 路由自检失败: {e}", flush=True)
         raise
+    
+    # 显示路由迁移仪表盘
+    if os.environ.get("SHOW_MIGRATION_DASHBOARD", "1") == "1":
+        from myxai_desk.web.migration_dashboard import print_migration_dashboard
+        print_migration_dashboard(flask_app)
     
     # Debug 模式下打印路由信息
     if os.environ.get("DEBUG_ROUTES"):
