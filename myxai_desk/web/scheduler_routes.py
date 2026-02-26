@@ -6,7 +6,6 @@
 from flask import Blueprint, jsonify, request, current_app
 
 from myxai_desk.web.state import get_state
-from myxai_desk.web.migration_guards import mark
 
 bp = Blueprint("scheduler", __name__, url_prefix="/api/scheduler")
 
@@ -20,7 +19,6 @@ _OFFICIAL_APP_META = {
 @bp.post("/trigger/<task_id>")
 def trigger(task_id):
     """手动触发定时任务."""
-    mark("[NEW] scheduler/trigger")
     state = get_state(current_app)
     
     # 访问 scheduler service（从 app.py 导入）
@@ -35,8 +33,6 @@ def trigger(task_id):
 @bp.get("/runs/<task_id>")
 def runs(task_id):
     """返回任务的最近运行历史（用于 UI 显示）."""
-    mark("[NEW] scheduler/runs")
-    
     from myxai_desk.core.scheduler_service import get_recent_runs
     
     limit = request.args.get("limit", 20, type=int)
@@ -47,8 +43,6 @@ def runs(task_id):
 @bp.get("/status")
 def status():
     """快速概览：列出所有定时任务及其下次/上次运行信息."""
-    mark("[NEW] scheduler/status")
-    
     from myxai_desk.core.scheduler_service import compute_due_slots
     from myxai_desk.core.timeutil import now_local
     from app import _load_official_tasks, _load_custom_tasks
@@ -83,8 +77,6 @@ def today():
     每个项目包括：task_id, name, icon, scheduled_time, status, finished_at.
     状态: planned | running | success | failed
     """
-    mark("[NEW] scheduler/today")
-    
     from myxai_desk.core.scheduler_service import (
         compute_due_slots,
         get_running_tasks,

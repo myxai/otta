@@ -10,8 +10,6 @@ import shutil
 
 from flask import Blueprint, current_app, jsonify
 
-from myxai_desk.web.migration_guards import mark
-
 log = logging.getLogger("myxai.web.mcp_routes")
 bp = Blueprint("mcp", __name__, url_prefix="/api/mcp")
 
@@ -19,8 +17,6 @@ bp = Blueprint("mcp", __name__, url_prefix="/api/mcp")
 @bp.post("/test")
 def test():
     """测试 MCP 服务器连接，不影响运行中的 agent."""
-    mark("[NEW] mcp/test")
-    
     try:
         from nanobot.config.loader import load_config
     except ImportError:
@@ -106,8 +102,6 @@ def test():
 @bp.post("/reconnect")
 def reconnect():
     """强制重新连接运行中 agent 的 MCP 服务器."""
-    mark("[NEW] mcp/reconnect")
-    
     try:
         import nanobot  # noqa: F401
     except ImportError:
@@ -165,8 +159,6 @@ def reconnect():
 @bp.get("/log")
 def log():
     """返回 MCP 诊断日志."""
-    mark("[NEW] mcp/log")
-    
     import app as _app
     with _app._mcp_log_lock:
         return jsonify(list(_app._mcp_log))

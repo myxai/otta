@@ -135,6 +135,7 @@ def init_default_tables() -> None:
         task_id TEXT NOT NULL,
         idempotency_key TEXT NOT NULL,
         scheduled_for TEXT NOT NULL,
+        scheduled_local_date TEXT NOT NULL,
         trigger TEXT DEFAULT 'tick',
         started_at TEXT,
         finished_at TEXT,

@@ -54,6 +54,19 @@ except ImportError:
 # ---------------------------------------------------------------------------
 flask_app = Flask(__name__, static_folder="frontend", static_url_path="/static")
 flask_app.config["JSON_AS_ASCII"] = False
+flask_app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
+
+
+_NO_STORE_PATHS = frozenset({"/", "/static/app.js", "/static/i18n.js"})
+
+
+@flask_app.after_request
+def _no_cache_critical(response):
+    """Prevent caching of index.html and critical JS files."""
+    if request.path in _NO_STORE_PATHS:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+    return response
 
 
 _ALLOWED_HOSTS = frozenset()
@@ -94,7 +107,13 @@ def _check_api_token():
     req_token = request.headers.get("X-MyxAI-Token")
     if req_token and req_token == token:
         return None
-    log.warning("Rejected API request without valid token: %s %s", request.method, request.path)
+    has_hdr = req_token is not None
+    ref = request.headers.get("Referer", "-")
+    ua = (request.headers.get("User-Agent") or "")[:80]
+    log.warning(
+        "Rejected API request: %s %s | has_token_header=%s referer=%s ua=%s",
+        request.method, request.path, has_hdr, ref, ua,
+    )
     return jsonify({"error": "Forbidden"}), 403
 
 
@@ -1433,9 +1452,39 @@ def _run_agent_with_prompt(
 # ---------------------------------------------------------------------------
 
 
+def _compute_build_hash() -> str:
+    """SHA-256 of frontend assets — stable within the same version."""
+    import hashlib
+    h = hashlib.sha256()
+    _fe = Path(__file__).parent / "frontend"
+    for name in ("app.js", "i18n.js", "style.css"):
+        p = _fe / name
+        if p.exists():
+            h.update(p.read_bytes())
+    return h.hexdigest()[:12]
+
+
+_BUILD_HASH = _compute_build_hash()
+
+
 @flask_app.route("/")
 def index():
-    return send_from_directory("frontend", "index.html")
+    token = flask_app.config.get("MYXAI_API_TOKEN", "")
+    if not token:
+        return send_from_directory("frontend", "index.html")
+    html = (Path(__file__).parent / "frontend" / "index.html").read_text(encoding="utf-8")
+    bootstrap = (
+        "<script>"
+        f"window.__myxai_token={json.dumps(token)};"
+        f"window.__myxai_expected_build={json.dumps(_BUILD_HASH)};"
+        "</script>"
+    )
+    import re as _re_idx
+    html = _re_idx.sub(r"(?i)</head>", f"{bootstrap}\n</head>", html, count=1)
+    html = html.replace("/static/app.js", f"/static/app.js?v={_BUILD_HASH}")
+    html = html.replace("/static/i18n.js", f"/static/i18n.js?v={_BUILD_HASH}")
+    html = html.replace("/static/style.css", f"/static/style.css?v={_BUILD_HASH}")
+    return html
 
 
 # ---------------------------------------------------------------------------
@@ -1705,6 +1754,9 @@ def api_status():
         from nanobot.config.loader import get_config_path, load_config
         from nanobot.providers.registry import PROVIDERS
 
+        from myxai_desk.core.scheduler_service import get_scheduler_health
+        from myxai_desk.core.system_info import get_system_info
+
         cp = get_config_path()
         config = load_config()
         workspace = config.workspace_path
@@ -1760,6 +1812,12 @@ def api_status():
             mcp_log_copy = list(_mcp_log)
 
         _display_model = config.agents.defaults.model
+        
+        # Include scheduler health
+        scheduler_health = get_scheduler_health()
+        
+        # Include system information
+        system_info = get_system_info()
 
         return jsonify(
             {
@@ -1775,6 +1833,8 @@ def api_status():
                 "mcp_tool_count": mcp_tool_count,
                 "mcp_tool_names": mcp_tool_names,
                 "mcp_log": mcp_log_copy,
+                "scheduler": scheduler_health,
+                "system": system_info,
             }
         )
     except Exception as e:
@@ -2264,7 +2324,12 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
 
 
 def _exec_email_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
-    config = task.extra["config"]
+    config = dict(task.extra["config"])
+    from myxai_desk.core.storage import secrets as _sec
+    if _sec.is_secret_ref(config.get("imap_password")):
+        real = _sec.retrieve_app_secret("email_summary", "imap_password")
+        if real:
+            config["imap_password"] = real
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     _gate = gate_app_run("email_summary")
@@ -2591,6 +2656,41 @@ def api_desk_lang():
     return jsonify({"ok": True, "lang": lang})
 
 
+@flask_app.route("/api/desk/settings", methods=["GET"])
+def api_desk_settings_get():
+    """Return desktop app preferences (close_action, etc.)."""
+    from myxai_desk.core.storage.paths import DESK_SETTINGS_FILE
+    settings = {"close_action": "minimize"}
+    if DESK_SETTINGS_FILE.exists():
+        try:
+            settings.update(json.loads(DESK_SETTINGS_FILE.read_text(encoding="utf-8")))
+        except Exception:
+            log.debug("Failed to read desk_settings.json", exc_info=True)
+    return jsonify(settings)
+
+
+@flask_app.route("/api/desk/settings", methods=["POST"])
+def api_desk_settings_post():
+    """Save desktop app preferences."""
+    from myxai_desk.core.storage.paths import DESK_SETTINGS_FILE
+    data = request.get_json(silent=True) or {}
+    close_action = data.get("close_action", "minimize")
+    if close_action not in ("minimize", "quit"):
+        close_action = "minimize"
+    settings = {"close_action": close_action}
+    try:
+        DESK_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+        DESK_SETTINGS_FILE.write_text(
+            json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8"
+        )
+    except Exception:
+        log.exception("Failed to save desk_settings.json")
+        return jsonify({"error": "save failed"}), 500
+    if _desk_manager is not None:
+        _desk_manager.close_action = close_action
+    return jsonify({"ok": True, **settings})
+
+
 # ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
@@ -2663,27 +2763,9 @@ def main():
     # Run catch-up check in background so missed tasks are compensated on startup
     threading.Thread(target=_scheduler_svc.on_app_start, daemon=True).start()
 
-    # --- 迁移护栏：路由自检 ---------------------------------------------- #
-    from myxai_desk.web.migration_guards import assert_no_duplicate_routes, dump_routes
-    
-    try:
-        assert_no_duplicate_routes(flask_app)
-        print("[Migration Guard] ✓ 路由自检通过，无重复路由", flush=True)
-    except RuntimeError as e:
-        print(f"[Migration Guard] ✗ 路由自检失败: {e}", flush=True)
-        raise
-    
-    # 显示路由迁移仪表盘
-    if os.environ.get("SHOW_MIGRATION_DASHBOARD", "1") == "1":
-        from myxai_desk.web.migration_dashboard import print_migration_dashboard
-        print_migration_dashboard(flask_app)
-    
-    # Debug 模式下打印路由信息
-    if os.environ.get("DEBUG_ROUTES"):
-        print("\n[Debug] 已注册的 API 路由:", flush=True)
-        for path, methods, endpoint in dump_routes(flask_app, "/api/"):
-            print(f"  {path} {methods} -> {endpoint}", flush=True)
-        print()
+    # --- Route dedup guard ------------------------------------------------ #
+    from myxai_desk.web.migration_guards import assert_no_duplicate_routes
+    assert_no_duplicate_routes(flask_app)
 
     port = 19280
 
@@ -2789,6 +2871,15 @@ def main():
         pass
 
     _desk_manager._on_resume = _scheduler_svc.on_resume
+
+    # Load saved desk preferences (close_action, etc.)
+    from myxai_desk.core.storage.paths import DESK_SETTINGS_FILE
+    if DESK_SETTINGS_FILE.exists():
+        try:
+            _ds = json.loads(DESK_SETTINGS_FILE.read_text(encoding="utf-8"))
+            _desk_manager.close_action = _ds.get("close_action", "minimize")
+        except Exception:
+            log.debug("Failed to load desk_settings.json at startup", exc_info=True)
 
     def _grant_media_permissions(win):
         """Auto-allow microphone/camera permissions in WebView2."""

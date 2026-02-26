@@ -18,6 +18,7 @@ Timezone handling:
 from __future__ import annotations
 
 import logging
+import sqlite3
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -25,8 +26,10 @@ from typing import TYPE_CHECKING, Any, Literal
 
 try:
     from croniter import croniter
+    CRONITER_AVAILABLE = True
 except ImportError:
     croniter = None  # type: ignore[assignment,misc]
+    CRONITER_AVAILABLE = False
 
 from myxai_desk.core.storage import sqlite as db
 from myxai_desk.core.timeutil import local_date_str, now_local, now_utc, to_local, utc_isoformat
@@ -35,6 +38,27 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 log = logging.getLogger("myxai.scheduler")
+
+# ── Scheduler health tracking ──────────────────────────────────────────
+
+_scheduler_degraded: dict[str, Any] = {
+    "db_write_failed": False,
+    "croniter_missing": not CRONITER_AVAILABLE,
+    "last_error": "",
+}
+
+
+def get_scheduler_health() -> dict[str, Any]:
+    """Return current scheduler health status for system diagnostics."""
+    return {
+        "degraded": any([
+            _scheduler_degraded["db_write_failed"],
+            _scheduler_degraded["croniter_missing"],
+        ]),
+        "croniter_available": CRONITER_AVAILABLE,
+        "db_write_failed": _scheduler_degraded["db_write_failed"],
+        "last_error": _scheduler_degraded["last_error"],
+    }
 
 # ── Types ──────────────────────────────────────────────────────────────
 
@@ -91,6 +115,7 @@ def _ensure_task_runs_table() -> None:
             task_id TEXT NOT NULL,
             idempotency_key TEXT NOT NULL,
             scheduled_for TEXT NOT NULL,
+            scheduled_local_date TEXT NOT NULL,
             trigger TEXT DEFAULT 'tick',
             started_at TEXT,
             finished_at TEXT,
@@ -100,6 +125,33 @@ def _ensure_task_runs_table() -> None:
             UNIQUE(idempotency_key)
         """,
         )
+        # Migrate existing rows if needed — add scheduled_local_date column
+        try:
+            db.execute(
+                "SELECT scheduled_local_date FROM task_runs LIMIT 1",
+                readonly=True,
+            )
+        except Exception:
+            log.info("[scheduler] migrating task_runs table — adding scheduled_local_date")
+            db.execute("ALTER TABLE task_runs ADD COLUMN scheduled_local_date TEXT DEFAULT ''")
+        # Re-compute scheduled_local_date for ALL rows to fix any
+        # prior mis-computed values (naive-local was wrongly treated as UTC).
+        rows = db.execute("SELECT id, scheduled_for FROM task_runs", readonly=True)
+        for row in rows:
+            try:
+                dt = datetime.fromisoformat(row["scheduled_for"])
+                # Legacy records stored naive-local from croniter;
+                # aware records (new UTC format) need proper conversion.
+                if dt.tzinfo is None:
+                    local_date = dt.strftime("%Y-%m-%d")
+                else:
+                    local_date = local_date_str(dt)
+                db.execute(
+                    "UPDATE task_runs SET scheduled_local_date = ? WHERE id = ?",
+                    (local_date, row["id"]),
+                )
+            except Exception:
+                log.warning("Failed to backfill scheduled_local_date for row %s", row["id"])
         _TABLE_INIT = True
 
 
@@ -113,24 +165,75 @@ def has_successful_run(idempotency_key: str) -> bool:
     return len(rows) > 0
 
 
+def _slot_local_date(dt: datetime) -> str:
+    """Extract local calendar date from a DueSlot's scheduled_for.
+
+    - Naive datetime (from croniter) is already in local time → extract directly.
+    - Aware datetime (from now_local()) → convert to local then extract.
+    """
+    if dt.tzinfo is None:
+        return dt.strftime("%Y-%m-%d")
+    return local_date_str(dt)
+
+
 def record_run_start(
-    task_id: str, idempotency_key: str, scheduled_for: str, trigger: str
+    task_id: str,
+    idempotency_key: str,
+    scheduled_for: str,
+    scheduled_local_date: str,
+    trigger: str,
 ) -> int | None:
-    """Insert a 'running' record. Returns None if the key already exists."""
+    """Insert a 'running' record. Returns None if the key already exists.
+
+    Args:
+        task_id: unique task identifier
+        idempotency_key: deduplication key (task_id + schedule period)
+        scheduled_for: UTC ISO timestamp of the scheduled time
+        scheduled_local_date: local calendar date string (YYYY-MM-DD),
+            computed by the caller who holds the original datetime
+        trigger: trigger source (startup, resume, tick, manual)
+
+    Returns:
+        Row ID on success, None if duplicate key or DB error
+    """
     _ensure_task_runs_table()
     now_iso = utc_isoformat()
+
     try:
         rows = db.execute(
             """INSERT INTO task_runs
-               (task_id, idempotency_key, scheduled_for, trigger, started_at, status)
-               VALUES (?, ?, ?, ?, ?, 'running')""",
-            (task_id, idempotency_key, scheduled_for, trigger, now_iso),
+               (task_id, idempotency_key, scheduled_for, scheduled_local_date, trigger, started_at, status)
+               VALUES (?, ?, ?, ?, ?, ?, 'running')""",
+            (task_id, idempotency_key, scheduled_for, scheduled_local_date, trigger, now_iso),
         )
-        # fetch last insert id
         rows = db.execute("SELECT last_insert_rowid() AS rid", readonly=True)
-        return rows[0]["rid"] if rows else None
-    except Exception:
-        log.warning("Failed to record run start for task %s", task_id, exc_info=True)
+        row_id = rows[0]["rid"] if rows else None
+        log.info(
+            "[scheduler] started run: task=%s key=%s trigger=%s rid=%s local_date=%s",
+            task_id,
+            idempotency_key,
+            trigger,
+            row_id,
+            scheduled_local_date,
+        )
+        return row_id
+    except sqlite3.IntegrityError:
+        log.debug(
+            "[scheduler] duplicate idempotency key (expected): task=%s key=%s",
+            task_id,
+            idempotency_key,
+        )
+        return None
+    except Exception as exc:
+        log.error(
+            "[scheduler] DB error recording run start: task=%s key=%s error=%s",
+            task_id,
+            idempotency_key,
+            exc,
+            exc_info=True,
+        )
+        _scheduler_degraded["db_write_failed"] = True
+        _scheduler_degraded["last_error"] = str(exc)
         return None
 
 
@@ -157,12 +260,16 @@ def get_recent_runs(task_id: str, limit: int = 20) -> list[dict]:
 
 
 def get_today_runs() -> list[dict]:
-    """Return all task_runs for today (local date)."""
+    """Return all task_runs for today (local date).
+    
+    Uses scheduled_local_date for accurate local date filtering,
+    avoiding timezone-related boundary issues.
+    """
     _ensure_task_runs_table()
     today = local_date_str()
     return db.execute(
-        "SELECT * FROM task_runs WHERE scheduled_for LIKE ? ORDER BY id",
-        (f"{today}%",),
+        "SELECT * FROM task_runs WHERE scheduled_local_date = ? ORDER BY id",
+        (today,),
         readonly=True,
     )
 
@@ -310,10 +417,18 @@ def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
     
     Note: croniter requires naive datetime, so we strip timezone info for computation,
     but ensure all comparisons are done with consistent timezone handling.
+    
+    If croniter is not installed, logs an error and returns empty list.
     """
-    if croniter is None:
-        log.warning("croniter not installed — falling back to exact match")
-        return _compute_exact_match(task, now)
+    if not CRONITER_AVAILABLE:
+        log.error(
+            "[scheduler] croniter not installed — cannot schedule task %s. "
+            "Install via: pip install croniter",
+            task.task_id,
+        )
+        _scheduler_degraded["croniter_missing"] = True
+        _scheduler_degraded["last_error"] = "croniter package not installed"
+        return []
 
     cron_expr = task.cron_expr
     if not cron_expr:
@@ -337,8 +452,8 @@ def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
 
     try:
         cron = croniter(cron_expr, anchor)
-    except Exception:
-        log.warning("Invalid cron expression %r for task %s", cron_expr, task.task_id)
+    except Exception as exc:
+        log.warning("Invalid cron expression %r for task %s: %s", cron_expr, task.task_id, exc)
         return []
 
     mode = task.schedule.get("mode", "daily")
@@ -515,7 +630,8 @@ class SchedulerService:
                     rid = record_run_start(
                         task.task_id,
                         slot.idempotency_key,
-                        slot.scheduled_for.isoformat(),
+                        utc_isoformat(slot.scheduled_for),
+                        _slot_local_date(slot.scheduled_for),
                         trigger,
                     )
                     if rid is None:

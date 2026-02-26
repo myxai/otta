@@ -52,6 +52,10 @@ SECURITY_MODE_FILE: Path = POLICY_DIR / "mode.json"
 
 SCHEDULER_DIR: Path = NANOBOT_HOME / "scheduler"
 
+# ── Desk (desktop app preferences) ────────────────────────────────
+
+DESK_SETTINGS_FILE: Path = NANOBOT_HOME / "desk_settings.json"
+
 # ── Token & search usage ──────────────────────────────────────────
 
 TOKEN_USAGE_FILE: Path = USAGE_DIR / "token_usage.json"

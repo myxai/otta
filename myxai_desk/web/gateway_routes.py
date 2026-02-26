@@ -12,7 +12,6 @@ import sys
 from flask import Blueprint, jsonify, current_app
 
 from myxai_desk.web.state import get_state
-from myxai_desk.web.migration_guards import mark
 
 log = logging.getLogger("myxai.web.gateway_routes")
 bp = Blueprint("gateway", __name__, url_prefix="/api/gateway")
@@ -54,7 +53,6 @@ def _cleanup_gateway(state) -> None:
 @bp.post("/start")
 def start():
     """启动 nanobot gateway 进程."""
-    mark("[NEW] gateway/start")
     state = get_state(current_app)
     
     # 使用全局锁保护进程状态（第一版宁可锁大一点）
@@ -85,7 +83,6 @@ def start():
 @bp.post("/stop")
 def stop():
     """停止 nanobot gateway 进程."""
-    mark("[NEW] gateway/stop")
     state = get_state(current_app)
     
     with state.agent_lock:
@@ -102,7 +99,6 @@ def stop():
 @bp.get("/status")
 def status():
     """查询 gateway 进程状态."""
-    mark("[NEW] gateway/status")
     state = get_state(current_app)
     
     with state.agent_lock:
@@ -119,7 +115,6 @@ def status():
 @bp.get("/logs")
 def logs():
     """获取 gateway 进程日志（最多 100 行）."""
-    mark("[NEW] gateway/logs")
     state = get_state(current_app)
     
     with state.agent_lock:

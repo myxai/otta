@@ -10,7 +10,6 @@ from flask import Blueprint, jsonify, request
 log = logging.getLogger("myxai.web.reports_routes")
 
 from myxai_desk.web.apps_helpers import _t
-from myxai_desk.web.migration_guards import mark
 
 bp = Blueprint("reports", __name__, url_prefix="/api/reports")
 
@@ -32,7 +31,6 @@ def _html_to_summary(html: str, max_len: int = 60) -> str:
 @bp.get("")
 def all_reports():
     """聚合所有应用的报告列表."""
-    mark("[NEW] reports/list")
     result: list[dict] = []
 
     try:
@@ -122,7 +120,6 @@ def all_reports():
 @bp.get("/unread_count")
 def unread_count():
     """所有报告来源的未读总数."""
-    mark("[NEW] reports/unread_count")
     total = 0
     try:
         from apps.custom_app import all_unread_counts
@@ -144,7 +141,6 @@ def unread_count():
 
 @bp.post("/mark_all_read")
 def mark_all_read():
-    mark("[NEW] reports/mark_all_read")
     try:
         from apps.custom_app import list_apps as _list_custom
         from apps.custom_app import list_reports as custom_list
@@ -179,7 +175,6 @@ def mark_all_read():
 
 @bp.delete("/<app_id>/<path:key>")
 def delete_report(app_id, key):
-    mark("[NEW] reports/delete")
     ok = False
     if app_id == "daily_digest":
         from apps.daily_digest import delete_report
@@ -198,7 +193,6 @@ def delete_report(app_id, key):
 @bp.get("/<app_id>/<path:key>")
 def report_content(app_id, key):
     """获取单个报告的完整内容."""
-    mark("[NEW] reports/content")
     if app_id == "daily_digest":
         from apps.daily_digest import load_report
         from apps.daily_digest import mark_report_read as digest_mark

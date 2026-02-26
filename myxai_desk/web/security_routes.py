@@ -7,8 +7,6 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from myxai_desk.web.migration_guards import mark
-
 log = logging.getLogger("myxai.web.security_routes")
 bp = Blueprint("security", __name__, url_prefix="/api/security")
 
@@ -19,7 +17,6 @@ bp = Blueprint("security", __name__, url_prefix="/api/security")
 @bp.get("/mode")
 def mode_get():
     """获取当前安全模式及其策略摘要."""
-    mark("[NEW] security/mode/get")
     from myxai_desk.core.policy.modes import get_current_mode, mode_policy_as_dict
 
     return jsonify(mode_policy_as_dict(get_current_mode()))
@@ -28,7 +25,6 @@ def mode_get():
 @bp.post("/mode")
 def mode_set():
     """切换全局安全模式（仅限 1-3 级，Dev 模式需系统配置）."""
-    mark("[NEW] security/mode/set")
     from myxai_desk.core.policy.modes import (
         USER_SELECTABLE_MODES,
         SecurityMode,
@@ -76,7 +72,6 @@ def mode_set():
 @bp.get("/modes")
 def modes_list():
     """返回所有可用模式及其策略."""
-    mark("[NEW] security/modes/list")
     from myxai_desk.core.policy.modes import (
         USER_SELECTABLE_MODES,
         SecurityMode,
@@ -100,7 +95,6 @@ def modes_list():
 @bp.get("/app/<app_id>/mode")
 def app_mode_get(app_id):
     """返回单个应用的模式覆盖（如果使用全局则为 null）."""
-    mark("[NEW] security/app_mode/get")
     from myxai_desk.core.policy.modes import (
         get_app_mode,
         get_current_mode,
@@ -121,7 +115,6 @@ def app_mode_get(app_id):
 @bp.post("/app/<app_id>/mode")
 def app_mode_set(app_id):
     """设置单个应用的模式覆盖。如果权限升级需要确认."""
-    mark("[NEW] security/app_mode/set")
     from myxai_desk.core.policy.modes import (
         USER_SELECTABLE_MODES,
         SecurityMode,
@@ -197,7 +190,6 @@ def app_mode_set(app_id):
 @bp.post("/app/_preview/mode")
 def app_mode_preview():
     """预览权限升级评估，不持久化任何数据."""
-    mark("[NEW] security/app_mode/preview")
     from myxai_desk.core.policy.modes import SecurityMode, assess_escalation
 
     data = request.json or {}
@@ -216,7 +208,6 @@ def app_mode_preview():
 @bp.get("/dev/status")
 def dev_status():
     """获取 Developer 模式状态."""
-    mark("[NEW] security/dev/status")
     from myxai_desk.core.policy.modes import DEV_EXPIRY_POLICIES, get_dev_mode_status
 
     return jsonify(
@@ -230,7 +221,6 @@ def dev_status():
 @bp.post("/dev/enable")
 def dev_enable():
     """启用 Developer 模式，必须指定失效策略."""
-    mark("[NEW] security/dev/enable")
     from myxai_desk.core.policy.modes import enable_dev_mode
 
     data = request.json or {}
@@ -266,7 +256,6 @@ def dev_enable():
 @bp.post("/dev/disable")
 def dev_disable():
     """禁用 Developer 模式，恢复为 Operator."""
-    mark("[NEW] security/dev/disable")
     from myxai_desk.core.policy.modes import disable_dev_mode
 
     result = disable_dev_mode()

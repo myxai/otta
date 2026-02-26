@@ -56,6 +56,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span data-i18n="tasks.btn">任务</span>
           <span class="task-badge" id="task-badge"></span>
+          <span class="task-running-dot" id="task-running-dot"></span>
         </button>
       </nav>
       <div class="sidebar-footer">
@@ -166,278 +167,321 @@
           <h1 data-i18n="settings.title">设置</h1>
           <button class="btn btn-primary" onclick="saveConfig()" data-i18n="settings.save">保存配置</button>
         </div>
+        <div class="settings-tabs" id="settings-tabs">
+          <button class="settings-tab active" data-stab="general" onclick="switchSettingsTab('general')" data-i18n="settings.tabGeneral">通用</button>
+          <button class="settings-tab" data-stab="model" onclick="switchSettingsTab('model')" data-i18n="settings.tabModel">模型</button>
+          <button class="settings-tab" data-stab="tools" onclick="switchSettingsTab('tools')" data-i18n="settings.tabTools">工具</button>
+          <button class="settings-tab" data-stab="privacy" onclick="switchSettingsTab('privacy')" data-i18n="settings.tabPrivacy">隐私</button>
+          <button class="settings-tab" data-stab="advanced" onclick="switchSettingsTab('advanced')" data-i18n="settings.tabAdvanced">高级</button>
+        </div>
         <div class="settings-scroll">
-          <!-- Language -->
-          <div class="settings-card">
-            <h2 data-i18n="settings.language">界面语言</h2>
-            <div class="lang-options">
-              <label class="lang-option">
-                <input type="radio" name="lang-radio" value="auto" onchange="setLanguage('auto')" checked />
-                <span data-i18n="settings.langAuto">跟随系统</span>
-              </label>
-              <label class="lang-option">
-                <input type="radio" name="lang-radio" value="zh" onchange="setLanguage('zh')" />
-                <span>中文</span>
-              </label>
-              <label class="lang-option">
-                <input type="radio" name="lang-radio" value="en" onchange="setLanguage('en')" />
-                <span>English</span>
-              </label>
-            </div>
-          </div>
 
-          <!-- Model Settings -->
-          <div class="settings-card">
-            <h2 data-i18n="settings.model">模型设置</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label data-i18n="settings.modelName">模型名称</label>
-                <input type="text" id="cfg-model" placeholder="例如: anthropic/claude-opus-4-5" />
-              </div>
-              <div class="form-group">
-                <label>Temperature <span class="label-value" id="temp-value">0.7</span></label>
-                <input type="range" id="cfg-temperature" min="0" max="2" step="0.1" value="0.7" oninput="document.getElementById('temp-value').textContent=this.value" />
-              </div>
-              <div class="form-group">
-                <label data-i18n="settings.maxTokens">Max Tokens</label>
-                <input type="number" id="cfg-max-tokens" placeholder="8192" />
-              </div>
-              <div class="form-group">
-                <label data-i18n="settings.maxIter">最大工具迭代次数</label>
-                <input type="number" id="cfg-max-iterations" placeholder="20" />
-              </div>
-              <div class="form-group">
-                <label data-i18n="settings.memoryWindow">记忆窗口大小</label>
-                <input type="number" id="cfg-memory-window" placeholder="50" />
-              </div>
-            </div>
-          </div>
-
-          <!-- Provider API Keys -->
-          <div class="settings-card">
-            <h2 data-i18n="settings.apiKeys">API 密钥</h2>
-            <div class="form-grid">
-              <div class="form-group"><label>OpenRouter</label><input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-xxx" /></div>
-              <div class="form-group"><label>Anthropic</label><input type="password" id="cfg-anthropic-key" placeholder="sk-ant-xxx" /></div>
-              <div class="form-group"><label>OpenAI</label><input type="password" id="cfg-openai-key" placeholder="sk-xxx" /></div>
-              <div class="form-group"><label>DeepSeek</label><input type="password" id="cfg-deepseek-key" placeholder="sk-xxx" /></div>
-              <div class="form-group"><label>Gemini</label><input type="password" id="cfg-gemini-key" placeholder="AI..." /></div>
-              <div class="form-group"><label>Groq</label><input type="password" id="cfg-groq-key" placeholder="gsk_xxx" /></div>
-              <div class="form-group"><label>Moonshot / Kimi</label><input type="password" id="cfg-moonshot-key" placeholder="sk-xxx" /></div>
-              <div class="form-group"><label>Zhipu (智谱)</label><input type="password" id="cfg-zhipu-key" placeholder="xxx.xxx" /></div>
-              <div class="form-group"><label>DashScope (通义千问)</label><input type="password" id="cfg-dashscope-key" placeholder="sk-xxx" /></div>
-              <div class="form-group"><label>SiliconFlow (硅基流动)</label><input type="password" id="cfg-siliconflow-key" placeholder="sk-xxx" /></div>
-              <div class="form-group"><label>MiniMax</label><input type="password" id="cfg-minimax-key" placeholder="xxx" /></div>
-              <div class="form-group"><label>AiHubMix</label><input type="password" id="cfg-aihubmix-key" placeholder="xxx" /></div>
-            </div>
-          </div>
-
-          <!-- Search & Tools -->
-          <div class="settings-card">
-            <h2 data-i18n="settings.searchTools">搜索与工具</h2>
-            <div class="form-grid">
-              <div class="form-group">
-                <label data-i18n="settings.baiduKey">Baidu Search API Key</label>
-                <input type="password" id="cfg-baidu-key" placeholder="bce-v3/..." />
-                <div class="search-usage-bar" id="baidu-usage-bar"></div>
-              </div>
-              <div class="form-group">
-                <label data-i18n="settings.braveKey">Brave Search API Key</label>
-                <input type="password" id="cfg-brave-key" placeholder="BSA..." />
-                <div class="search-usage-bar" id="brave-usage-bar"></div>
-              </div>
-              <div class="form-group form-group-checkbox">
-                <label>
-                  <input type="checkbox" id="cfg-quota-only" checked />
-                  <span data-i18n="settings.quotaOnly">仅使用免费额度</span>
+          <!-- ═══ Tab: General ═══ -->
+          <div class="settings-tab-content active" data-tab="general">
+            <div class="settings-card">
+              <h2 data-i18n="settings.language">界面语言</h2>
+              <div class="lang-options">
+                <label class="lang-option">
+                  <input type="radio" name="lang-radio" value="auto" onchange="setLanguage('auto')" checked />
+                  <span data-i18n="settings.langAuto">跟随系统</span>
+                </label>
+                <label class="lang-option">
+                  <input type="radio" name="lang-radio" value="zh" onchange="setLanguage('zh')" />
+                  <span>中文</span>
+                </label>
+                <label class="lang-option">
+                  <input type="radio" name="lang-radio" value="en" onchange="setLanguage('en')" />
+                  <span>English</span>
                 </label>
               </div>
-              <div class="form-group">
-                <label data-i18n="settings.shellTimeout">Shell 超时 (秒)</label>
-                <input type="number" id="cfg-exec-timeout" placeholder="60" />
-              </div>
-              <div class="form-group form-group-checkbox">
-                <label>
-                  <input type="checkbox" id="cfg-restrict-workspace" />
-                  <span data-i18n="settings.restrictWorkspace">限制工具在工作区内操作</span>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="settings.closeBehavior">关闭窗口时</h2>
+              <div class="lang-options">
+                <label class="lang-option">
+                  <input type="radio" name="close-action" value="minimize" checked onchange="saveCloseBehavior(this.value)" />
+                  <span data-i18n="settings.closeMinimize">最小化到托盘（后台运行）</span>
+                </label>
+                <label class="lang-option">
+                  <input type="radio" name="close-action" value="quit" onchange="saveCloseBehavior(this.value)" />
+                  <span data-i18n="settings.closeQuit">完全退出</span>
                 </label>
               </div>
             </div>
           </div>
 
-          <!-- MCP Servers -->
-          <div class="settings-card">
-            <div class="card-header-row">
-              <h2>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-                <span data-i18n="mcp.title">MCP 工具服务</span>
-              </h2>
-              <button class="btn btn-sm" onclick="addMcpServer()" data-i18n="mcp.addServer">+ 添加服务</button>
-            </div>
-            <p class="mcp-desc" data-i18n="mcp.desc">连接外部 MCP 服务器，扩展 Agent 的工具能力（如浏览器、数据库等）。</p>
-            <div class="mcp-server-list" id="mcp-server-list">
-              <div class="mcp-empty" data-i18n="mcp.empty">暂未配置 MCP 服务</div>
-            </div>
-          </div>
-
-          <!-- Channels -->
-          <div class="settings-card">
-            <h2 data-i18n="settings.channels">频道</h2>
-            <div class="channels-grid" id="channels-grid"></div>
-          </div>
-
-          <!-- Gateway -->
-          <div class="settings-card">
-            <h2 data-i18n="gw.title">网关控制</h2>
-            <div class="gateway-settings-row" id="gw-settings-row">
-              <div class="gateway-indicator off" id="gw-settings-indicator"></div>
-              <span id="gw-settings-status" data-i18n="gw.stopped">网关已停止</span>
-              <button class="btn btn-sm btn-primary" id="gw-settings-start" onclick="startGateway();_syncGwSettings()" data-i18n="gw.start">启动网关</button>
-              <button class="btn btn-sm btn-danger" id="gw-settings-stop" onclick="stopGateway();setTimeout(_syncGwSettings,500)" style="display:none" data-i18n="gw.stop">停止网关</button>
-            </div>
-          </div>
-
-          <!-- Advanced JSON -->
-          <div class="settings-card">
-            <div class="card-header-row">
-              <h2 data-i18n="settings.advancedJson">高级 JSON 编辑</h2>
-              <button class="btn btn-sm" onclick="toggleJsonEditor()" data-i18n="settings.toggleJson">展开/折叠</button>
-            </div>
-            <div id="json-editor-wrap" style="display:none;">
-              <textarea id="cfg-json-raw" spellcheck="false"></textarea>
-              <button class="btn btn-primary" onclick="applyRawJson()" style="margin-top:8px;" data-i18n="settings.applyJson">应用 JSON</button>
-            </div>
-          </div>
-
-          <!-- Privacy & Personalization -->
-          <div class="settings-card persona-card">
-            <h2 data-i18n="privacy.title">隐私与个性化</h2>
-            <p class="persona-subtitle" data-i18n="privacy.subtitle">你掌控数据，我负责更贴合的结果。</p>
-
-            <!-- Status banner (shown when all off) -->
-            <div class="persona-status-banner" id="persona-status-banner" style="display:none;">
-              <span id="persona-status-text"></span>
-            </div>
-
-            <!-- Data sources -->
-            <div class="persona-section">
-              <h3 class="persona-section-title" data-i18n="privacy.dataTitle">用这些信息，让结果更顺手</h3>
-              <div class="persona-toggles">
-                <label class="persona-toggle" id="persona-toggle-browser">
-                  <input type="checkbox" id="privacy-browser" checked onchange="savePrivacySettings()" />
-                  <div class="persona-toggle-content">
-                    <span class="persona-toggle-label" data-i18n="privacy.browserHistory">浏览记录</span>
-                    <span class="persona-toggle-hint" data-i18n="privacy.browserHint">更贴近你最近关注的内容</span>
-                  </div>
-                </label>
-                <label class="persona-toggle" id="persona-toggle-chat">
-                  <input type="checkbox" id="privacy-chat" checked onchange="savePrivacySettings()" />
-                  <div class="persona-toggle-content">
-                    <span class="persona-toggle-label" data-i18n="privacy.chatHistory">对话记录</span>
-                    <span class="persona-toggle-hint" data-i18n="privacy.chatHint">更贴近你正在思考的问题</span>
-                  </div>
-                </label>
-                <label class="persona-toggle" id="persona-toggle-file">
-                  <input type="checkbox" id="privacy-file" onchange="savePrivacySettings();toggleFileWatchPaths()" />
-                  <div class="persona-toggle-content">
-                    <span class="persona-toggle-label" data-i18n="privacy.fileHistory">文件变更</span>
-                    <span class="persona-toggle-hint" data-i18n="privacy.fileHint">更贴近你当前的工作进展</span>
-                  </div>
-                </label>
-              </div>
-              <div id="file-watch-paths-item" style="display:none;">
-                <label class="persona-field-label" data-i18n="privacy.watchPaths">监控文件夹</label>
-                <p class="persona-field-help" data-i18n="privacy.watchPathsHelp">输入要监控的文件夹路径，每行一个。例如：D:\Projects</p>
-                <textarea id="privacy-watch-paths" rows="3" class="persona-textarea" onchange="savePrivacySettings()"></textarea>
-              </div>
-              <div class="persona-actions">
-                <button class="btn btn-primary persona-btn-generate" onclick="generatePersona()" data-i18n="privacy.generate">生成个性化</button>
-                <button class="btn-secondary persona-btn-clear" onclick="clearProfile()" data-i18n="privacy.clear">清空个性化</button>
-              </div>
-              <p class="persona-privacy-note" data-i18n="privacy.localNote">所有数据默认仅在本地处理。</p>
-            </div>
-
-            <!-- Persona usage control -->
-            <div class="persona-section">
-              <h3 class="persona-section-title" data-i18n="privacy.usageTitle">画像使用范围</h3>
-              <div class="persona-toggles">
-                <label class="persona-toggle" id="persona-toggle-digest">
-                  <input type="checkbox" id="privacy-persona-digest" onchange="savePrivacySettings()" />
-                  <div class="persona-toggle-content">
-                    <span class="persona-toggle-label" data-i18n="privacy.personaInDigest">允许画像增强 AI 回复</span>
-                    <span class="persona-toggle-hint" data-i18n="privacy.personaInDigestHint">画像仅注入系统提示词，对话内容中不会出现</span>
-                  </div>
-                </label>
-              </div>
-              <p class="persona-privacy-note" data-i18n="privacy.personaUsageNote">开启后，AI 会根据你的背景和兴趣给出更贴合的回复，但画像内容不会出现在任何对话消息中。</p>
-            </div>
-
-            <!-- Personalization effect -->
-            <div class="persona-section" id="persona-effect-section" style="display:none;">
-              <h3 class="persona-section-title" data-i18n="privacy.effectTitle">当前个性化效果</h3>
-
-              <div class="persona-effect-card" id="persona-effect-style">
-                <div class="persona-effect-header">
-                  <span class="persona-effect-label" data-i18n="privacy.stablePersona">稳定画像</span>
-                  <div class="persona-effect-actions">
-                    <button class="persona-action-btn" onclick="copyPersonaBlock('style')" title="复制">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                    <button class="persona-action-btn" onclick="editPersonaBlock('stable')" title="编辑">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
-                  </div>
+          <!-- ═══ Tab: Model ═══ -->
+          <div class="settings-tab-content" data-tab="model">
+            <div class="settings-card">
+              <h2 data-i18n="settings.model">模型设置</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label data-i18n="settings.modelName">模型名称</label>
+                  <input type="text" id="cfg-model" placeholder="例如: anthropic/claude-opus-4-5" />
                 </div>
-                <p class="persona-effect-text" id="persona-style-text"></p>
-              </div>
-
-              <div class="persona-effect-card" id="persona-effect-direction">
-                <div class="persona-effect-header">
-                  <span class="persona-effect-label" data-i18n="privacy.recentSnapshot">近期兴趣</span>
-                  <div class="persona-effect-actions">
-                    <button class="persona-action-btn" onclick="copyPersonaBlock('direction')" title="复制">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                    </button>
-                    <button class="persona-action-btn" onclick="editPersonaBlock('recent')" title="编辑">
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                    </button>
-                  </div>
+                <div class="form-group">
+                  <label>Temperature <span class="label-value" id="temp-value">0.7</span></label>
+                  <input type="range" id="cfg-temperature" min="0" max="2" step="0.1" value="0.7" oninput="document.getElementById('temp-value').textContent=this.value" />
                 </div>
-                <p class="persona-effect-text" id="persona-direction-text"></p>
-              </div>
-            </div>
-
-            <!-- Advanced: analysis window (collapsed) -->
-            <details class="persona-advanced">
-              <summary data-i18n="privacy.advanced">高级设置</summary>
-              <div class="persona-advanced-content">
-                <div class="form-group" style="max-width:200px;">
-                  <label data-i18n="privacy.analysisDays">分析时长（天）</label>
-                  <input type="number" id="privacy-analysis-days" value="7" min="1" max="30" onchange="savePrivacySettings()" />
-                  <p class="persona-field-help" data-i18n="privacy.analysisDaysHelp">生成画像时分析最近 N 天的数据，不保存历史记录</p>
+                <div class="form-group">
+                  <label data-i18n="settings.maxTokens">Max Tokens</label>
+                  <input type="number" id="cfg-max-tokens" placeholder="8192" />
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.maxIter">最大工具迭代次数</label>
+                  <input type="number" id="cfg-max-iterations" placeholder="20" />
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.memoryWindow">记忆窗口大小</label>
+                  <input type="number" id="cfg-memory-window" placeholder="50" />
                 </div>
               </div>
-            </details>
-          </div>
-
-          <!-- Audit & Undo (advanced entry) -->
-          <div class="settings-card">
-            <h2 data-i18n="audit.title">审计日志</h2>
-            <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;" data-i18n="settings.auditDesc">查看操作审计记录和可撤销操作历史。</p>
-            <button class="btn-secondary" onclick="switchPage('audit')" data-i18n="settings.auditOpen">打开审计日志</button>
-          </div>
-
-          <!-- Developer Mode System Config (last) -->
-          <div class="settings-card" id="dev-mode-settings-card">
-            <h2 data-i18n="security.devCard.title">🛡️ 开发模式 — 可执行所有操作（高风险）</h2>
-            <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;" data-i18n="security.devCard.desc">
-              开发模式可执行所有操作，包括文件删除、命令执行、网络外传等高风险操作。仅限受信任环境使用，必须设置失效策略。
-            </p>
-            <div id="dev-mode-settings-content" style="display:flex;align-items:center;gap:12px;">
-              <button class="btn btn-danger" onclick="openDevModeSettings()" data-i18n="security.devCard.btn">⚙️ 配置开发模式</button>
-              <span id="dev-mode-settings-status" style="font-size:0.85rem;color:var(--text-sub);"></span>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="settings.apiKeys">API 密钥</h2>
+              <div class="form-grid">
+                <div class="form-group"><label>OpenRouter</label><input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-xxx" /></div>
+                <div class="form-group"><label>Anthropic</label><input type="password" id="cfg-anthropic-key" placeholder="sk-ant-xxx" /></div>
+                <div class="form-group"><label>OpenAI</label><input type="password" id="cfg-openai-key" placeholder="sk-xxx" /></div>
+                <div class="form-group"><label>DeepSeek</label><input type="password" id="cfg-deepseek-key" placeholder="sk-xxx" /></div>
+                <div class="form-group"><label>Gemini</label><input type="password" id="cfg-gemini-key" placeholder="AI..." /></div>
+                <div class="form-group"><label>Groq</label><input type="password" id="cfg-groq-key" placeholder="gsk_xxx" /></div>
+                <div class="form-group"><label>Moonshot / Kimi</label><input type="password" id="cfg-moonshot-key" placeholder="sk-xxx" /></div>
+                <div class="form-group"><label>Zhipu (智谱)</label><input type="password" id="cfg-zhipu-key" placeholder="xxx.xxx" /></div>
+                <div class="form-group"><label>DashScope (通义千问)</label><input type="password" id="cfg-dashscope-key" placeholder="sk-xxx" /></div>
+                <div class="form-group"><label>SiliconFlow (硅基流动)</label><input type="password" id="cfg-siliconflow-key" placeholder="sk-xxx" /></div>
+                <div class="form-group"><label>MiniMax</label><input type="password" id="cfg-minimax-key" placeholder="xxx" /></div>
+                <div class="form-group"><label>AiHubMix</label><input type="password" id="cfg-aihubmix-key" placeholder="xxx" /></div>
+              </div>
             </div>
           </div>
+
+          <!-- ═══ Tab: Tools ═══ -->
+          <div class="settings-tab-content" data-tab="tools">
+            <div class="settings-card">
+              <h2 data-i18n="settings.searchTools">搜索与工具</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label data-i18n="settings.baiduKey">Baidu Search API Key</label>
+                  <input type="password" id="cfg-baidu-key" placeholder="bce-v3/..." />
+                  <div class="search-usage-bar" id="baidu-usage-bar"></div>
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.braveKey">Brave Search API Key</label>
+                  <input type="password" id="cfg-brave-key" placeholder="BSA..." />
+                  <div class="search-usage-bar" id="brave-usage-bar"></div>
+                </div>
+                <div class="form-group form-group-checkbox">
+                  <label>
+                    <input type="checkbox" id="cfg-quota-only" checked />
+                    <span data-i18n="settings.quotaOnly">仅使用免费额度</span>
+                  </label>
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.shellTimeout">Shell 超时 (秒)</label>
+                  <input type="number" id="cfg-exec-timeout" placeholder="60" />
+                </div>
+                <div class="form-group form-group-checkbox">
+                  <label>
+                    <input type="checkbox" id="cfg-restrict-workspace" />
+                    <span data-i18n="settings.restrictWorkspace">限制工具在工作区内操作</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="card-header-row">
+                <h2>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                  <span data-i18n="mcp.title">MCP 工具服务</span>
+                </h2>
+                <button class="btn btn-sm" onclick="addMcpServer()" data-i18n="mcp.addServer">+ 添加服务</button>
+              </div>
+              <p class="mcp-desc" data-i18n="mcp.desc">连接外部 MCP 服务器，扩展 Agent 的工具能力（如浏览器、数据库等）。</p>
+              <div class="mcp-server-list" id="mcp-server-list">
+                <div class="mcp-empty" data-i18n="mcp.empty">暂未配置 MCP 服务</div>
+              </div>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="settings.channels">频道</h2>
+              <div class="channels-grid" id="channels-grid"></div>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="gw.title">网关控制</h2>
+              <div class="gateway-settings-row" id="gw-settings-row">
+                <div class="gateway-indicator off" id="gw-settings-indicator"></div>
+                <span id="gw-settings-status" data-i18n="gw.stopped">网关已停止</span>
+                <button class="btn btn-sm btn-primary" id="gw-settings-start" onclick="startGateway();_syncGwSettings()" data-i18n="gw.start">启动网关</button>
+                <button class="btn btn-sm btn-danger" id="gw-settings-stop" onclick="stopGateway();setTimeout(_syncGwSettings,500)" style="display:none" data-i18n="gw.stop">停止网关</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══ Tab: Privacy ═══ -->
+          <div class="settings-tab-content" data-tab="privacy">
+            <div class="settings-card persona-card">
+              <h2 data-i18n="privacy.title">隐私与个性化</h2>
+              <p class="persona-subtitle" data-i18n="privacy.subtitle">你掌控数据，我负责更贴合的结果。</p>
+              <div class="persona-status-banner" id="persona-status-banner" style="display:none;">
+                <span id="persona-status-text"></span>
+              </div>
+              <div class="persona-section">
+                <h3 class="persona-section-title" data-i18n="privacy.dataTitle">用这些信息，让结果更顺手</h3>
+                <div class="persona-toggles">
+                  <label class="persona-toggle" id="persona-toggle-browser">
+                    <input type="checkbox" id="privacy-browser" checked onchange="savePrivacySettings()" />
+                    <div class="persona-toggle-content">
+                      <span class="persona-toggle-label" data-i18n="privacy.browserHistory">浏览记录</span>
+                      <span class="persona-toggle-hint" data-i18n="privacy.browserHint">更贴近你最近关注的内容</span>
+                    </div>
+                  </label>
+                  <label class="persona-toggle" id="persona-toggle-chat">
+                    <input type="checkbox" id="privacy-chat" checked onchange="savePrivacySettings()" />
+                    <div class="persona-toggle-content">
+                      <span class="persona-toggle-label" data-i18n="privacy.chatHistory">对话记录</span>
+                      <span class="persona-toggle-hint" data-i18n="privacy.chatHint">更贴近你正在思考的问题</span>
+                    </div>
+                  </label>
+                  <label class="persona-toggle" id="persona-toggle-file">
+                    <input type="checkbox" id="privacy-file" onchange="savePrivacySettings();toggleFileWatchPaths()" />
+                    <div class="persona-toggle-content">
+                      <span class="persona-toggle-label" data-i18n="privacy.fileHistory">文件变更</span>
+                      <span class="persona-toggle-hint" data-i18n="privacy.fileHint">更贴近你当前的工作进展</span>
+                    </div>
+                  </label>
+                </div>
+                <div id="file-watch-paths-item" style="display:none;">
+                  <label class="persona-field-label" data-i18n="privacy.watchPaths">监控文件夹</label>
+                  <p class="persona-field-help" data-i18n="privacy.watchPathsHelp">输入要监控的文件夹路径，每行一个。例如：D:\Projects</p>
+                  <textarea id="privacy-watch-paths" rows="3" class="persona-textarea" onchange="savePrivacySettings()"></textarea>
+                </div>
+                <div class="persona-actions">
+                  <button class="btn btn-primary persona-btn-generate" onclick="generatePersona()" data-i18n="privacy.generate">生成个性化</button>
+                  <button class="btn-secondary persona-btn-clear" onclick="clearProfile()" data-i18n="privacy.clear">清空个性化</button>
+                </div>
+                <p class="persona-privacy-note" data-i18n="privacy.localNote">所有数据默认仅在本地处理。</p>
+              </div>
+              <div class="persona-section">
+                <h3 class="persona-section-title" data-i18n="privacy.usageTitle">画像使用范围</h3>
+                <div class="persona-toggles">
+                  <label class="persona-toggle" id="persona-toggle-digest">
+                    <input type="checkbox" id="privacy-persona-digest" onchange="savePrivacySettings()" />
+                    <div class="persona-toggle-content">
+                      <span class="persona-toggle-label" data-i18n="privacy.personaInDigest">允许画像增强 AI 回复</span>
+                      <span class="persona-toggle-hint" data-i18n="privacy.personaInDigestHint">画像仅注入系统提示词，对话内容中不会出现</span>
+                    </div>
+                  </label>
+                </div>
+                <p class="persona-privacy-note" data-i18n="privacy.personaUsageNote">开启后，AI 会根据你的背景和兴趣给出更贴合的回复，但画像内容不会出现在任何对话消息中。</p>
+              </div>
+              <div class="persona-section" id="persona-effect-section" style="display:none;">
+                <h3 class="persona-section-title" data-i18n="privacy.effectTitle">当前个性化效果</h3>
+                <div class="persona-effect-card" id="persona-effect-style">
+                  <div class="persona-effect-header">
+                    <span class="persona-effect-label" data-i18n="privacy.stablePersona">稳定画像</span>
+                    <div class="persona-effect-actions">
+                      <button class="persona-action-btn" onclick="copyPersonaBlock('style')" title="复制">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                      </button>
+                      <button class="persona-action-btn" onclick="editPersonaBlock('stable')" title="编辑">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <p class="persona-effect-text" id="persona-style-text"></p>
+                </div>
+                <div class="persona-effect-card" id="persona-effect-direction">
+                  <div class="persona-effect-header">
+                    <span class="persona-effect-label" data-i18n="privacy.recentSnapshot">近期兴趣</span>
+                    <div class="persona-effect-actions">
+                      <button class="persona-action-btn" onclick="copyPersonaBlock('direction')" title="复制">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                      </button>
+                      <button class="persona-action-btn" onclick="editPersonaBlock('recent')" title="编辑">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                  <p class="persona-effect-text" id="persona-direction-text"></p>
+                </div>
+              </div>
+              <details class="persona-advanced">
+                <summary data-i18n="privacy.advanced">高级设置</summary>
+                <div class="persona-advanced-content">
+                  <div class="form-group" style="max-width:200px;">
+                    <label data-i18n="privacy.analysisDays">分析时长（天）</label>
+                    <input type="number" id="privacy-analysis-days" value="7" min="1" max="30" onchange="savePrivacySettings()" />
+                    <p class="persona-field-help" data-i18n="privacy.analysisDaysHelp">生成画像时分析最近 N 天的数据，不保存历史记录</p>
+                  </div>
+                </div>
+              </details>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="privacy.dataStorageTitle">数据存储说明</h2>
+              <div class="data-locality-list">
+                <div class="data-locality-item local">
+                  <span class="data-locality-icon">🔒</span>
+                  <div>
+                    <span class="data-locality-label" data-i18n="privacy.localOnly">仅本地存储</span>
+                    <span class="data-locality-desc" data-i18n="privacy.localOnlyDesc">对话记录、浏览历史、用户画像、审计日志 — 始终保存在你的设备上，不会发送到任何外部服务。</span>
+                  </div>
+                </div>
+                <div class="data-locality-item keyring">
+                  <span class="data-locality-icon">🔑</span>
+                  <div>
+                    <span class="data-locality-label" data-i18n="privacy.keyringSec">密钥安全存储</span>
+                    <span class="data-locality-desc" data-i18n="privacy.keyringSecDesc">API Key、邮箱密码等敏感信息通过系统钥匙串（Keyring）加密保存，配置文件中仅存引用。</span>
+                    <span class="data-locality-badge" id="secrets-backend-badge"></span>
+                  </div>
+                </div>
+                <div class="data-locality-item send">
+                  <span class="data-locality-icon">📡</span>
+                  <div>
+                    <span class="data-locality-label" data-i18n="privacy.sentToApi">发送到外部 API</span>
+                    <span class="data-locality-desc" data-i18n="privacy.sentToApiDesc">当前对话消息会发送到 LLM 提供商；搜索查询会发送到搜索 API。对话历史和画像不会自动发送。</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="privacy.secretsTitle">密钥管理</h2>
+              <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;" data-i18n="privacy.secretsDesc">查看当前存储的密钥数量，或一键清除所有已保存的 API Key 和密码。</p>
+              <div class="secrets-info-row" id="secrets-info-row">
+                <span id="secrets-count"></span>
+                <button class="btn btn-danger btn-sm" onclick="clearAllSecrets()" data-i18n="privacy.clearSecrets">清除所有密钥</button>
+              </div>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="audit.title">审计日志</h2>
+              <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;" data-i18n="settings.auditDesc">查看操作审计记录和可撤销操作历史。</p>
+              <button class="btn-secondary" onclick="switchPage('audit')" data-i18n="settings.auditOpen">打开审计日志</button>
+            </div>
+          </div>
+
+          <!-- ═══ Tab: Advanced ═══ -->
+          <div class="settings-tab-content" data-tab="advanced">
+            <div class="settings-card" id="dev-mode-settings-card">
+              <h2 data-i18n="security.devCard.title">🛡️ 开发模式 — 可执行所有操作（高风险）</h2>
+              <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;" data-i18n="security.devCard.desc">
+                开发模式可执行所有操作，包括文件删除、命令执行、网络外传等高风险操作。仅限受信任环境使用，必须设置失效策略。
+              </p>
+              <div id="dev-mode-settings-content" style="display:flex;align-items:center;gap:12px;">
+                <button class="btn btn-danger" onclick="openDevModeSettings()" data-i18n="security.devCard.btn">⚙️ 配置开发模式</button>
+                <span id="dev-mode-settings-status" style="font-size:0.85rem;color:var(--text-sub);"></span>
+              </div>
+            </div>
+            <div class="settings-card">
+              <div class="card-header-row">
+                <h2 data-i18n="settings.advancedJson">高级 JSON 编辑</h2>
+                <button class="btn btn-sm" onclick="toggleJsonEditor()" data-i18n="settings.toggleJson">展开/折叠</button>
+              </div>
+              <div id="json-editor-wrap" style="display:none;">
+                <textarea id="cfg-json-raw" spellcheck="false"></textarea>
+                <button class="btn btn-primary" onclick="applyRawJson()" style="margin-top:8px;" data-i18n="settings.applyJson">应用 JSON</button>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -445,15 +489,15 @@
       <div class="page" id="page-stats" style="display:none;">
         <div class="page-header">
           <h1 data-i18n="nav.stats">统计</h1>
+          <div class="stats-time-filter">
+            <button class="stats-time-btn active" data-days="7" onclick="updateStatsTimeRange(7)">7天</button>
+            <button class="stats-time-btn" data-days="30" onclick="updateStatsTimeRange(30)">30天</button>
+          </div>
         </div>
         <div class="stats-scroll">
           <div class="token-chart-section">
             <div class="token-chart-header">
               <h3 data-i18n="stats.tokenTitle">Token 消耗</h3>
-              <div class="token-chart-tabs" id="token-chart-tabs">
-                <button class="token-chart-tab active" data-days="7" onclick="loadTokenChart(7)">7天</button>
-                <button class="token-chart-tab" data-days="30" onclick="loadTokenChart(30)">30天</button>
-              </div>
               <span class="token-chart-total" id="token-chart-total"></span>
             </div>
             <div class="token-chart-container" id="token-chart-container"></div>
@@ -461,10 +505,6 @@
           <div class="token-chart-section">
             <div class="token-chart-header">
               <h3 data-i18n="stats.searchTitle">搜索 API 调用</h3>
-              <div class="token-chart-tabs" id="search-chart-tabs">
-                <button class="token-chart-tab active" data-days="7" onclick="loadSearchChart(7)">7天</button>
-                <button class="token-chart-tab" data-days="30" onclick="loadSearchChart(30)">30天</button>
-              </div>
               <span class="token-chart-total" id="search-chart-total"></span>
             </div>
             <div class="token-chart-container" id="search-chart-container"></div>
@@ -472,10 +512,6 @@
           <div class="token-chart-section">
             <div class="token-chart-header">
               <h3 data-i18n="stats.categoryTitle">分类消耗</h3>
-              <div class="token-chart-tabs" id="category-chart-tabs">
-                <button class="token-chart-tab active" data-days="7" onclick="loadCategoryCharts(7)">7天</button>
-                <button class="token-chart-tab" data-days="30" onclick="loadCategoryCharts(30)">30天</button>
-              </div>
             </div>
             <div class="category-charts-row">
               <div class="category-chart-cell">

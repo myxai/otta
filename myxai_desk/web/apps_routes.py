@@ -20,15 +20,38 @@ from myxai_desk.web.apps_helpers import (
     save_apps_prefs,
     save_apps_registry,
 )
-from myxai_desk.web.migration_guards import mark
+
+from myxai_desk.core.storage import secrets
 
 bp = Blueprint("apps", __name__, url_prefix="/api/apps")
+
+# Per-app sensitive fields that should be stored in keyring
+_APP_SECRET_FIELDS: dict[str, list[str]] = {
+    "email_summary": ["imap_password"],
+}
+
+
+def _extract_app_secrets(app_id: str, config: dict) -> None:
+    """Move sensitive fields from config dict into keyring."""
+    for field in _APP_SECRET_FIELDS.get(app_id, []):
+        val = config.get(field)
+        if val and not secrets.is_secret_ref(val):
+            secrets.store_app_secret(app_id, field, val)
+            config[field] = secrets.SECRET_REF
+
+
+def _merge_app_secrets(app_id: str, config: dict) -> None:
+    """Restore sensitive fields from keyring into config dict."""
+    for field in _APP_SECRET_FIELDS.get(app_id, []):
+        if secrets.is_secret_ref(config.get(field)):
+            real = secrets.retrieve_app_secret(app_id, field)
+            if real:
+                config[field] = real
 
 
 @bp.get("")
 def list_apps():
     """返回所有应用：目录 + 安装状态 + 自定义应用."""
-    mark("[NEW] apps/list")
     registry = load_apps_registry()
     prefs = load_apps_prefs()
     result = []
@@ -89,7 +112,6 @@ def list_apps():
 
 @bp.post("/<app_id>/install")
 def install(app_id):
-    mark("[NEW] apps/install")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run(app_id, capabilities=["fs.write"])
@@ -127,7 +149,6 @@ def install(app_id):
 
 @bp.post("/<app_id>/uninstall")
 def uninstall(app_id):
-    mark("[NEW] apps/uninstall")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run(app_id, capabilities=["fs.write"])
@@ -155,7 +176,6 @@ def uninstall(app_id):
 
 @bp.post("/<app_id>/enable")
 def enable(app_id):
-    mark("[NEW] apps/enable")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run(app_id, capabilities=["fs.write"])
@@ -183,7 +203,6 @@ def enable(app_id):
 
 @bp.post("/<app_id>/disable")
 def disable(app_id):
-    mark("[NEW] apps/disable")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run(app_id, capabilities=["fs.write"])
@@ -212,7 +231,6 @@ def disable(app_id):
 @bp.post("/<app_id>/favorite")
 def favorite(app_id):
     """切换收藏状态."""
-    mark("[NEW] apps/favorite")
     prefs = load_apps_prefs()
     p = prefs.setdefault(app_id, {})
     p["favorite"] = not p.get("favorite", False)
@@ -223,7 +241,6 @@ def favorite(app_id):
 @bp.post("/<app_id>/record-run")
 def record_run(app_id):
     """记录运行次数."""
-    mark("[NEW] apps/record-run")
     prefs = load_apps_prefs()
     p = prefs.setdefault(app_id, {})
     p["run_count"] = p.get("run_count", 0) + 1
@@ -233,16 +250,16 @@ def record_run(app_id):
 
 @bp.get("/<app_id>/config")
 def get_config(app_id):
-    mark("[NEW] apps/config/get")
     registry = load_apps_registry()
     if app_id not in registry:
         return jsonify({"error": _t("error.app_not_installed")}), 404
-    return jsonify(registry[app_id].get("config", {}))
+    config = registry[app_id].get("config", {})
+    _merge_app_secrets(app_id, config)
+    return jsonify(config)
 
 
 @bp.post("/<app_id>/config")
 def save_config(app_id):
-    mark("[NEW] apps/config/save")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run(app_id, capabilities=["fs.write"])
@@ -253,6 +270,7 @@ def save_config(app_id):
     if app_id not in registry:
         return jsonify({"error": _t("error.app_not_installed")}), 404
     new_config = request.json or {}
+    _extract_app_secrets(app_id, new_config)
     registry[app_id]["config"] = new_config
     save_apps_registry(registry)
     try:

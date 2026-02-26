@@ -91,6 +91,7 @@ class DeskManager:
         self._get_token_usage = None  # callable, injected from app.py
         self._on_resume: Callable | None = None  # callable, injected from app.py
         self.lang: str = self._detect_lang()  # "zh" or "en"
+        self.close_action: str = "minimize"  # "minimize" (hide to tray) or "quit"
 
     # ---- i18n ------------------------------------------------------------- #
 
@@ -366,11 +367,17 @@ class DeskManager:
     # ---- closing event handler -------------------------------------------- #
 
     def on_main_closing(self):
-        """Intercept the native X button — hide to tray instead of quitting.
+        """Intercept the native X button.
 
-        Returns ``False`` to cancel the real close.
+        When ``close_action`` is ``"minimize"`` (default), hides the window
+        to the system tray.  When ``"quit"``, terminates the application.
+
+        Returns ``False`` to cancel the real close (hide mode).
         """
         if self._quitting:
+            return True
+        if self.close_action == "quit":
+            self.quit()
             return True
         self.hide_main()
         return False
@@ -381,12 +388,13 @@ class DeskManager:
         """Inject the API token into the webview JS context.
 
         Called on every ``loaded`` event so the token survives page
-        navigations and refreshes.
+        navigations and refreshes inside the pywebview window.
         """
         if self.main_window and self.api_token:
             with contextlib.suppress(Exception):
                 self.main_window.evaluate_js(
                     f"window.__myxai_token = '{self.api_token}';"
+                    "sessionStorage.setItem('__myxai_token', window.__myxai_token);"
                 )
 
     # ---- webview entry point ---------------------------------------------- #

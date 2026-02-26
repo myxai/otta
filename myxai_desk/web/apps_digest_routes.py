@@ -18,7 +18,6 @@ from myxai_desk.web.apps_helpers import (
     load_apps_registry,
     save_apps_registry,
 )
-from myxai_desk.web.migration_guards import mark
 
 bp = Blueprint("apps_digest", __name__, url_prefix="/api/apps/daily_digest")
 
@@ -26,7 +25,6 @@ bp = Blueprint("apps_digest", __name__, url_prefix="/api/apps/daily_digest")
 @bp.post("/run")
 def run():
     """后台启动每日摘要."""
-    mark("[NEW] apps/daily_digest/run")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run("daily_digest")
@@ -97,21 +95,18 @@ def run():
 
 @bp.get("/status")
 def status():
-    mark("[NEW] apps/daily_digest/status")
     with digest_task_lock:
         return jsonify(dict(digest_task_status) if digest_task_status else {"status": "idle"})
 
 
 @bp.get("/reports")
 def reports():
-    mark("[NEW] apps/daily_digest/reports")
     from apps.daily_digest import list_reports
     return jsonify(list_reports())
 
 
 @bp.get("/report/<date_str>")
 def report(date_str):
-    mark("[NEW] apps/daily_digest/report")
     from apps.daily_digest import load_report
 
     report = load_report(date_str)
@@ -122,7 +117,6 @@ def report(date_str):
 
 @bp.get("/browsers")
 def browsers():
-    mark("[NEW] apps/daily_digest/browsers")
     from apps.daily_digest import find_browser_history_paths
     return jsonify(find_browser_history_paths())
 
@@ -130,7 +124,6 @@ def browsers():
 @bp.get("/preview")
 def preview():
     """快速预览：读取历史+提取兴趣，不生成完整报告."""
-    mark("[NEW] apps/daily_digest/preview")
     import app as _app
 
     registry = load_apps_registry()
@@ -197,7 +190,6 @@ def preview():
 @bp.post("/explore")
 def explore():
     """为摘要中的特定内容构建探索提示词."""
-    mark("[NEW] apps/daily_digest/explore")
     body = request.json or {}
     item = body.get("item")
     date_str = body.get("date")

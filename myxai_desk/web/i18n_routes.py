@@ -7,8 +7,6 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from myxai_desk.web.migration_guards import mark
-
 log = logging.getLogger("myxai.web.i18n_routes")
 from myxai_desk.core.i18n import get_translator
 
@@ -22,8 +20,6 @@ def get_messages():
     Query params:
         locale: 语言代码（zh/en），默认 zh
     """
-    mark("[NEW] i18n/messages")
-    
     locale = request.args.get("locale", "zh")
     
     try:
@@ -55,8 +51,6 @@ def set_locale():
     Body:
         locale: 语言代码（zh/en）
     """
-    mark("[NEW] i18n/locale/set")
-    
     data = request.get_json() or {}
     locale = data.get("locale")
     
@@ -83,8 +77,6 @@ def set_locale():
 @bp.get("/locale")
 def get_locale():
     """获取当前语言."""
-    mark("[NEW] i18n/locale/get")
-    
     try:
         t = get_translator()
         return jsonify({"locale": t.locale})

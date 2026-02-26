@@ -7,8 +7,6 @@ import logging
 
 from flask import Blueprint, jsonify, request, current_app
 
-from myxai_desk.web.migration_guards import mark
-
 log = logging.getLogger("myxai.web.config_routes")
 from myxai_desk.core.config_service import get_config, save_config
 
@@ -18,8 +16,6 @@ bp = Blueprint("config", __name__, url_prefix="/api/config")
 @bp.get("")
 def get():
     """获取 nanobot 配置."""
-    mark("[NEW] config/get")
-    
     # 检查 nanobot 是否可用
     from app import NANOBOT_AVAILABLE
     if not NANOBOT_AVAILABLE:
@@ -38,8 +34,6 @@ def get():
 @bp.post("")
 def save():
     """保存 nanobot 配置."""
-    mark("[NEW] config/save")
-    
     # 检查 nanobot 是否可用
     from app import NANOBOT_AVAILABLE
     if not NANOBOT_AVAILABLE:

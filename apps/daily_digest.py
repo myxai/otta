@@ -1645,6 +1645,11 @@ def save_report(
         json.dumps(data, ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
+    # Clear read mark so a regenerated report appears as unread
+    read_set = _load_read_set()
+    if date_str in read_set:
+        read_set.discard(date_str)
+        _save_read_set(read_set)
     return data
 
 

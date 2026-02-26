@@ -12,7 +12,6 @@ import threading
 from flask import Blueprint, Response, jsonify, request, stream_with_context
 
 from myxai_desk.web.apps_helpers import _t, inc_run_count
-from myxai_desk.web.migration_guards import mark
 
 log = logging.getLogger("myxai.web.apps_custom_routes")
 bp = Blueprint("apps_custom", __name__, url_prefix="/api/apps/custom")
@@ -20,14 +19,12 @@ bp = Blueprint("apps_custom", __name__, url_prefix="/api/apps/custom")
 
 @bp.get("")
 def list_all():
-    mark("[NEW] apps/custom/list")
     from apps.custom_app import list_apps
     return jsonify(list_apps())
 
 
 @bp.post("")
 def create():
-    mark("[NEW] apps/custom/create")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run("custom_app_mgmt", source="user", capabilities=["fs.write"])
@@ -63,21 +60,18 @@ def create():
 
 @bp.get("/meta")
 def meta():
-    mark("[NEW] apps/custom/meta")
     from apps.custom_app import OUTPUT_FORMATS, SCHEDULE_MODES
     return jsonify({"output_formats": OUTPUT_FORMATS, "schedule_modes": SCHEDULE_MODES})
 
 
 @bp.get("/unread")
 def unread():
-    mark("[NEW] apps/custom/unread")
     from apps.custom_app import all_unread_counts
     return jsonify(all_unread_counts())
 
 
 @bp.get("/<app_id>")
 def get(app_id):
-    mark("[NEW] apps/custom/get")
     from apps.custom_app import get_app
 
     app = get_app(app_id)
@@ -88,7 +82,6 @@ def get(app_id):
 
 @bp.put("/<app_id>")
 def update(app_id):
-    mark("[NEW] apps/custom/update")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run("custom_app_mgmt", source="user", capabilities=["fs.write"])
@@ -114,7 +107,6 @@ def update(app_id):
 
 @bp.delete("/<app_id>")
 def delete(app_id):
-    mark("[NEW] apps/custom/delete")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run("custom_app_mgmt", source="user", capabilities=["fs.write"])
@@ -139,7 +131,6 @@ def delete(app_id):
 @bp.post("/<app_id>/run")
 def run(app_id):
     """运行自定义应用 — SSE 流式响应."""
-    mark("[NEW] apps/custom/run")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run(app_id, source="user")
@@ -274,14 +265,12 @@ def run(app_id):
 
 @bp.get("/<app_id>/reports")
 def reports(app_id):
-    mark("[NEW] apps/custom/reports")
     from apps.custom_app import list_reports
     return jsonify(list_reports(app_id))
 
 
 @bp.get("/<app_id>/report/<path:key>")
 def report_get(app_id, key):
-    mark("[NEW] apps/custom/report/get")
     from apps.custom_app import get_report, mark_report_read
 
     report = get_report(app_id, key)
@@ -293,7 +282,6 @@ def report_get(app_id, key):
 
 @bp.delete("/<app_id>/report/<path:key>")
 def report_delete(app_id, key):
-    mark("[NEW] apps/custom/report/delete")
     from apps.custom_app import delete_report
 
     if delete_report(app_id, key):
@@ -304,7 +292,6 @@ def report_delete(app_id, key):
 @bp.post("/<app_id>/summary")
 def summary(app_id):
     """从历史报告生成汇总 — SSE 流式响应."""
-    mark("[NEW] apps/custom/summary")
     from apps.custom_app import build_summary_prompt, get_app, mark_triggered, save_report
 
     app_data = get_app(app_id)

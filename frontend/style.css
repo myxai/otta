@@ -334,16 +334,33 @@ a:hover { text-decoration: underline; }
   font-weight: 700;
   line-height: 16px;
   text-align: center;
-  background: var(--blue);
+  background: var(--red, #f38ba8);
   color: var(--bg-crust);
   display: none;
   pointer-events: none;
 }
-.task-badge[data-count]:not([data-count=""]):not([data-count="0"]) {
+.task-badge.visible {
   display: inline-block;
 }
-.task-badge[data-has-running="true"] {
-  background: var(--blue);
+.task-running-dot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green, #a6e3a1);
+  display: none;
+  pointer-events: none;
+  box-shadow: 0 0 4px var(--green, #a6e3a1);
+  animation: task-dot-pulse 1.5s ease-in-out infinite;
+}
+.task-running-dot.visible {
+  display: inline-block;
+}
+@keyframes task-dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 /* ── Task Panel (floating popover) ───────────────────────────────── */
@@ -558,6 +575,7 @@ a:hover { text-decoration: underline; }
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
   padding: 20px 28px;
   border-bottom: 1px solid var(--bg-surface0);
 }
@@ -997,6 +1015,30 @@ a:hover { text-decoration: underline; }
 .voice-preview-btn:hover { color: var(--blue); border-color: var(--blue); }
 
 /* ── Settings page ─────────────────────────────────────────────────── */
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--bg-surface0);
+  flex-shrink: 0;
+}
+.settings-tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-sub);
+  font-size: 13px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+.settings-tab:hover { color: var(--text); }
+.settings-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 .settings-scroll {
   flex: 1;
   overflow-y: auto;
@@ -1007,6 +1049,13 @@ a:hover { text-decoration: underline; }
 }
 .settings-scroll::-webkit-scrollbar { width: 6px; }
 .settings-scroll::-webkit-scrollbar-thumb { background: var(--bg-surface1); border-radius: 3px; }
+
+.settings-tab-content {
+  display: none;
+  flex-direction: column;
+  gap: 20px;
+}
+.settings-tab-content.active { display: flex; }
 
 .settings-card {
   background: var(--bg-mantle);
@@ -1377,6 +1426,28 @@ a:hover { text-decoration: underline; }
   color: var(--bg-base);
   border-color: var(--accent);
 }
+
+/* Stats time filter (unified at top) */
+.stats-time-filter {
+  display: flex;
+  gap: 4px;
+}
+.stats-time-btn {
+  padding: 6px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--bg-surface2);
+  background: transparent;
+  color: var(--text-sub);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.stats-time-btn.active {
+  background: var(--accent);
+  color: var(--bg-base);
+  border-color: var(--accent);
+}
+
 .token-chart-total {
   font-size: 12px;
   color: var(--text-sub);
@@ -3033,6 +3104,39 @@ a:hover { text-decoration: underline; }
   height: 16px;
   accent-color: var(--accent);
 }
+
+/* ── Data Locality / Secrets Info ────────────────────────────────── */
+.data-locality-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.data-locality-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg-dark, var(--bg-surface0));
+}
+.data-locality-icon { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
+.data-locality-label { font-size: 13px; font-weight: 600; display: block; color: var(--text); }
+.data-locality-desc { font-size: 12px; color: var(--text-sub); display: block; margin-top: 2px; }
+.data-locality-badge {
+  display: inline-block;
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  margin-top: 4px;
+  background: var(--bg-surface1);
+  color: var(--text-dim);
+}
+.secrets-info-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.secrets-info-row span { font-size: 13px; color: var(--text-sub); }
 
 /* ── Persona / Personalization Card ──────────────────────────────── */
 .persona-card { }

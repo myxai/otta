@@ -7,15 +7,23 @@ import threading
 
 from flask import Blueprint, jsonify
 
+from myxai_desk.core.storage import secrets
 from myxai_desk.web.apps_helpers import _t, load_apps_registry, save_apps_registry
-from myxai_desk.web.migration_guards import mark
+
+
+def _resolve_email_config(config: dict) -> dict:
+    """Merge IMAP password from keyring into config dict."""
+    if secrets.is_secret_ref(config.get("imap_password")):
+        real = secrets.retrieve_app_secret("email_summary", "imap_password")
+        if real:
+            config["imap_password"] = real
+    return config
 
 bp = Blueprint("apps_email", __name__, url_prefix="/api/apps/email_summary")
 
 
 @bp.post("/run")
 def run():
-    mark("[NEW] apps/email_summary/run")
     from myxai_desk.core.runtime.app_governance import gate_app_run
 
     decision = gate_app_run("email_summary")
@@ -27,7 +35,7 @@ def run():
         return jsonify({"error": _t("error.app_not_installed")}), 400
     from apps.email_summary import run_email_summary
 
-    app_config = registry["email_summary"].get("config", {})
+    app_config = _resolve_email_config(registry["email_summary"].get("config", {}))
     if not app_config.get("imap_host") or not app_config.get("imap_user"):
         return jsonify({"error": _t("error.imap_not_configured")}), 400
 
@@ -55,21 +63,18 @@ def run():
 
 @bp.get("/status")
 def status():
-    mark("[NEW] apps/email_summary/status")
     from apps.email_summary import get_status
     return jsonify(get_status())
 
 
 @bp.get("/reports")
 def reports():
-    mark("[NEW] apps/email_summary/reports")
     from apps.email_summary import list_reports
     return jsonify(list_reports())
 
 
 @bp.get("/report/<date_str>")
 def report(date_str):
-    mark("[NEW] apps/email_summary/report")
     from apps.email_summary import get_report
 
     report = get_report(date_str)
@@ -80,18 +85,16 @@ def report(date_str):
 
 @bp.post("/test")
 def test_connection():
-    mark("[NEW] apps/email_summary/test")
     registry = load_apps_registry()
     if "email_summary" not in registry:
         return jsonify({"error": _t("error.app_not_installed")}), 400
     from apps.email_summary import test_connection
 
-    app_config = registry["email_summary"].get("config", {})
+    app_config = _resolve_email_config(registry["email_summary"].get("config", {}))
     return jsonify(test_connection(app_config))
 
 
 @bp.get("/presets")
 def presets():
-    mark("[NEW] apps/email_summary/presets")
     from apps.email_summary import IMAP_PRESETS
     return jsonify(IMAP_PRESETS)

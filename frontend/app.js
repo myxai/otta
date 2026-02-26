@@ -2,19 +2,51 @@
    MyxAI Desk — Frontend Logic
    =================================================================== */
 
+// Build version probe — server injects __myxai_expected_build in <head>.
+// Used to detect stale pages (e.g. old browser tab left open).
+window.__myxai_build__ = window.__myxai_expected_build || "";
+
 // ── API token guard (localhost CSRF / DNS-rebinding protection) ────
-// Token is injected by pywebview (window.__myxai_token) or via URL
-// query param (?token=...) in browser-fallback mode.
+// Priority: inline <script> injection (most reliable) > URL param (dev) > sessionStorage (refresh fallback)
 (function _bootstrapToken() {
-  if (window.__myxai_token) return;
-  const p = new URLSearchParams(window.location.search);
-  const t = p.get("token");
-  if (t) {
-    window.__myxai_token = t;
-    // Strip token from URL to avoid leaking it in Referer headers
-    const clean = window.location.pathname + window.location.hash;
-    window.history.replaceState(null, "", clean);
+  if (!window.__myxai_token) {
+    const p = new URLSearchParams(window.location.search);
+    const t = p.get("token");
+    if (t) {
+      window.__myxai_token = t;
+      const clean = window.location.pathname + window.location.hash;
+      window.history.replaceState(null, "", clean);
+    }
   }
+  if (!window.__myxai_token) {
+    window.__myxai_token = sessionStorage.getItem("__myxai_token") || "";
+  }
+  if (window.__myxai_token) {
+    sessionStorage.setItem("__myxai_token", window.__myxai_token);
+  }
+})();
+
+// ── Stale page detection — stop polls and show banner if version mismatches ──
+(function _checkStalePage() {
+  var expected = window.__myxai_expected_build || "";
+  var actual = window.__myxai_build__ || "";
+  if (expected && actual === expected) return;
+  if (!expected && !actual) return;
+  console.warn("[MyxAI] Stale page detected (expected=" + expected + " actual=" + actual + "). Stopping polls.");
+  window.__myxai_stale_page = true;
+  document.addEventListener("DOMContentLoaded", function() {
+    [window._notifTimer, window._badgePollTimer, window._taskPollTimer].forEach(function(t) {
+      if (t) clearInterval(t);
+    });
+    var b = document.createElement("div");
+    b.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:10000;"
+      + "background:var(--yellow,#f9e2af);color:var(--base,#1e1e2e);"
+      + "padding:10px 20px;text-align:center;font-size:14px;"
+      + "border-bottom:1px solid var(--overlay0,#6c7086);";
+    b.innerHTML = "\u26a0\ufe0f \u9875\u9762\u7248\u672c\u5df2\u8fc7\u671f\uff0c\u8bf7\u5237\u65b0\u6216\u5173\u95ed\u6b64\u6807\u7b7e\u9875 "
+      + '<button onclick="location.reload()" style="margin-left:12px;padding:4px 12px;cursor:pointer;border-radius:4px;border:1px solid currentColor;background:transparent;">\u7acb\u5373\u5237\u65b0</button>';
+    document.body.prepend(b);
+  });
 })();
 
 function authHeaders(extra) {
@@ -46,6 +78,8 @@ const FALLBACK_I18N = {
     "chat.error":"错误: ","chat.requestFail":"请求失败: ",
     "chat.executing":"执行中…","chat.execDone":"执行完成","chat.steps":"步",
     "settings.title":"设置","settings.save":"保存配置",
+    "settings.tabGeneral":"通用","settings.tabModel":"模型","settings.tabTools":"工具","settings.tabPrivacy":"隐私","settings.tabAdvanced":"高级",
+    "settings.closeBehavior":"关闭窗口时","settings.closeMinimize":"最小化到托盘（后台运行）","settings.closeQuit":"完全退出",
     "settings.model":"模型设置","settings.modelName":"模型名称",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"最大工具迭代次数","settings.memoryWindow":"记忆窗口大小",
     "settings.apiKeys":"API 密钥",
@@ -71,8 +105,18 @@ const FALLBACK_I18N = {
     "status.mcpConnected":"已连接","status.mcpNotConnected":"未连接","status.mcpNoTools":"无工具注册",
     "status.mcpTest":"测试连接","status.mcpReconnect":"重新连接","status.mcpTesting":"测试中…","status.mcpReconnecting":"连接中…",
     "status.mcpLog":"诊断日志","status.mcpRegisteredTools":"已注册工具",
+    "status.scheduler":"调度器","status.schedulerHealthy":"正常","status.schedulerDegraded":"降级",
+    "status.available":"可用性","status.installed":"已安装","status.notInstalled":"未安装",
+    "status.dbWriteStatus":"数据库写入","status.failed":"失败","status.normal":"正常",
     "status.positiveCases":"正面案例 (👍)","status.negativeCases":"负面案例 (👎)",
     "status.recentPositive":"最近正面","status.recentNegative":"最近负面",
+    "system.info":"系统信息","system.device":"设备","system.hostname":"主机名","system.os":"操作系统",
+    "system.architecture":"架构","system.processor":"处理器","system.cpu":"CPU","system.cores":"核心",
+    "system.frequency":"频率","system.usage":"使用率","system.memory":"内存","system.total":"总计",
+    "system.used":"已用","system.available":"可用","system.storage":"存储","system.disk":"磁盘",
+    "system.free":"空闲","system.gpu":"显卡","system.noGpu":"未检测到独立显卡","system.network":"网络",
+    "system.interfaces":"网络接口","system.sent":"发送","system.received":"接收",
+    "system.bootTime":"启动时间","system.uptime":"运行时长","system.physical":"物理","system.logical":"逻辑",
     "gw.title":"网关控制","gw.stopped":"网关已停止","gw.running":"网关运行中",
     "gw.stoppedDesc":"启动网关以连接 Telegram、Discord 等平台","gw.runningDesc":"网关正在处理来自各频道的消息",
     "gw.start":"启动网关","gw.stop":"停止网关","gw.logs":"网关日志",
@@ -125,6 +169,13 @@ const FALLBACK_I18N = {
     "privacy.advanced":"高级设置",
     "privacy.generating":"正在生成...","privacy.generated":"个性化已生成","privacy.cleared":"个性化已清空","privacy.saved":"设置已保存",
     "privacy.copied":"已复制","privacy.editSaved":"已保存",
+    "privacy.dataStorageTitle":"数据存储说明","privacy.localOnly":"仅本地存储","privacy.localOnlyDesc":"对话记录、浏览历史、用户画像、审计日志 — 始终保存在你的设备上，不会发送到任何外部服务。",
+    "privacy.keyringSec":"密钥安全存储","privacy.keyringSecDesc":"API Key、邮箱密码等敏感信息通过系统钥匙串加密保存，配置文件中仅存引用。",
+    "privacy.sentToApi":"发送到外部 API","privacy.sentToApiDesc":"当前对话消息发送到 LLM 提供商；搜索查询发送到搜索 API。对话历史和画像不会自动发送。",
+    "privacy.secretsTitle":"密钥管理","privacy.secretsDesc":"查看当前存储的密钥数量，或一键清除所有已保存的 API Key 和密码。",
+    "privacy.clearSecrets":"清除所有密钥","privacy.clearSecretsConfirm":"确定要清除所有已保存的 API Key 和密码吗？清除后需要重新配置。",
+    "privacy.secretsCleared":"所有密钥已清除","privacy.backend":"存储后端","privacy.backendKeyring":"系统钥匙串","privacy.backendFile":"加密文件",
+    "privacy.storedKeys":"已存储密钥",
     "nav.reports":"报告","nav.apps":"应用",
     "reports.title":"报告","reports.unread":"未读","reports.24h":"24小时","reports.3d":"3天","reports.7d":"7天","reports.30d":"30天","reports.all":"全部",
     "reports.empty":"暂无报告","reports.allRead":"全部已读，去看看其他时间段吧","reports.viewReport":"查看",
@@ -231,6 +282,8 @@ const FALLBACK_I18N = {
     "chat.error":"Error: ","chat.requestFail":"Request failed: ",
     "chat.executing":"Executing…","chat.execDone":"Done","chat.steps":"steps",
     "settings.title":"Settings","settings.save":"Save",
+    "settings.tabGeneral":"General","settings.tabModel":"Model","settings.tabTools":"Tools","settings.tabPrivacy":"Privacy","settings.tabAdvanced":"Advanced",
+    "settings.closeBehavior":"On Window Close","settings.closeMinimize":"Minimize to tray (run in background)","settings.closeQuit":"Quit completely",
     "settings.model":"Model Settings","settings.modelName":"Model Name",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"Max Tool Iterations","settings.memoryWindow":"Memory Window Size",
     "settings.apiKeys":"API Keys",
@@ -256,8 +309,18 @@ const FALLBACK_I18N = {
     "status.mcpConnected":"Connected","status.mcpNotConnected":"Not connected","status.mcpNoTools":"No tools registered",
     "status.mcpTest":"Test Connection","status.mcpReconnect":"Reconnect","status.mcpTesting":"Testing…","status.mcpReconnecting":"Reconnecting…",
     "status.mcpLog":"Diagnostic Log","status.mcpRegisteredTools":"Registered Tools",
+    "status.scheduler":"Scheduler","status.schedulerHealthy":"Healthy","status.schedulerDegraded":"Degraded",
+    "status.available":"Availability","status.installed":"Installed","status.notInstalled":"Not Installed",
+    "status.dbWriteStatus":"Database Write","status.failed":"Failed","status.normal":"Normal",
     "status.positiveCases":"Positive (👍)","status.negativeCases":"Negative (👎)",
     "status.recentPositive":"Recent Positive","status.recentNegative":"Recent Negative",
+    "system.info":"System Information","system.device":"Device","system.hostname":"Hostname","system.os":"Operating System",
+    "system.architecture":"Architecture","system.processor":"Processor","system.cpu":"CPU","system.cores":"Cores",
+    "system.frequency":"Frequency","system.usage":"Usage","system.memory":"Memory","system.total":"Total",
+    "system.used":"Used","system.available":"Available","system.storage":"Storage","system.disk":"Disk",
+    "system.free":"Free","system.gpu":"GPU","system.noGpu":"No dedicated GPU detected","system.network":"Network",
+    "system.interfaces":"Network Interfaces","system.sent":"Sent","system.received":"Received",
+    "system.bootTime":"Boot Time","system.uptime":"Uptime","system.physical":"Physical","system.logical":"Logical",
     "gw.title":"Gateway Control","gw.stopped":"Gateway Stopped","gw.running":"Gateway Running",
     "gw.stoppedDesc":"Start gateway to connect Telegram, Discord, etc.","gw.runningDesc":"Gateway is processing channel messages",
     "gw.start":"Start Gateway","gw.stop":"Stop Gateway","gw.logs":"Gateway Logs",
@@ -310,6 +373,13 @@ const FALLBACK_I18N = {
     "privacy.advanced":"Advanced settings",
     "privacy.generating":"Generating...","privacy.generated":"Personalization generated","privacy.cleared":"Personalization cleared","privacy.saved":"Settings saved",
     "privacy.copied":"Copied","privacy.editSaved":"Saved",
+    "privacy.dataStorageTitle":"Data Storage Info","privacy.localOnly":"Local Only","privacy.localOnlyDesc":"Chat history, browsing history, user profile, audit logs — always stored on your device, never sent to external services.",
+    "privacy.keyringSec":"Secure Key Storage","privacy.keyringSecDesc":"API keys, email passwords and other secrets are encrypted via system Keyring. Config files only store references.",
+    "privacy.sentToApi":"Sent to External APIs","privacy.sentToApiDesc":"Current chat messages are sent to LLM providers; search queries to search APIs. Chat history and profiles are not sent automatically.",
+    "privacy.secretsTitle":"Key Management","privacy.secretsDesc":"View stored secret count, or clear all saved API keys and passwords at once.",
+    "privacy.clearSecrets":"Clear All Keys","privacy.clearSecretsConfirm":"Are you sure you want to clear all saved API keys and passwords? You will need to reconfigure them.",
+    "privacy.secretsCleared":"All secrets cleared","privacy.backend":"Backend","privacy.backendKeyring":"System Keyring","privacy.backendFile":"Encrypted File",
+    "privacy.storedKeys":"Stored keys",
     "nav.reports":"Reports","nav.apps":"Apps",
     "reports.title":"Reports","reports.unread":"Unread","reports.24h":"24h","reports.3d":"3 Days","reports.7d":"7 Days","reports.30d":"30 Days","reports.all":"All",
     "reports.empty":"No reports yet","reports.allRead":"All caught up! Try another time range","reports.viewReport":"View",
@@ -488,7 +558,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   _lang = detectLang();
   const sel = document.getElementById("lang-select");
   if (sel) sel.value = localStorage.getItem("nanobot_lang") || "auto";
-  fetch("/api/desk/lang", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({lang: _lang})}).catch(()=>{});
+  fetch("/api/desk/lang", {method:"POST", headers:authHeaders({"Content-Type":"application/json"}), body: JSON.stringify({lang: _lang})}).catch(()=>{});
   setupInput();
 
   // Intercept all link clicks — open external URLs in system browser
@@ -572,7 +642,7 @@ function startNotificationPoll() {
 }
 async function pollNotifications() {
   try {
-    const items = await api("/api/notifications");
+    const items = await api("/api/notifications", "POST");
     if (!items || !items.length) return;
     items.forEach(n => {
       toast(`🔔 ${n.title}\n${n.content}`, n.level === "error" ? "error" : "success", 8000);
@@ -616,13 +686,39 @@ function switchPage(page) {
     const np = n.dataset.page;
     n.classList.toggle("active", np === page || (np === "apps" && page === "app-detail"));
   });
-  if (page === "settings") { loadConfig(); _syncGwSettings(); }
-  if (page === "stats") { loadTokenChart(); loadSearchChart(); loadCategoryCharts(); }
+  if (page === "settings") { loadConfig(); _syncGwSettings(); loadDeskSettings(); switchSettingsTab(_lastSettingsTab || "general"); }
+  if (page === "stats") { loadTokenChart(_statsTimeRange); loadSearchChart(_statsTimeRange); loadCategoryCharts(_statsTimeRange); }
   if (page === "status") loadStatus();
   if (page === "gateway") loadGatewayStatus();
   if (page === "apps") loadApps();
   if (page === "reports") loadReportsPage();
   if (page === "audit") loadAuditPage();
+}
+
+// ── Settings tabs ─────────────────────────────────────────────────────
+
+let _lastSettingsTab = "general";
+
+function switchSettingsTab(tab) {
+  _lastSettingsTab = tab;
+  document.querySelectorAll(".settings-tab").forEach(b => b.classList.toggle("active", b.dataset.stab === tab));
+  document.querySelectorAll(".settings-tab-content").forEach(c => c.classList.toggle("active", c.dataset.tab === tab));
+}
+
+async function loadDeskSettings() {
+  try {
+    const data = await api("/api/desk/settings");
+    const radio = document.querySelector(`input[name="close-action"][value="${data.close_action || "minimize"}"]`);
+    if (radio) radio.checked = true;
+  } catch (_) {}
+}
+
+async function saveCloseBehavior(value) {
+  try {
+    await api("/api/desk/settings", "POST", { close_action: value });
+  } catch (_) {
+    toast(t("settings.saveFail"), "error");
+  }
 }
 
 // ── Session list (sidebar) ────────────────────────────────────────────
@@ -821,7 +917,7 @@ function _startBackgroundChat(msgSessionId, text, thinkingId) {
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ message: text, session_id: msgSessionId }),
       });
       const reader = response.body.getReader();
@@ -1474,8 +1570,17 @@ function applyRawJson() {
 
 // ── Stats charts ──────────────────────────────────────────────────────
 
-let _tokenChartDays = 7;
-let _searchChartDays = 7;
+let _statsTimeRange = 7;
+
+function updateStatsTimeRange(days) {
+  _statsTimeRange = days;
+  document.querySelectorAll(".stats-time-btn").forEach(btn => {
+    btn.classList.toggle("active", Number(btn.dataset.days) === days);
+  });
+  loadTokenChart(days);
+  loadSearchChart(days);
+  loadCategoryCharts(days);
+}
 
 function _fmtNum(n) { return n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n); }
 
@@ -1494,15 +1599,11 @@ function _renderBarChart(container, items, valueKey, unit) {
 }
 
 async function loadTokenChart(days) {
-  _tokenChartDays = days || _tokenChartDays;
-  document.querySelectorAll("#token-chart-tabs .token-chart-tab").forEach(btn => {
-    btn.classList.toggle("active", Number(btn.dataset.days) === _tokenChartDays);
-  });
   const container = document.getElementById("token-chart-container");
   const totalEl = document.getElementById("token-chart-total");
   if (!container) return;
   try {
-    const data = await api(`/api/token/history?days=${_tokenChartDays}`);
+    const data = await api(`/api/token/history?days=${days || _statsTimeRange}`);
     const history = data.history || [];
     const totalIn = history.reduce((s, d) => s + (d.input || 0), 0);
     const totalOut = history.reduce((s, d) => s + (d.output || 0), 0);
@@ -1526,15 +1627,11 @@ async function loadTokenChart(days) {
 }
 
 async function loadSearchChart(days) {
-  _searchChartDays = days || _searchChartDays;
-  document.querySelectorAll("#search-chart-tabs .token-chart-tab").forEach(btn => {
-    btn.classList.toggle("active", Number(btn.dataset.days) === _searchChartDays);
-  });
   const container = document.getElementById("search-chart-container");
   const totalEl = document.getElementById("search-chart-total");
   if (!container) return;
   try {
-    const data = await api(`/api/search/history?days=${_searchChartDays}`);
+    const data = await api(`/api/search/history?days=${days || _statsTimeRange}`);
     const history = data.history || [];
     const total = data.total || 0;
     if (totalEl) totalEl.textContent = `${t("stats.rangeTotal")} ${_fmtNum(total)} 次`;
@@ -1548,7 +1645,6 @@ async function loadSearchChart(days) {
 
 let _categoryPieChart = null;
 let _categoryBarChart = null;
-let _catDays = 7;
 
 const _CHART_COLORS = [
   '#89b4fa', '#a6e3a1', '#f9e2af', '#f38ba8', '#cba6f7',
@@ -1571,15 +1667,11 @@ function _emptyCanvas(canvas) {
 }
 
 async function loadCategoryCharts(days) {
-  _catDays = days || _catDays;
-  document.querySelectorAll('#category-chart-tabs .token-chart-tab').forEach(btn => {
-    btn.classList.toggle('active', Number(btn.dataset.days) === _catDays);
-  });
   const pieCanvas = document.getElementById('category-pie-chart');
   const barCanvas = document.getElementById('category-bar-chart');
   if (!pieCanvas && !barCanvas) return;
   try {
-    const data = await api(`/api/usage/categories?days=${_catDays}`);
+    const data = await api(`/api/usage/categories?days=${days || _statsTimeRange}`);
     const cats = data.categories || {};
     const labels = [], values = [], avgValues = [], colors = [];
     let ci = 0;
@@ -1756,6 +1848,133 @@ async function loadStatus() {
       }
       html += `<div class="status-card" style="grid-column: 1 / -1"><h3>${t("status.cases")}</h3>${casesHtml}</div>`;
     } catch (_) {}
+
+    // Scheduler health
+    if (data.scheduler) {
+      const sch = data.scheduler;
+      let schedBadge = sch.degraded 
+        ? `<span class="badge badge-off" style="margin-left:8px">⚠️ ${t("status.schedulerDegraded")}</span>`
+        : `<span class="badge badge-ok" style="margin-left:8px">${t("status.schedulerHealthy")}</span>`;
+      
+      let schedHtml = '<div class="provider-list">';
+      schedHtml += `<div class="provider-row"><span>Croniter ${t("status.available")}</span><span class="badge ${sch.croniter_available ? 'badge-ok' : 'badge-off'}">${sch.croniter_available ? t("status.installed") : t("status.notInstalled")}</span></div>`;
+      schedHtml += `<div class="provider-row"><span>${t("status.dbWriteStatus")}</span><span class="badge ${sch.db_write_failed ? 'badge-off' : 'badge-ok'}">${sch.db_write_failed ? t("status.failed") : t("status.normal")}</span></div>`;
+      schedHtml += '</div>';
+      
+      if (sch.last_error) {
+        schedHtml += `<div style="margin-top:8px;padding:8px;background:var(--bg-dark);border-radius:6px;font-size:11px;color:var(--red);font-family:monospace">${escapeHtml(sch.last_error)}</div>`;
+      }
+      
+      if (!sch.croniter_available) {
+        schedHtml += `<div style="margin-top:8px;padding:8px;background:var(--bg-dark);border-radius:6px;font-size:11px;color:var(--yellow)"><code>pip install croniter</code></div>`;
+      }
+      
+      html += `<div class="status-card" style="grid-column: 1 / -1"><h3>${t("status.scheduler")} ${schedBadge}</h3>${schedHtml}</div>`;
+    }
+
+    // System information
+    if (data.system) {
+      const sys = data.system;
+      let sysHtml = '<div class="provider-list">';
+      
+      // Device info
+      if (sys.hostname) {
+        sysHtml += `<div class="provider-row"><span>${t("system.hostname")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(sys.hostname)}</span></div>`;
+      }
+      if (sys.platform) {
+        const osText = `${sys.platform} ${sys.platform_release || ''}`.trim();
+        sysHtml += `<div class="provider-row"><span>${t("system.os")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(osText)}</span></div>`;
+      }
+      if (sys.architecture) {
+        sysHtml += `<div class="provider-row"><span>${t("system.architecture")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(sys.architecture)}</span></div>`;
+      }
+      if (sys.processor) {
+        sysHtml += `<div class="provider-row"><span>${t("system.processor")}</span><span style="font-size:12px;color:var(--text-dim);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(sys.processor)}">${escapeHtml(sys.processor)}</span></div>`;
+      }
+      
+      // CPU info
+      if (sys.cpu && sys.psutil_available) {
+        const cpu = sys.cpu;
+        let cpuText = '';
+        if (cpu.physical_cores) cpuText += `${cpu.physical_cores} ${t("system.physical")}`;
+        if (cpu.logical_cores) cpuText += ` / ${cpu.logical_cores} ${t("system.logical")}`;
+        if (cpuText) {
+          sysHtml += `<div class="provider-row"><span>${t("system.cpu")} ${t("system.cores")}</span><span style="font-size:12px;color:var(--text-dim)">${cpuText}</span></div>`;
+        }
+        if (cpu.current_frequency) {
+          const freqText = cpu.current_frequency >= 1000 ? `${(cpu.current_frequency / 1000).toFixed(2)} GHz` : `${cpu.current_frequency.toFixed(0)} MHz`;
+          sysHtml += `<div class="provider-row"><span>${t("system.cpu")} ${t("system.frequency")}</span><span style="font-size:12px;color:var(--text-dim)">${freqText}</span></div>`;
+        }
+        if (cpu.usage_percent !== undefined) {
+          sysHtml += `<div class="provider-row"><span>${t("system.cpu")} ${t("system.usage")}</span><span class="badge ${cpu.usage_percent > 80 ? 'badge-off' : 'badge-ok'}">${cpu.usage_percent.toFixed(1)}%</span></div>`;
+        }
+      }
+      
+      // Memory info
+      if (sys.memory && sys.psutil_available) {
+        const mem = sys.memory;
+        const totalGB = (mem.total / (1024**3)).toFixed(1);
+        const usedGB = (mem.used / (1024**3)).toFixed(1);
+        const availGB = (mem.available / (1024**3)).toFixed(1);
+        sysHtml += `<div class="provider-row"><span>${t("system.memory")} ${t("system.total")}</span><span style="font-size:12px;color:var(--text-dim)">${totalGB} GB</span></div>`;
+        sysHtml += `<div class="provider-row"><span>${t("system.memory")} ${t("system.used")} / ${t("system.available")}</span><span class="badge ${mem.percent > 80 ? 'badge-off' : 'badge-ok'}">${usedGB} GB / ${availGB} GB (${mem.percent.toFixed(1)}%)</span></div>`;
+      }
+      
+      // Disk info
+      if (sys.disk && sys.psutil_available) {
+        const disk = sys.disk;
+        const totalGB = (disk.total / (1024**3)).toFixed(1);
+        const usedGB = (disk.used / (1024**3)).toFixed(1);
+        const freeGB = (disk.free / (1024**3)).toFixed(1);
+        sysHtml += `<div class="provider-row"><span>${t("system.disk")} ${t("system.total")}</span><span style="font-size:12px;color:var(--text-dim)">${totalGB} GB</span></div>`;
+        sysHtml += `<div class="provider-row"><span>${t("system.disk")} ${t("system.used")} / ${t("system.free")}</span><span class="badge ${disk.percent > 85 ? 'badge-off' : 'badge-ok'}">${usedGB} GB / ${freeGB} GB (${disk.percent.toFixed(1)}%)</span></div>`;
+      }
+      
+      // GPU info
+      if (sys.gpu && sys.gpu.length > 0) {
+        sys.gpu.forEach((gpu, idx) => {
+          const gpuLabel = sys.gpu.length > 1 ? `${t("system.gpu")} ${idx + 1}` : t("system.gpu");
+          sysHtml += `<div class="provider-row"><span>${gpuLabel}</span><span style="font-size:12px;color:var(--text-dim);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(gpu.name)}">${escapeHtml(gpu.name)}</span></div>`;
+          if (gpu.memory) {
+            sysHtml += `<div class="provider-row" style="padding-left:16px"><span>${t("system.memory")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(gpu.memory)}</span></div>`;
+          }
+        });
+      } else if (sys.psutil_available) {
+        sysHtml += `<div class="provider-row"><span>${t("system.gpu")}</span><span style="font-size:12px;color:var(--text-dim)">${t("system.noGpu")}</span></div>`;
+      }
+      
+      // Network info
+      if (sys.network && sys.network.interfaces && sys.network.interfaces.length > 0 && sys.psutil_available) {
+        sysHtml += `<div class="provider-row"><span>${t("system.interfaces")}</span><span style="font-size:12px;color:var(--text-dim)">${sys.network.interfaces.map(i => `${escapeHtml(i.name)}: ${escapeHtml(i.address)}`).join(', ')}</span></div>`;
+        if (sys.network.bytes_sent !== undefined) {
+          const sentGB = (sys.network.bytes_sent / (1024**3)).toFixed(2);
+          const recvGB = (sys.network.bytes_recv / (1024**3)).toFixed(2);
+          sysHtml += `<div class="provider-row"><span>${t("system.network")}</span><span style="font-size:12px;color:var(--text-dim)">${t("system.sent")}: ${sentGB} GB, ${t("system.received")}: ${recvGB} GB</span></div>`;
+        }
+      }
+      
+      // Boot time / uptime
+      if (sys.boot_time && sys.psutil_available) {
+        const bootDate = new Date(sys.boot_time * 1000);
+        const uptime = Math.floor((Date.now() - bootDate.getTime()) / 1000);
+        const days = Math.floor(uptime / 86400);
+        const hours = Math.floor((uptime % 86400) / 3600);
+        const minutes = Math.floor((uptime % 3600) / 60);
+        let uptimeText = '';
+        if (days > 0) uptimeText += `${days}d `;
+        if (hours > 0) uptimeText += `${hours}h `;
+        uptimeText += `${minutes}m`;
+        sysHtml += `<div class="provider-row"><span>${t("system.uptime")}</span><span style="font-size:12px;color:var(--text-dim)">${uptimeText}</span></div>`;
+      }
+      
+      sysHtml += '</div>';
+      
+      if (!sys.psutil_available) {
+        sysHtml += `<div style="margin-top:8px;padding:8px;background:var(--bg-dark);border-radius:6px;font-size:11px;color:var(--yellow)">💡 ${t("system.info")}: <code>pip install psutil</code> ${_lang === 'zh' ? '获取详细系统信息' : 'for detailed system information'}</div>`;
+      }
+      
+      html += `<div class="status-card" style="grid-column: 1 / -1"><h3>💻 ${t("system.info")}</h3>${sysHtml}</div>`;
+    }
 
     grid.innerHTML = html;
   } catch (e) {
@@ -2183,7 +2402,7 @@ function stopSpeech() {
 const _origPollNotifications = pollNotifications;
 pollNotifications = async function() {
   try {
-    const items = await api("/api/notifications");
+    const items = await api("/api/notifications", "POST");
     if (!items || !items.length) return;
     items.forEach(n => {
       toast(`🔔 ${n.title}\n${n.content}`, n.level === "error" ? "error" : "success", 8000);
@@ -3847,7 +4066,7 @@ async function runCustomApp(appId) {
   try {
     const resp = await fetch(`/api/apps/custom/${appId}/run`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({ param_groups: paramGroups }),
       signal: ac.signal,
     });
@@ -3888,7 +4107,7 @@ async function runCustomSummary(appId) {
   try {
     const resp = await fetch(`/api/apps/custom/${appId}/summary`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders({ "Content-Type": "application/json" }),
       signal: ac.signal,
     });
     if (!resp.ok) {
@@ -4274,20 +4493,28 @@ async function _fetchTasks() {
 
 function _updateTaskBadge(tasks) {
   const badge = document.getElementById("task-badge");
+  const dot = document.getElementById("task-running-dot");
   const btn = document.getElementById("task-nav-btn");
-  if (!badge) return;
-  const running = tasks.filter(t => t.status === "running").length;
-  if (running > 0) {
-    badge.setAttribute("data-count", String(running));
-    badge.setAttribute("data-has-running", "true");
-    badge.textContent = String(running);
-    badge.style.display = "";
-    if (btn) btn.classList.add("has-active");
-  } else {
-    badge.removeAttribute("data-count");
-    badge.removeAttribute("data-has-running");
-    badge.style.display = "none";
-    if (btn) btn.classList.remove("has-active");
+
+  const alertCount = tasks.filter(t => t.status === "failed" || t.status === "pending_catchup").length;
+  const hasRunning = tasks.some(t => t.status === "running");
+
+  if (badge) {
+    if (alertCount > 0) {
+      badge.textContent = String(alertCount);
+      badge.classList.add("visible");
+    } else {
+      badge.textContent = "";
+      badge.classList.remove("visible");
+    }
+  }
+
+  if (dot) {
+    dot.classList.toggle("visible", hasRunning);
+  }
+
+  if (btn) {
+    btn.classList.toggle("has-active", hasRunning || alertCount > 0);
   }
 }
 
@@ -4321,12 +4548,10 @@ function _renderTaskPanel(tasks) {
     const statusLabel = _taskStatusLabel(task.status);
     const timeStr = _taskTimeDisplay(task);
     const tName = (_lang === "en" ? task.name_en : task.name_zh) || task.name_zh || task.task_id;
-    const canRun = task.status === "planned" || task.status === "failed" || task.status === "pending_catchup";
-    const runBtn = canRun
-      ? `<button class="task-run-btn" onclick="triggerTask('${_escAttr(task.task_id)}')" title="${t("tasks.runNow")}">▶</button>`
-      : task.status === "running"
-        ? `<span class="task-running-indicator">⏳</span>`
-        : "";
+    const isRunning = task.status === "running";
+    const runBtn = isRunning
+      ? `<span class="task-running-indicator">⏳</span>`
+      : `<button class="task-run-btn" onclick="triggerTask('${_escAttr(task.task_id)}')" title="${t("tasks.runNow")}">▶</button>`;
     html += `<div class="task-item" title="${_escAttr(tName)}">
       <span class="task-item-icon">${task.icon || "🤖"}</span>
       <div class="task-item-body">
@@ -4829,7 +5054,7 @@ async function verifyAuditChain() {
 
 async function exportAuditChain() {
   try {
-    const resp = await fetch("/api/audit/export");
+    const resp = await fetch("/api/audit/export", { headers: authHeaders() });
     const blob = await resp.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -4879,6 +5104,7 @@ async function loadPrivacySettings() {
   } catch (_) {}
   updatePersonaStatusBanner();
   loadPersonaEffect();
+  loadSecretsInfo();
 }
 
 function toggleFileWatchPaths() {
@@ -4925,6 +5151,33 @@ async function savePrivacySettings() {
     toast(`Error: ${e}`, "error");
   }
   updatePersonaStatusBanner();
+}
+
+async function loadSecretsInfo() {
+  try {
+    const data = await api("/api/profile/secrets/info");
+    const badge = document.getElementById("secrets-backend-badge");
+    const count = document.getElementById("secrets-count");
+    if (badge) {
+      const name = data.backend === "keyring" ? t("privacy.backendKeyring") : t("privacy.backendFile");
+      badge.textContent = `${t("privacy.backend")}: ${name}`;
+    }
+    if (count) {
+      const n = (data.stored_keys || []).length;
+      count.textContent = `${t("privacy.storedKeys")}: ${n}`;
+    }
+  } catch (_) {}
+}
+
+async function clearAllSecrets() {
+  if (!confirm(t("privacy.clearSecretsConfirm"))) return;
+  try {
+    await api("/api/profile/secrets/clear", "POST");
+    toast(t("privacy.secretsCleared"), "success");
+    loadSecretsInfo();
+  } catch (e) {
+    toast(`Error: ${e}`, "error");
+  }
 }
 
 async function generatePersona() {
