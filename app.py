@@ -17,7 +17,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from flask import (
@@ -49,6 +49,10 @@ except ImportError:
 # ---------------------------------------------------------------------------
 flask_app = Flask(__name__, static_folder="frontend", static_url_path="/static")
 flask_app.config["JSON_AS_ASCII"] = False
+
+# 初始化 extensions 字典（用于后续状态管理）
+if not hasattr(flask_app, 'extensions'):
+    flask_app.extensions = {}
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -4621,6 +4625,23 @@ def main():
 
     # Run catch-up check in background so missed tasks are compensated on startup
     threading.Thread(target=_scheduler_svc.on_app_start, daemon=True).start()
+
+    # --- 迁移护栏：路由自检 ---------------------------------------------- #
+    from myxai_desk.web.migration_guards import assert_no_duplicate_routes, dump_routes
+    
+    try:
+        assert_no_duplicate_routes(flask_app)
+        print("[Migration Guard] ✓ 路由自检通过，无重复路由", flush=True)
+    except RuntimeError as e:
+        print(f"[Migration Guard] ✗ 路由自检失败: {e}", flush=True)
+        raise
+    
+    # Debug 模式下打印路由信息
+    if os.environ.get("DEBUG_ROUTES"):
+        print("\n[Debug] 已注册的 API 路由:", flush=True)
+        for path, methods, endpoint in dump_routes(flask_app, "/api/"):
+            print(f"  {path} {methods} -> {endpoint}", flush=True)
+        print()
 
     port = 19280
 

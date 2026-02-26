@@ -290,7 +290,10 @@ def _compute_exact_match(task: TaskDescriptor, now: datetime | None = None) -> l
         if last:
             try:
                 last_dt = datetime.fromisoformat(last)
-                if (now - last_dt).days < interval:
+                # Ensure both are naive or both are aware for comparison
+                now_cmp = now.replace(tzinfo=None) if now.tzinfo else now
+                last_dt_cmp = last_dt.replace(tzinfo=None) if last_dt.tzinfo else last_dt
+                if (now_cmp - last_dt_cmp).days < interval:
                     return []
             except Exception:
                 pass
@@ -302,7 +305,11 @@ def _compute_exact_match(task: TaskDescriptor, now: datetime | None = None) -> l
 
 
 def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
-    """Compute missed cron-based due slots within catchup_window."""
+    """Compute missed cron-based due slots within catchup_window.
+    
+    Note: croniter requires naive datetime, so we strip timezone info for computation,
+    but ensure all comparisons are done with consistent timezone handling.
+    """
     if croniter is None:
         log.warning("croniter not installed — falling back to exact match")
         return _compute_exact_match(task, now)
@@ -313,13 +320,16 @@ def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
     if not cron_expr:
         return []
 
+    # Convert now to naive for croniter compatibility
+    now_naive = now.replace(tzinfo=None) if now.tzinfo else now
+    
     anchor_str = task.last_success_at or task.created_at
     try:
         anchor = datetime.fromisoformat(anchor_str).replace(tzinfo=None)
     except Exception:
-        anchor = now - timedelta(hours=task.catchup_window_hours)
+        anchor = now_naive - timedelta(hours=task.catchup_window_hours)
 
-    window_start = now - timedelta(hours=task.catchup_window_hours)
+    window_start = now_naive - timedelta(hours=task.catchup_window_hours)
     if anchor < window_start:
         anchor = window_start
 
@@ -335,7 +345,7 @@ def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
     while safety < 500:
         safety += 1
         nxt = cron.get_next(datetime)
-        if nxt > now:
+        if nxt > now_naive:
             break
         key = make_idempotency_key(task.task_id, nxt, mode)
         if not has_successful_run(key):
@@ -357,7 +367,10 @@ def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
 
 
 def _compute_interval_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
-    """Compute missed slots for interval-based schedules."""
+    """Compute missed slots for interval-based schedules.
+    
+    Note: Uses naive datetime for consistent arithmetic.
+    """
     sched = task.schedule
     interval_days = max(1, sched.get("interval_days", 1))
     sched_time = sched.get("time", "")
@@ -365,13 +378,16 @@ def _compute_interval_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot
         return []
     hh, mm = int(sched_time.split(":")[0]), int(sched_time.split(":")[1])
 
+    # Convert now to naive for consistent arithmetic
+    now_naive = now.replace(tzinfo=None) if now.tzinfo else now
+    
     anchor_str = task.last_success_at or task.created_at
     try:
         anchor = datetime.fromisoformat(anchor_str).replace(tzinfo=None)
     except Exception:
-        anchor = now - timedelta(hours=task.catchup_window_hours)
+        anchor = now_naive - timedelta(hours=task.catchup_window_hours)
 
-    window_start = now - timedelta(hours=task.catchup_window_hours)
+    window_start = now_naive - timedelta(hours=task.catchup_window_hours)
     cursor = anchor.replace(hour=hh, minute=mm, second=0, microsecond=0)
     if cursor <= anchor:
         cursor += timedelta(days=interval_days)
@@ -379,7 +395,7 @@ def _compute_interval_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot
     mode = "interval"
     slots: list[DueSlot] = []
     safety = 0
-    while cursor <= now and safety < 500:
+    while cursor <= now_naive and safety < 500:
         safety += 1
         if cursor >= window_start:
             key = make_idempotency_key(task.task_id, cursor, mode)
