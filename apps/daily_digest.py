@@ -27,7 +27,16 @@ import shutil
 import sqlite3
 import tempfile
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
+from pathlib import Path
+
+try:
+    from myxai_desk.core.timeutil import local_date_str, local_isoformat
+except ImportError:
+    def local_date_str(dt=None, fmt="%Y-%m-%d"):
+        return datetime.now().strftime(fmt)
+    def local_isoformat(dt=None):
+        return datetime.now().astimezone().isoformat()
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -1266,7 +1275,7 @@ def _load_interest_history(days: int = 7) -> str:
     """Load interests from past reports to build a multi-day user profile."""
     if not _REPORTS_DIR.exists():
         return ""
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = local_date_str()
     lines: list[str] = []
     for f in sorted(_REPORTS_DIR.glob("*.json"), reverse=True):
         if f.stem == today:
@@ -1306,7 +1315,7 @@ def _update_user_profile(interests: dict) -> None:
 
     top_keywords = sorted(kw_counts.items(), key=lambda x: x[1], reverse=True)[:50]
     profile["keyword_counts"] = dict(top_keywords)
-    profile["last_updated"] = datetime.now().astimezone().isoformat()
+    profile["last_updated"] = local_isoformat()
 
     _PROFILE_FILE.write_text(
         json.dumps(profile, ensure_ascii=False, indent=2),
@@ -1599,7 +1608,7 @@ def save_report(
     items: dict | None = None,
 ) -> dict:
     if date_str is None:
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = local_date_str()
     _REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     sr_compact: dict[str, list[dict]] | None = None
     if search_results:
@@ -1620,7 +1629,7 @@ def save_report(
         "interests": interests,
         "search_stats": search_stats,
         "search_results": sr_compact,
-        "generated_at": datetime.now().astimezone().isoformat(),
+        "generated_at": local_isoformat(),
     }
     if items is not None:
         data["items"] = items
@@ -1633,7 +1642,7 @@ def save_report(
 
 def load_report(date_str: str | None = None) -> dict | None:
     if date_str is None:
-        date_str = datetime.now().strftime("%Y-%m-%d")
+        date_str = local_date_str()
     fp = _REPORTS_DIR / f"{date_str}.json"
     if fp.exists():
         return json.loads(fp.read_text(encoding="utf-8"))
@@ -1790,7 +1799,7 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
     """
     browser = config.get("browser", "auto")
     hours = config.get("history_hours", 24)
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    date_str = local_date_str()
 
     model = config.get("model")
     api_key = config.get("api_key")

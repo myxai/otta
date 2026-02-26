@@ -8,6 +8,11 @@ Trigger points:
     1. App startup       — ``on_app_start()``
     2. OS sleep resume   — ``on_resume()``
     3. Periodic heartbeat — ``tick()``  (called every 60 s by the existing timer)
+    
+Timezone handling:
+    - All stored timestamps (started_at, finished_at, scheduled_for) use UTC
+    - All schedule time comparisons (HH:MM matching, day boundaries) use local time
+    - Idempotency keys use local date for daily/weekly/monthly schedules
 """
 
 from __future__ import annotations
@@ -15,7 +20,7 @@ from __future__ import annotations
 import logging
 import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Literal
 
 try:
@@ -24,6 +29,7 @@ except ImportError:
     croniter = None  # type: ignore[assignment,misc]
 
 from myxai_desk.core.storage import sqlite as db
+from myxai_desk.core.timeutil import local_date_str, now_local, now_utc, to_local, utc_isoformat
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -112,7 +118,7 @@ def record_run_start(
 ) -> int | None:
     """Insert a 'running' record. Returns None if the key already exists."""
     _ensure_task_runs_table()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = utc_isoformat()
     try:
         rows = db.execute(
             """INSERT INTO task_runs
@@ -131,7 +137,7 @@ def record_run_finish(
     idempotency_key: str, *, success: bool, error: str = "", artifacts: str = "{}"
 ) -> None:
     _ensure_task_runs_table()
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = utc_isoformat()
     status = "success" if success else "failed"
     db.execute(
         "UPDATE task_runs SET finished_at = ?, status = ?, error = ?, artifacts = ? "
@@ -152,7 +158,7 @@ def get_recent_runs(task_id: str, limit: int = 20) -> list[dict]:
 def get_today_runs() -> list[dict]:
     """Return all task_runs for today (local date)."""
     _ensure_task_runs_table()
-    today = datetime.now().strftime("%Y-%m-%d")
+    today = local_date_str()
     return db.execute(
         "SELECT * FROM task_runs WHERE scheduled_for LIKE ? ORDER BY id",
         (f"{today}%",),
@@ -183,7 +189,7 @@ def cleanup_stale_running() -> int:
     )
     if not stale:
         return 0
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = utc_isoformat()
     db.execute(
         "UPDATE task_runs SET status = 'failed', finished_at = ?, "
         "error = 'interrupted (app restart)' WHERE status = 'running'",
@@ -197,15 +203,22 @@ def cleanup_stale_running() -> int:
 
 
 def make_idempotency_key(task_id: str, due: datetime, mode: str) -> str:
+    """Generate idempotency key using local timezone for date-based schedules.
+    
+    This ensures that daily/weekly/monthly tasks are keyed by local calendar date,
+    not UTC date, so that users in different timezones see consistent behavior.
+    """
+    due_local = to_local(due) if due.tzinfo else due
+    
     if mode == "daily":
-        return f"{task_id}:{due.strftime('%Y-%m-%d')}"
+        return f"{task_id}:{due_local.strftime('%Y-%m-%d')}"
     if mode == "weekly":
-        iso_year, iso_week, _ = due.isocalendar()
+        iso_year, iso_week, _ = due_local.isocalendar()
         return f"{task_id}:{iso_year}-W{iso_week:02d}"
     if mode == "monthly":
-        return f"{task_id}:{due.strftime('%Y-%m')}"
+        return f"{task_id}:{due_local.strftime('%Y-%m')}"
     # interval or fallback — use full timestamp (minute-precision)
-    return f"{task_id}:{due.strftime('%Y-%m-%dT%H:%M')}"
+    return f"{task_id}:{due_local.strftime('%Y-%m-%dT%H:%M')}"
 
 
 # ── Due-slot computation ───────────────────────────────────────────────
@@ -239,11 +252,13 @@ def compute_due_slots(task: TaskDescriptor, now: datetime | None = None) -> list
       2. Generate cron iterations from anchor forward.
       3. Collect slots where due_time <= now and within catchup_window.
       4. Apply catchup_policy to decide which slots to keep.
+      
+    All schedule comparisons use local timezone for consistency with user expectations.
     """
     if task.catchup_policy == "NONE":
         return _compute_exact_match(task, now)
 
-    now = now or datetime.now()
+    now = now or now_local()
     mode = task.schedule.get("mode", "daily")
 
     if mode == "interval":
@@ -253,8 +268,11 @@ def compute_due_slots(task: TaskDescriptor, now: datetime | None = None) -> list
 
 
 def _compute_exact_match(task: TaskDescriptor, now: datetime | None = None) -> list[DueSlot]:
-    """NONE policy — only trigger on exact minute match (legacy behaviour)."""
-    now = now or datetime.now()
+    """NONE policy — only trigger on exact minute match (legacy behaviour).
+    
+    Uses local time for all comparisons to match user expectations.
+    """
+    now = now or now_local()
     current_hm = now.strftime("%H:%M")
     sched = task.schedule
     sched_time = sched.get("time", "")
@@ -432,7 +450,7 @@ class SchedulerService:
 
     def run_due_checks(self, trigger: str = "tick") -> None:
         _ensure_task_runs_table()
-        now = datetime.now()
+        now = now_local()
         tasks = self._load_all_tasks()
 
         for task in tasks:
@@ -507,7 +525,7 @@ class SchedulerService:
         if task is None:
             return False, f"task {task_id} not found"
 
-        now = datetime.now()
+        now = now_local()
         slot = DueSlot(
             task_id=task_id,
             scheduled_for=now,

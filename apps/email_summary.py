@@ -10,8 +10,16 @@ import imaplib
 import json
 import re
 import traceback
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
+
+try:
+    from myxai_desk.core.timeutil import local_date_str, local_isoformat
+except ImportError:
+    def local_date_str(dt=None, fmt="%Y-%m-%d"):
+        return datetime.now().strftime(fmt)
+    def local_isoformat(dt=None):
+        return datetime.now().astimezone().isoformat()
 
 _APP_DIR = Path.home() / ".nanobot" / "apps" / "email_summary"
 _REPORTS_DIR = _APP_DIR / "reports"
@@ -455,7 +463,7 @@ def run_email_summary(config: dict, model_config: dict | None = None) -> dict:
         return {"error": "正在运行中"}
 
     _run_status = {"running": True, "progress": "连接邮箱…", "last_run": None, "error": None}
-    date_str = datetime.now().strftime("%Y-%m-%d")
+    date_str = local_date_str()
 
     try:
         _run_status["progress"] = "连接 IMAP…"
@@ -500,7 +508,7 @@ def run_email_summary(config: dict, model_config: dict | None = None) -> dict:
             "date": date_str,
             "email_count": len(emails_data),
             "content": content,
-            "generated_at": datetime.now().astimezone().isoformat(),
+            "generated_at": local_isoformat(),
             "method": "llm" if has_llm else "fallback",
         }
         if items_data is not None:

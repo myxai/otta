@@ -1,10 +1,14 @@
 """Shared LLM call utility for all apps."""
 
 import json
+import logging
 import os
+import re
 import threading
 from datetime import date, timedelta
 from pathlib import Path
+
+log = logging.getLogger("llm_utils")
 
 _KNOWN_LITELLM_PREFIXES = (
     "openai/",
@@ -205,12 +209,47 @@ def snapshot_today_tokens() -> dict:
 
 
 def litellm_model_name(model: str, api_base: str | None) -> str:
-    """Ensure *model* has a provider prefix that litellm understands."""
+    """Ensure *model* has a provider prefix that litellm understands.
+    
+    Auto-detection logic:
+    1. If model already has a known prefix (e.g., "ollama/qwen3"), respect it
+    2. If api_base looks like Ollama, use "ollama/" prefix
+    3. If api_base is set but not recognized, use "openai/" prefix (generic)
+    4. Otherwise, assume it's a direct model name (e.g., OpenAI official)
+    
+    Known patterns:
+    - Ollama: localhost:11434, 127.0.0.1:11434, *:11434, */ollama/*, ollama.* domains
+    - vLLM/llama.cpp: require explicit "openai/" prefix or provider config
+    """
+    # Respect user's explicit provider prefix
     if any(model.startswith(p) for p in _KNOWN_LITELLM_PREFIXES):
         return model
-    if api_base:
-        return f"openai/{model}"
-    return model
+    
+    # No api_base means using default provider (e.g., OpenAI official API)
+    if not api_base:
+        return model
+    
+    # Normalize api_base for pattern matching
+    base_lower = api_base.lower()
+    
+    # Detect Ollama endpoints
+    ollama_patterns = [
+        # Port 11434 (default Ollama port)
+        r":11434",
+        # Path contains /ollama/
+        r"[:/]ollama[:/]",
+        # Domain starts with ollama
+        r"//ollama\.",
+    ]
+    
+    if any(re.search(pattern, base_lower) for pattern in ollama_patterns):
+        log.info(f"[llm_utils] Auto-detected Ollama endpoint: {api_base} → ollama/{model}")
+        return f"ollama/{model}"
+    
+    # For other custom endpoints, default to OpenAI-compatible
+    # Users can explicitly pass "provider/model" to override
+    log.debug(f"[llm_utils] Using OpenAI-compatible endpoint: {api_base} → openai/{model}")
+    return f"openai/{model}"
 
 
 def llm_call(
@@ -221,23 +260,110 @@ def llm_call(
     temperature: float = 0.5,
     max_tokens: int = 2048,
 ) -> str:
-    """Thin wrapper around litellm.completion with auto provider detection."""
+    """Thin wrapper around litellm.completion with auto provider detection.
+    
+    Args:
+        messages: Chat messages in OpenAI format
+        model: Model name, can include provider prefix (e.g., "ollama/qwen3")
+        api_key: API key (use "dummy" for local models)
+        api_base: API base URL (auto-detects Ollama endpoints)
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
+        
+    Returns:
+        Generated text content
+        
+    Raises:
+        LLMCallError: Wrapped exception with detailed error info
+    """
     os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
     import litellm
 
     resolved = litellm_model_name(model, api_base)
-    resp = litellm.completion(
-        model=resolved,
-        messages=messages,
-        api_key=api_key,
-        api_base=api_base,
-        temperature=temperature,
-        max_tokens=max_tokens,
-    )
-    usage = getattr(resp, "usage", None)
-    if usage:
-        record_tokens(
-            prompt_tokens=getattr(usage, "prompt_tokens", 0),
-            completion_tokens=getattr(usage, "completion_tokens", 0),
+    
+    try:
+        log.debug(
+            f"[llm_utils] Calling LLM: model={resolved}, "
+            f"api_base={api_base}, temp={temperature}, max_tokens={max_tokens}"
         )
-    return resp.choices[0].message.content or ""
+        
+        resp = litellm.completion(
+            model=resolved,
+            messages=messages,
+            api_key=api_key,
+            api_base=api_base,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+        
+        usage = getattr(resp, "usage", None)
+        if usage:
+            prompt_tokens = getattr(usage, "prompt_tokens", 0)
+            completion_tokens = getattr(usage, "completion_tokens", 0)
+            record_tokens(
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+            )
+            log.debug(
+                f"[llm_utils] LLM call successful: "
+                f"{prompt_tokens} prompt + {completion_tokens} completion tokens"
+            )
+        
+        content = resp.choices[0].message.content or ""
+        if not content:
+            log.warning("[llm_utils] LLM returned empty content")
+        
+        return content
+        
+    except Exception as e:
+        error_info = {
+            "model": model,
+            "resolved_model": resolved,
+            "api_base": api_base,
+            "error_type": type(e).__name__,
+            "error_message": str(e),
+        }
+        
+        # Log detailed error for debugging
+        log.error(
+            f"[llm_utils] LLM call failed: {error_info['error_type']}: {error_info['error_message']}\n"
+            f"  Model: {model} → {resolved}\n"
+            f"  API Base: {api_base}\n"
+            f"  Messages: {len(messages)} messages"
+        )
+        
+        # Provide user-friendly error messages
+        error_msg = f"LLM 调用失败: {error_info['error_type']}"
+        
+        # Check for common error patterns
+        error_str = str(e).lower()
+        if "not found" in error_str or "404" in error_str:
+            error_msg += f"\n模型 '{model}' 未找到"
+            if api_base and "ollama" not in resolved:
+                error_msg += f"\n提示: 如果使用 Ollama，请确保 api_base 包含 'ollama' 或使用 localhost:11434"
+        elif "unauthorized" in error_str or "401" in error_str or "403" in error_str:
+            error_msg += "\nAPI 密钥无效或权限不足"
+        elif "connection" in error_str or "timeout" in error_str:
+            error_msg += f"\n无法连接到 API 端点: {api_base or 'default'}"
+        elif "rate limit" in error_str or "429" in error_str:
+            error_msg += "\n请求频率超限，请稍后重试"
+        else:
+            error_msg += f"\n{error_info['error_message']}"
+        
+        # Wrap and re-raise with context
+        raise LLMCallError(error_msg, original_error=e, **error_info) from e
+
+
+class LLMCallError(Exception):
+    """Wrapper for LLM call errors with detailed context."""
+    
+    def __init__(self, message: str, original_error: Exception = None, **context):
+        super().__init__(message)
+        self.original_error = original_error
+        self.context = context
+    
+    def __str__(self):
+        return f"{super().__str__()}"
+    
+    def __repr__(self):
+        return f"LLMCallError({self.args[0]!r}, context={self.context})"

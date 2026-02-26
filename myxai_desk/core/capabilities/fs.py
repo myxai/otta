@@ -18,14 +18,13 @@ from __future__ import annotations
 import os
 import shutil
 import uuid
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from myxai_desk.core.policy.rules.fs import is_safe_path
 from myxai_desk.core.storage.paths import TRASH_DIR, ensure_dir
+from myxai_desk.core.timeutil import local_datetime_str
 
-_LOCAL_TZ = timezone(timedelta(hours=8))
 _BACKUP_SUFFIX = ".myxai_bak"
 
 
@@ -41,7 +40,7 @@ def _new_action_id() -> str:
 
 def _trash_dest(original: Path) -> Path:
     ensure_dir(TRASH_DIR)
-    ts = datetime.now(_LOCAL_TZ).strftime("%Y%m%d_%H%M%S")
+    ts = local_datetime_str()
     unique = uuid.uuid4().hex[:6]
     return TRASH_DIR / f"{ts}_{unique}_{original.name}"
 

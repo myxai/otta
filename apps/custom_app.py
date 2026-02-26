@@ -7,11 +7,9 @@ Execution is 100% delegated to the nanobot agent (same path as chat).
 import json
 import re
 import uuid
-from datetime import datetime, timedelta, timezone
-
-_LOCAL_TZ = timezone(timedelta(hours=8))  # CST
-import contextlib
 from pathlib import Path
+
+from myxai_desk.core.timeutil import local_date_str, local_isoformat, now_local
 
 _BASE_DIR = Path.home() / ".nanobot" / "apps" / "custom"
 _PARAM_RE = re.compile(r"\{\{([^}]+)\}\}")
@@ -114,6 +112,8 @@ _DEFAULT_SUMMARY = {
 }
 
 
+import contextlib
+
 def create_app(
     name: str,
     prompt_template: str,
@@ -138,7 +138,7 @@ def create_app(
         "summary": {**_DEFAULT_SUMMARY, **(summary or {})},
         "security_mode": security_mode,
         "inject_profile": inject_profile,
-        "created_at": datetime.now(_LOCAL_TZ).isoformat(),
+        "created_at": local_isoformat(),
         "last_run": None,
     }
     _save(app)
@@ -238,7 +238,7 @@ def set_last_run(app_id: str, ts: str | None = None):
     app = get_app(app_id)
     if not app:
         return
-    app["last_run"] = ts or datetime.now(_LOCAL_TZ).isoformat()
+    app["last_run"] = ts or local_isoformat()
     _save(app)
 
 
@@ -278,21 +278,25 @@ def build_message(app: dict, param_values: dict) -> str:
 # ── Schedule helpers ────────────────────────────────────────────────
 
 
-def should_trigger(schedule: dict, now: datetime | None = None) -> bool:
+def should_trigger(schedule: dict, now: None = None) -> bool:
     """Check if a schedule should trigger at *now*.
 
     When catchup_policy is NONE (or the SchedulerService is unavailable),
     this falls back to exact-minute matching for backward compatibility.
     Otherwise it delegates to the SchedulerService due-slot computation.
+    
+    Note: now parameter is deprecated, function always uses local time.
     """
+    from datetime import datetime
+    
     if not schedule.get("enabled"):
         return False
     sched_time = schedule.get("time", "")
     if not sched_time:
         return False
 
-    now = now or datetime.now()
-    current_hm = now.strftime("%H:%M")
+    local_now = now_local()
+    current_hm = local_now.strftime("%H:%M")
     if current_hm != sched_time:
         return False
 
@@ -303,11 +307,11 @@ def should_trigger(schedule: dict, now: datetime | None = None) -> bool:
 
     if mode == "weekly":
         dow = schedule.get("day_of_week", 0)
-        return now.weekday() == dow
+        return local_now.weekday() == dow
 
     if mode == "monthly":
         dom = schedule.get("day_of_month", 1)
-        return now.day == dom
+        return local_now.day == dom
 
     if mode == "interval":
         interval = max(1, schedule.get("interval_days", 1))
@@ -316,7 +320,7 @@ def should_trigger(schedule: dict, now: datetime | None = None) -> bool:
             return True
         try:
             last_dt = datetime.fromisoformat(last)
-            delta = (now - last_dt).days
+            delta = (local_now - last_dt).days
             return delta >= interval
         except Exception:
             return True
@@ -374,7 +378,7 @@ def mark_triggered(app_id: str, schedule_key: str = "schedule"):
         else app.get("summary", {}).get("schedule")
     )
     if sched:
-        sched["last_triggered"] = datetime.now(_LOCAL_TZ).isoformat()
+        sched["last_triggered"] = local_isoformat()
     if schedule_key == "schedule":
         app["schedule"] = sched
     else:
@@ -413,8 +417,7 @@ def save_report(app_id: str, content: str, params_used: dict, report_type: str =
     shows as unread again.
     """
     _ensure_dirs(app_id)
-    now = datetime.now(_LOCAL_TZ)
-    date_str = now.strftime("%Y-%m-%d")
+    date_str = local_date_str()
     key = _report_key(date_str, report_type, params_used)
     report = {
         "key": key,
@@ -422,7 +425,7 @@ def save_report(app_id: str, content: str, params_used: dict, report_type: str =
         "type": report_type,
         "content": content,
         "params_used": params_used,
-        "generated_at": now.isoformat(),
+        "generated_at": local_isoformat(),
     }
     (_reports_dir(app_id) / f"{key}.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2),
@@ -528,6 +531,8 @@ def all_unread_counts() -> dict[str, int]:
 def build_summary_prompt(app: dict, max_reports: int = 30) -> str | None:
     """Build a summary prompt from historical reports within configured range.
     Returns None if no reports or summary not configured."""
+    from datetime import timedelta
+    
     summary_cfg = app.get("summary", {})
     if not summary_cfg.get("enabled"):
         return None
@@ -539,7 +544,7 @@ def build_summary_prompt(app: dict, max_reports: int = 30) -> str | None:
     range_days = summary_cfg.get("range_days", 7)
     output_format = summary_cfg.get("output_format", "html")
 
-    cutoff = (datetime.now(_LOCAL_TZ) - timedelta(days=range_days)).strftime("%Y-%m-%d")
+    cutoff = local_date_str(now_local() - timedelta(days=range_days))
 
     all_reports = list_reports(app["id"], report_type="run")
     reports = [r for r in all_reports if r.get("date", "") >= cutoff][:max_reports]

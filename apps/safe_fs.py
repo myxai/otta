@@ -15,10 +15,16 @@ import os
 import shutil
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-_LOCAL_TZ = timezone(timedelta(hours=8))
+try:
+    from myxai_desk.core.timeutil import local_datetime_str
+except ImportError:
+    from datetime import datetime, timedelta, timezone
+    _LOCAL_TZ = timezone(timedelta(hours=8))
+    
+    def local_datetime_str(dt=None, fmt="%Y%m%d_%H%M%S"):
+        return datetime.now(_LOCAL_TZ).strftime(fmt)
 
 try:
     from myxai_desk.core.storage.paths import TRASH_DIR, ensure_dir
@@ -65,7 +71,7 @@ def check_same_drive(src: str | Path, dest: str | Path) -> tuple[bool, str]:
 
 def _trash_dest(original: Path) -> Path:
     ensure_dir(TRASH_DIR)
-    ts = datetime.now(_LOCAL_TZ).strftime("%Y%m%d_%H%M%S")
+    ts = local_datetime_str()
     unique = uuid.uuid4().hex[:6]
     return TRASH_DIR / f"{ts}_{unique}_{original.name}"
 

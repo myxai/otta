@@ -17,7 +17,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
 from flask import (
@@ -31,6 +31,7 @@ from flask import (
 
 import myxai_desk  # noqa: F401
 from myxai_desk.core.storage import paths as _paths  # noqa: F401
+from myxai_desk.core.timeutil import local_date_str
 
 # ---------------------------------------------------------------------------
 # nanobot availability
@@ -2881,7 +2882,7 @@ def api_digest_run():
             if result["status"] == "ok":
                 reg = _load_apps_registry()
                 if "daily_digest" in reg:
-                    reg["daily_digest"]["last_run"] = datetime.now().strftime("%Y-%m-%d")
+                    reg["daily_digest"]["last_run"] = local_date_str()
                     _save_apps_registry(reg)
                 _inc_run_count("daily_digest")
 
@@ -3332,7 +3333,7 @@ def api_email_run():
         if result.get("success"):
             reg = _load_apps_registry()
             if "email_summary" in reg:
-                reg["email_summary"]["last_run"] = datetime.now().strftime("%Y-%m-%d")
+                reg["email_summary"]["last_run"] = local_date_str()
                 _save_apps_registry(reg)
             _push_notification(
                 title="📧 邮件简报已生成",
@@ -4165,9 +4166,10 @@ def api_scheduler_runs(task_id):
 def api_scheduler_status():
     """Quick overview: list all scheduled tasks with next/last info."""
     from myxai_desk.core.scheduler_service import compute_due_slots
+    from myxai_desk.core.timeutil import now_local
 
     tasks = _load_official_tasks() + _load_custom_tasks()
-    now = datetime.now()
+    now = now_local()
     items = []
     for t in tasks:
         due = compute_due_slots(t, now)
@@ -4208,9 +4210,10 @@ def api_scheduler_today():
         get_running_tasks,
         get_today_runs,
     )
+    from myxai_desk.core.timeutil import local_date_str, now_local
 
-    now = datetime.now()
-    today_str = now.strftime("%Y-%m-%d")
+    now = now_local()
+    today_str = local_date_str()
 
     # Collect all task descriptors
     tasks = _load_official_tasks() + _load_custom_tasks()
