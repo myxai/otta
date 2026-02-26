@@ -55,6 +55,12 @@ if not hasattr(flask_app, 'extensions'):
     flask_app.extensions = {}
 
 # ---------------------------------------------------------------------------
+# Register blueprints (新架构路由)
+# ---------------------------------------------------------------------------
+from myxai_desk.web.gateway_routes import bp as gateway_bp
+flask_app.register_blueprint(gateway_bp)
+
+# ---------------------------------------------------------------------------
 # Global state
 # ---------------------------------------------------------------------------
 _async_loop: asyncio.AbstractEventLoop | None = None
@@ -4437,106 +4443,17 @@ def api_cases_stats():
 # ---------------------------------------------------------------------------
 
 
-def _find_nanobot_cmd() -> list[str]:
-    """Locate the nanobot executable; fall back to python -c wrapper."""
-    exe = shutil.which("nanobot")
-    if exe:
-        return [exe, "gateway"]
-    return [
-        sys.executable,
-        "-c",
-        "import sys; sys.argv=['nanobot','gateway']; from nanobot.cli.commands import app; app()",
-    ]
-
-
-def _kill_process_tree(pid: int) -> None:
-    """Force-kill a process and all its children (Windows-safe)."""
-    if sys.platform == "win32":
-        subprocess.run(
-            ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-        )
-    else:
-        import signal
-
-        with contextlib.suppress(ProcessLookupError, PermissionError):
-            os.killpg(os.getpgid(pid), signal.SIGTERM)
-
-
-def _cleanup_gateway() -> None:
-    """If the gateway process has exited, reset the global handle."""
-    global _gateway_process
-    if _gateway_process is not None and _gateway_process.poll() is not None:
-        _gateway_process = None
-
-
-@flask_app.route("/api/gateway/start", methods=["POST"])
-def api_gateway_start():
-    global _gateway_process
-    _cleanup_gateway()
-    if _gateway_process is not None:
-        return jsonify({"error": "网关已在运行"}), 400
-    try:
-        env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
-        cmd = _find_nanobot_cmd()
-        _gateway_process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            env=env,
-            creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-        )
-        return jsonify({"success": True, "pid": _gateway_process.pid})
-    except Exception as e:
-        _gateway_process = None
-        return jsonify({"error": str(e)}), 500
-
-
-@flask_app.route("/api/gateway/stop", methods=["POST"])
-def api_gateway_stop():
-    global _gateway_process
-    if _gateway_process is None:
-        return jsonify({"error": "网关未运行"}), 400
-    pid = _gateway_process.pid
-    _kill_process_tree(pid)
-    with contextlib.suppress(Exception):
-        _gateway_process.wait(timeout=5)
-    _gateway_process = None
-    return jsonify({"success": True})
-
-
-@flask_app.route("/api/gateway/status")
-def api_gateway_status():
-    _cleanup_gateway()
-    running = _gateway_process is not None
-    return jsonify(
-        {
-            "running": running,
-            "pid": _gateway_process.pid if running else None,
-        }
-    )
-
-
-@flask_app.route("/api/gateway/logs")
-def api_gateway_logs():
-    if not (_gateway_process and _gateway_process.stdout):
-        return jsonify({"logs": ""})
-    try:
-        lines = []
-        while _gateway_process.stdout.readable():
-            line = _gateway_process.stdout.readline()
-            if not line:
-                break
-            lines.append(line)
-            if len(lines) > 100:
-                break
-        return jsonify({"logs": "".join(lines)})
-    except Exception:
-        return jsonify({"logs": ""})
+# ---------------------------------------------------------------------------
+# Gateway 辅助函数和路由已迁移到 myxai_desk/web/gateway_routes.py
+# 旧函数定义已删除（PR-1）：
+#   - _find_nanobot_cmd()
+#   - _kill_process_tree()
+#   - _cleanup_gateway()
+#   - api_gateway_start()
+#   - api_gateway_stop()
+#   - api_gateway_status()
+#   - api_gateway_logs()
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------

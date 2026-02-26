@@ -17,6 +17,8 @@ def mark(tag: str):
     Args:
         tag: 标记字符串，格式如 "[NEW] module/endpoint" 或 "[OLD] module/endpoint"
     """
+    # 使用 print 确保输出可见（即使日志级别未配置）
+    print(tag, flush=True)
     log.info(tag)
 
 
