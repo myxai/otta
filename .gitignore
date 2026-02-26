@@ -7,6 +7,7 @@ myxai_desk/__pycache__/
 *.pyd
 docs/
 tests/
+.github/
 
 # Testing
 .pytest_cache/
