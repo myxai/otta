@@ -2,9 +2,12 @@
    MyxAI Desk — Frontend Logic
    =================================================================== */
 
-// ── i18n ──────────────────────────────────────────────────────────────
+// ── Load i18n module ───────────────────────────────────────────────
+// i18n.js will be loaded first via <script> tag in index.html
 
-const I18N = {
+// ── Embedded i18n fallback (used if backend unavailable) ───────────────
+
+const FALLBACK_I18N = {
   zh: {
     "nav.newChat":"新对话","nav.settings":"设置","nav.status":"状态","nav.gateway":"网关",
     "tasks.btn":"任务","tasks.today":"今日任务","tasks.planned":"待执行","tasks.running":"执行中","tasks.success":"已完成","tasks.failed":"失败","tasks.pendingCatchup":"待补偿","tasks.noTasks":"今日无任务","tasks.catchupNote":"补偿","tasks.runNow":"立即执行","tasks.triggered":"已触发执行","tasks.triggerFail":"触发失败",
@@ -386,7 +389,17 @@ function detectLang() {
   return nav.startsWith("zh") ? "zh" : "en";
 }
 
-function t(key) { return (I18N[_lang] && I18N[_lang][key]) || (I18N.zh[key]) || key; }
+// ── i18n ───────────────────────────────────────────────────────────
+// Use t() function provided by i18n.js (loaded in index.html)
+// This is a fallback wrapper in case i18n.js not loaded
+function t(key) { 
+  // If global t() from i18n.js exists, use it
+  if (typeof window.t === 'function' && window.t !== t) {
+    return window.t(key);
+  }
+  // Fallback to embedded messages
+  return (FALLBACK_I18N[_lang] && FALLBACK_I18N[_lang][key]) || (FALLBACK_I18N.zh && FALLBACK_I18N.zh[key]) || key; 
+}
 
 function setLanguage(val) {
   localStorage.setItem("nanobot_lang", val);

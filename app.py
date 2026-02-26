@@ -32,6 +32,7 @@ from flask import (
 import myxai_desk  # noqa: F401
 from myxai_desk.core.storage import paths as _paths  # noqa: F401
 from myxai_desk.core.timeutil import local_date_str
+from myxai_desk.core.i18n import init_i18n
 
 # ---------------------------------------------------------------------------
 # nanobot availability
@@ -50,6 +51,9 @@ except ImportError:
 flask_app = Flask(__name__, static_folder="frontend", static_url_path="/static")
 flask_app.config["JSON_AS_ASCII"] = False
 
+# 初始化 i18n
+flask_app.i18n = init_i18n()
+
 # 初始化 extensions 字典（用于后续状态管理）
 if not hasattr(flask_app, 'extensions'):
     flask_app.extensions = {}
@@ -61,11 +65,15 @@ from myxai_desk.web.gateway_routes import bp as gateway_bp
 from myxai_desk.web.scheduler_routes import bp as scheduler_bp
 from myxai_desk.web.config_routes import bp as config_bp
 from myxai_desk.web.security_routes import bp as security_bp
+from myxai_desk.web.mcp_routes import bp as mcp_bp
+from myxai_desk.web.i18n_routes import bp as i18n_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
 flask_app.register_blueprint(config_bp)
 flask_app.register_blueprint(security_bp)
+flask_app.register_blueprint(mcp_bp)
+flask_app.register_blueprint(i18n_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -167,13 +175,21 @@ def _make_provider(config):
 
 def _reset_agent():
     """Destroy the current agent, properly closing MCP connections."""
+    from myxai_desk.web.state import get_state
+    
     global _agent, _cron_service
+    state = get_state(flask_app)
+    
     if _cron_service is not None:
         _cron_service.stop()
         _cron_service = None
+        state.cron_service = None
+    
     with _agent_lock:
         old = _agent
         _agent = None
+        state.agent = None
+    
     if old and hasattr(old, "_mcp_stack") and old._mcp_stack is not None:
 
         async def _close():
@@ -184,6 +200,7 @@ def _reset_agent():
 
         _ensure_loop()
         asyncio.run_coroutine_threadsafe(_close(), _async_loop)
+    
     with _mcp_log_lock:
         _mcp_log.clear()
 
@@ -207,6 +224,22 @@ def _push_notification(title: str, content: str, level: str = "info"):
 import contextlib
 import re as _re
 
+# ---------------------------------------------------------------------------
+# i18n helper
+# ---------------------------------------------------------------------------
+def _t(key: str, **kwargs) -> str:
+    """Shorthand for translation with lazy initialization."""
+    try:
+        from myxai_desk.core.i18n import get_translator
+        return get_translator().t(key, **kwargs)
+    except:
+        # Fallback if i18n not initialized
+        return key
+
+
+# ---------------------------------------------------------------------------
+# Execution mode detection
+# ---------------------------------------------------------------------------
 _EXEC_TRIGGER = _re.compile(
     r"提醒|定时|闹钟|计划|取消|删除|清除|移除|搜索|查找|查询|"
     r"打开|访问|下载|安装|执行|运行|创建|新建|添加|设置|修改|"
@@ -217,9 +250,6 @@ _FAKE_EXEC = _re.compile(
     r"设置成功|创建成功|删除成功|取消成功|任务已|提醒已|"
     r"Executed tools|Created job|Removed job",
 )
-
-_EXEC_NUDGE = "请通过工具调用来完成这个操作。"
-_EXEC_FALLBACK = "抱歉，本次操作未能通过工具执行。请尝试重新描述您的需求，或新建一个对话重试。"
 
 
 def _is_exec_mode(user_msg: str) -> bool:
@@ -380,10 +410,13 @@ def _try_execute_pending() -> str | None:
         post_execution_audit(pa.capability, pa.op, pa.tool_args, result, None)
         post_execution_undo(pa.capability, pa.op, pa.tool_args, result)
         print(f"[policy] Confirmed via chat → executed {pa.tool_name}")
-        return f"工具: {pa.tool_name}\n参数: {str(pa.tool_args)[:300]}\n结果: {str(result)[:2000]}"
+        return _t("policy.tool_executed", 
+                  tool_name=pa.tool_name,
+                  args=str(pa.tool_args)[:300],
+                  result=str(result)[:2000])
     except Exception as exc:
         print(f"[policy] Pending execution error: {exc}")
-        return f"执行失败: {exc}"
+        return _t("policy.exec_failed", error=str(exc))
 
 
 _TOOLS_FS = {"exec", "read_file", "list_dir", "write_file", "edit_file"}
@@ -646,7 +679,11 @@ def _patch_agent_tool_history(agent):
                         if _decision.action == "DENY":
                             _suggest = _suggest_mode_for_deny(_decision.reason_code)
                             _upgrade_hint = (
-                                f"\n请提示用户将安全模式切换到「{_suggest}」或更高级别即可执行此操作。"
+                                _t("policy.blocked",
+                                   explain=_decision.explain,
+                                   suggest=_suggest,
+                                   mode=_decision.evidence.get('mode', ''),
+                                   code=_decision.reason_code)
                                 if _suggest
                                 else ""
                             )
@@ -706,10 +743,10 @@ def _patch_agent_tool_history(agent):
                             )
                             _path_arg = tc.arguments.get("path", tc.arguments.get("file_path", ""))
                             if _path_arg and not _sbx.is_path_allowed(_path_arg):
-                                result = (
-                                    f"[SANDBOX] 路径 {_path_arg} 不在沙箱工作区内，操作被拒绝。\n"
-                                    f"(risk={_decision.risk}, code={_decision.reason_code})"
-                                )
+                                result = _t("policy.sandbox_deny",
+                                           path=_path_arg,
+                                           risk=_decision.risk,
+                                           code=_decision.reason_code)
                                 _turn_events.append(
                                     {"tool": tc.name, "cap": _cap, "action": "SANDBOX_DENY"}
                                 )
@@ -795,7 +832,7 @@ def _patch_agent_tool_history(agent):
                         nudge_count += 1
                         print("[agent] nudge: fake exec detected, retrying")
                         messages.append({"role": "assistant", "content": text})
-                        messages.append({"role": "user", "content": _EXEC_NUDGE})
+                        messages.append({"role": "user", "content": _t("policy.exec_nudge")})
                         continue
                     final_content = text
                     break
@@ -809,7 +846,7 @@ def _patch_agent_tool_history(agent):
 
         if exec_mode and not tools_used and nudge_count >= max_nudges:
             print(f"[agent] EXEC fallback: {max_nudges} nudges exhausted, no tool calls")
-            final_content = _EXEC_FALLBACK
+            final_content = _t("policy.exec_fallback")
 
         from apps.llm_utils import record_task_usage
 
@@ -1071,6 +1108,13 @@ def _get_or_create_agent():
             f"[cron] service initialized, store={cron.store_path}, jobs={len(cron._store.jobs if cron._store else [])}"
         )
 
+        # 同步到 AppState
+        from myxai_desk.web.state import get_state
+        state = get_state(flask_app)
+        state.agent = _agent
+        state.cron_service = _cron_service
+        state.async_loop = _async_loop
+
         return _agent
 
 
@@ -1109,7 +1153,7 @@ async def _connect_mcp_safe(agent, progress_cb=None):
     total_registered = 0
     for name, cfg in agent._mcp_servers.items():
         if progress_cb:
-            await progress_cb(f"正在连接 MCP: {name} …")
+            await progress_cb(_t("progress.mcp_connecting", name=name))
         try:
             if cfg.command:
                 exe = shutil.which(cfg.command)
@@ -1277,7 +1321,7 @@ def _run_agent_with_prompt(
     from background threads (custom apps, scheduled tasks, etc.).
     """
     if not NANOBOT_AVAILABLE:
-        return {"content": "nanobot 未安装", "tools_used": []}
+        return {"content": _t("error.nanobot_not_installed"), "tools_used": []}
 
     result_holder: dict = {"content": "", "tools_used": []}
     error_holder: list = []
@@ -1316,7 +1360,7 @@ def _run_agent_with_prompt(
 
     if error_holder:
         return {
-            "content": f"执行出错: {error_holder[0]}",
+            "content": _t("policy.exec_failed", error=error_holder[0]),
             "tools_used": result_holder.get("tools_used", []),
         }
     return result_holder
@@ -1367,7 +1411,7 @@ def api_check():
 @flask_app.route("/api/onboard", methods=["POST"])
 def api_onboard():
     if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
+        return jsonify({"error": _t("error.nanobot_not_installed")}), 400
     try:
         from nanobot.config.loader import get_config_path, save_config
         from nanobot.config.schema import Config
@@ -1726,7 +1770,7 @@ def api_search_history():
 @flask_app.route("/api/status")
 def api_status():
     if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
+        return jsonify({"error": _t("error.nanobot_not_installed")}), 400
     try:
         from nanobot.config.loader import get_config_path, load_config
         from nanobot.providers.registry import PROVIDERS
@@ -1816,7 +1860,7 @@ def api_status():
 def api_tools():
     """Return registered tools (for diagnostics)."""
     if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
+        return jsonify({"error": _t("error.nanobot_not_installed")}), 400
     if _agent is None:
         return jsonify({"connected": False, "tools": [], "message": "Agent not yet created"})
     tool_names = list(_agent.tools._tools.keys())
@@ -1837,143 +1881,13 @@ def api_tools():
 # ---------------------------------------------------------------------------
 
 
-@flask_app.route("/api/mcp/test", methods=["POST"])
-def api_mcp_test():
-    """Test MCP server connections without affecting the running agent."""
-    if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
-
-    from nanobot.config.loader import load_config
-
-    config = load_config()
-    servers = config.tools.mcp_servers
-    if not servers:
-        return jsonify({"results": [], "message": "No MCP servers configured"})
-
-    results: list[dict] = []
-
-    async def _test():
-        from contextlib import AsyncExitStack
-
-        from mcp import ClientSession, StdioServerParameters
-        from mcp.client.stdio import stdio_client
-
-        for name, cfg in servers.items():
-            entry = {"name": name, "status": "error", "message": "", "tools": []}
-            try:
-                if cfg.command:
-                    exe = shutil.which(cfg.command)
-                    if not exe:
-                        entry["message"] = f"Command not found in PATH: {cfg.command}"
-                        results.append(entry)
-                        continue
-                    cmd, args = _win_fix_cmd(cfg.command, list(cfg.args))
-                    stack = AsyncExitStack()
-                    await stack.__aenter__()
-                    params = StdioServerParameters(
-                        command=cmd,
-                        args=args,
-                        env=cfg.env or None,
-                    )
-                    read, write = await asyncio.wait_for(
-                        stack.enter_async_context(stdio_client(params)),
-                        timeout=90,
-                    )
-                elif cfg.url:
-                    stack = AsyncExitStack()
-                    await stack.__aenter__()
-                    from mcp.client.streamable_http import streamable_http_client
-
-                    read, write, _ = await asyncio.wait_for(
-                        stack.enter_async_context(streamable_http_client(cfg.url)),
-                        timeout=30,
-                    )
-                else:
-                    entry["message"] = "No command or url"
-                    results.append(entry)
-                    continue
-
-                session = await stack.enter_async_context(ClientSession(read, write))
-                await session.initialize()
-                tools = await session.list_tools()
-                entry["status"] = "ok"
-                entry["tools"] = [t.name for t in tools.tools]
-                entry["message"] = f"{len(tools.tools)} tools available"
-                with contextlib.suppress(Exception):
-                    await stack.aclose()
-            except asyncio.TimeoutError:
-                entry["message"] = "Connection timed out (90s)"
-            except Exception as e:
-                entry["message"] = f"{type(e).__name__}: {e}"
-            results.append(entry)
-
-    _ensure_loop()
-    future = asyncio.run_coroutine_threadsafe(_test(), _async_loop)
-    try:
-        future.result(timeout=180)
-    except Exception as e:
-        return jsonify({"error": f"Test timed out: {e}"}), 500
-
-    return jsonify({"results": results})
-
-
-@flask_app.route("/api/mcp/reconnect", methods=["POST"])
-def api_mcp_reconnect():
-    """Force reconnect MCP servers on the running agent."""
-    if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
-    if _agent is None:
-        return jsonify({"error": "Agent not yet created — send a message first"}), 400
-
-    agent = _agent
-    if agent._mcp_stack is not None:
-
-        async def _close_old():
-            with contextlib.suppress(Exception):
-                await agent._mcp_stack.aclose()
-
-        _ensure_loop()
-        f = asyncio.run_coroutine_threadsafe(_close_old(), _async_loop)
-        with contextlib.suppress(Exception):
-            f.result(timeout=10)
-        agent._mcp_stack = None
-
-    agent._mcp_connected = False
-    for key in list(agent.tools._tools.keys()):
-        if key.startswith("mcp_"):
-            del agent.tools._tools[key]
-
-    with _mcp_log_lock:
-        _mcp_log.clear()
-
-    async def _reconn():
-        await _connect_mcp_safe(agent)
-
-    _ensure_loop()
-    future = asyncio.run_coroutine_threadsafe(_reconn(), _async_loop)
-    try:
-        future.result(timeout=180)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-    mcp_tools = [n for n in agent.tools._tools if n.startswith("mcp_")]
-    with _mcp_log_lock:
-        log_copy = list(_mcp_log)
-    return jsonify(
-        {
-            "success": True,
-            "mcp_tool_count": len(mcp_tools),
-            "mcp_tools": mcp_tools,
-            "mcp_log": log_copy,
-        }
-    )
-
-
-@flask_app.route("/api/mcp/log")
-def api_mcp_log():
-    """Return MCP diagnostic log."""
-    with _mcp_log_lock:
-        return jsonify(list(_mcp_log))
+# ---------------------------------------------------------------------------
+# MCP 路由已迁移到 myxai_desk/web/mcp_routes.py
+# 旧路由定义已删除（PR-6）：
+#   - api_mcp_test()
+#   - api_mcp_reconnect()
+#   - api_mcp_log()
+# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------
@@ -2005,24 +1919,20 @@ def api_notifications_all():
 @flask_app.route("/api/chat", methods=["POST"])
 def api_chat():
     if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
+        return jsonify({"error": _t("error.nanobot_not_installed")}), 400
 
     message = (request.json or {}).get("message", "").strip()
     session_id = (request.json or {}).get(
         "session_id", f"desktop:{_session_epoch}_{_session_counter}"
     )
     if not message:
-        return jsonify({"error": "消息不能为空"}), 400
+        return jsonify({"error": _t("error.message_empty")}), 400
 
     # ── Inline confirmation: execute pending action via chat ──
     if _CONFIRM_RE.match(message):
         _confirmed_result = _try_execute_pending()
         if _confirmed_result is not None:
-            message = (
-                f"[用户已确认，操作已执行，结果如下]\n"
-                f"{_confirmed_result}\n\n"
-                f"请根据以上执行结果，用自然语言向用户汇报。"
-            )
+            message = _t("policy.user_confirmed", result=_confirmed_result)
 
     q: queue.Queue[str] = queue.Queue()
 
@@ -2059,7 +1969,7 @@ def api_chat():
                     json.dumps(
                         {
                             "type": "progress",
-                            "content": f"⚠️ MCP 工具连接失败: {hint}",
+                            "content": _t("notification.mcp_failed", hint=hint),
                             "request_id": request_id,
                         },
                         ensure_ascii=False,
@@ -2102,7 +2012,7 @@ def api_chat():
                 if parsed.get("type") in ("done", "error"):
                     break
             except queue.Empty:
-                yield f"data: {json.dumps({'type': 'error', 'content': '请求超时'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': _t('error.request_timeout')})}\n\n"
                 break
 
     return Response(
@@ -2261,10 +2171,10 @@ _digest_task_status: dict = {}  # {"status": "idle"|"running"|"done"|"error", ..
 _APP_CATALOG = {
     "daily_digest": {
         "id": "daily_digest",
-        "name": "每日私享",
+        "name": _t("app.daily_digest.name"),
         "name_en": "Daily Briefing",
         "icon": "🎯",
-        "description": "你的私人资讯策展人——基于浏览和对话，每天精选最值得关注的内容，支持深入探索",
+        "description": _t("app.daily_digest.desc"),
         "description_en": "Your personal curator — daily picks based on your interests, with deep-dive exploration",
         "version": "2.0.0",
         "author": "nanobot",
@@ -2273,10 +2183,10 @@ _APP_CATALOG = {
     },
     "email_summary": {
         "id": "email_summary",
-        "name": "邮件简报",
+        "name": _t("app.email_summary.name"),
         "name_en": "Email Briefing",
         "icon": "📧",
-        "description": "连接邮箱，AI 分类归纳生成每日邮件简报",
+        "description": _t("app.email_summary.desc"),
         "description_en": "Connect your inbox, AI categorises and summarises into a daily briefing",
         "version": "1.0.0",
         "author": "nanobot",
@@ -2421,10 +2331,10 @@ def api_app_install(app_id):
         return jsonify({"error": decision["reason"]}), 403
 
     if app_id not in _APP_CATALOG:
-        return jsonify({"error": "应用不存在"}), 404
+        return jsonify({"error": _t("error.app_not_found")}), 404
     registry = _load_apps_registry()
     if app_id in registry:
-        return jsonify({"error": "应用已安装"}), 400
+        return jsonify({"error": _t("error.app_already_installed")}), 400
     default_configs = {
         "daily_digest": _DEFAULT_DIGEST_CONFIG,
         "email_summary": _DEFAULT_EMAIL_CONFIG,
@@ -2459,7 +2369,7 @@ def api_app_uninstall(app_id):
 
     registry = _load_apps_registry()
     if app_id not in registry:
-        return jsonify({"error": "应用未安装"}), 404
+        return jsonify({"error": _t("error.app_not_installed")}), 404
     del registry[app_id]
     _save_apps_registry(registry)
     try:
@@ -2486,7 +2396,7 @@ def api_app_enable(app_id):
 
     registry = _load_apps_registry()
     if app_id not in registry:
-        return jsonify({"error": "应用未安装"}), 404
+        return jsonify({"error": _t("error.app_not_installed")}), 404
     registry[app_id]["enabled"] = True
     _save_apps_registry(registry)
     try:
@@ -2513,7 +2423,7 @@ def api_app_disable(app_id):
 
     registry = _load_apps_registry()
     if app_id not in registry:
-        return jsonify({"error": "应用未安装"}), 404
+        return jsonify({"error": _t("error.app_not_installed")}), 404
     registry[app_id]["enabled"] = False
     _save_apps_registry(registry)
     try:
@@ -2554,7 +2464,7 @@ def api_app_record_run(app_id):
 def api_app_get_config(app_id):
     registry = _load_apps_registry()
     if app_id not in registry:
-        return jsonify({"error": "应用未安装"}), 404
+        return jsonify({"error": _t("error.app_not_installed")}), 404
     return jsonify(registry[app_id].get("config", {}))
 
 
@@ -2568,7 +2478,7 @@ def api_app_save_config(app_id):
 
     registry = _load_apps_registry()
     if app_id not in registry:
-        return jsonify({"error": "应用未安装"}), 404
+        return jsonify({"error": _t("error.app_not_installed")}), 404
     new_config = request.json or {}
     registry[app_id]["config"] = new_config
     _save_apps_registry(registry)
@@ -2597,12 +2507,12 @@ def api_digest_run():
 
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "每日私享未安装"}), 400
+        return jsonify({"error": _t("error.app_not_installed")}), 400
 
     with _digest_task_lock:
         if _digest_task_status.get("status") == "running":
-            return jsonify({"error": "日报正在生成中，请稍候"}), 409
-        _digest_task_status.update({"status": "running", "progress": "正在采集浏览器历史…"})
+            return jsonify({"error": _t("error.task_running", task=_t("app.daily_digest.name"))}), 409
+        _digest_task_status.update({"status": "running", "progress": _t("progress.collecting_history")})
 
     def _run():
         try:
@@ -2627,11 +2537,10 @@ def api_digest_run():
 
                 stats = result.get("stats", {})
                 _push_notification(
-                    title="🎯 每日私享已更新",
-                    content=(
-                        f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
-                        f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
-                    ),
+                    title=_t("notification.daily_digest.updated"),
+                    content=_t("notification.daily_digest.content",
+                              filtered=stats.get('filtered_count', 0),
+                              results=stats.get('search_results', 0)),
                     level="info",
                 )
 
@@ -2680,7 +2589,7 @@ def api_digest_report(date_str):
 
     report = load_report(date_str)
     if not report:
-        return jsonify({"error": "报告不存在"}), 404
+        return jsonify({"error": _t("error.report_not_found")}), 404
     return jsonify(report)
 
 
@@ -2699,7 +2608,7 @@ def api_digest_preview():
     """
     registry = _load_apps_registry()
     if "daily_digest" not in registry:
-        return jsonify({"error": "每日私享未安装"}), 400
+        return jsonify({"error": _t("error.app_not_installed")}), 400
 
     from apps.daily_digest import (
         classify_interests,
@@ -2811,7 +2720,7 @@ def _html_to_summary(html: str, max_len: int = 60) -> str:
     for prefix in ("📅", "📧", "🎯"):
         text = text.lstrip(prefix).strip()
     text = _re.sub(r"^\d{4}-\d{2}-\d{2}\s*", "", text).strip()
-    for skip in ("每日私享", "每日资讯", "Daily"):
+    for skip in (_t("app.daily_digest.name"), "每日资讯", "Daily"):
         if text.startswith(skip):
             text = text[len(skip) :].strip()
     return text[:max_len] if text else ""
@@ -2839,7 +2748,7 @@ def api_all_reports():
             result.append(
                 {
                     "app_id": "daily_digest",
-                    "app_name": "每日私享",
+                    "app_name": _t("app.daily_digest.name"),
                     "app_icon": "🎯",
                     "date": date,
                     "generated_at": r.get("generated_at", ""),
@@ -2862,7 +2771,7 @@ def api_all_reports():
             summary = ""
             email_count = r.get("email_count", 0)
             if email_count:
-                summary = f"{email_count} 封邮件简报"
+                summary = _t("notification.email_summary.content", count=email_count)
             else:
                 try:
                     rpt = email_get(date)
@@ -2873,7 +2782,7 @@ def api_all_reports():
             result.append(
                 {
                     "app_id": "email_summary",
-                    "app_name": "邮件简报",
+                    "app_name": _t("app.email_summary.name"),
                     "app_icon": "📧",
                     "date": date,
                     "generated_at": r.get("generated_at", ""),
@@ -3059,12 +2968,12 @@ def api_email_run():
 
     registry = _load_apps_registry()
     if "email_summary" not in registry:
-        return jsonify({"error": "邮件简报应用未安装"}), 400
+        return jsonify({"error": _t("error.app_not_installed")}), 400
     from apps.email_summary import run_email_summary
 
     app_config = registry["email_summary"].get("config", {})
     if not app_config.get("imap_host") or not app_config.get("imap_user"):
-        return jsonify({"error": "请先配置 IMAP 邮箱信息"}), 400
+        return jsonify({"error": _t("error.imap_not_configured")}), 400
     model_cfg = _get_model_config()
 
     def _run():
@@ -3075,8 +2984,8 @@ def api_email_run():
                 reg["email_summary"]["last_run"] = local_date_str()
                 _save_apps_registry(reg)
             _push_notification(
-                title="📧 邮件简报已生成",
-                content=f"汇总了 {result.get('email_count', 0)} 封邮件",
+                title=_t("notification.email_summary.generated"),
+                content=_t("notification.email_summary.content", count=result.get('email_count', 0)),
                 level="info",
             )
 
@@ -3104,7 +3013,7 @@ def api_email_report(date_str):
 
     report = get_report(date_str)
     if not report:
-        return jsonify({"error": "报告不存在"}), 404
+        return jsonify({"error": _t("error.report_not_found")}), 404
     return jsonify(report)
 
 
@@ -3112,7 +3021,7 @@ def api_email_report(date_str):
 def api_email_test():
     registry = _load_apps_registry()
     if "email_summary" not in registry:
-        return jsonify({"error": "邮件简报应用未安装"}), 400
+        return jsonify({"error": _t("error.app_not_installed")}), 400
     from apps.email_summary import test_connection
 
     app_config = registry["email_summary"].get("config", {})
@@ -3150,7 +3059,7 @@ def api_custom_create():
     name = body.get("name", "").strip()
     prompt_template = body.get("prompt_template", "").strip()
     if not name or not prompt_template:
-        return jsonify({"error": "名称和任务描述不能为空"}), 400
+        return jsonify({"error": _t("error.field_required", field="name and prompt_template")}), 400
     from apps.custom_app import create_app
 
     app = create_app(
@@ -3201,7 +3110,7 @@ def api_custom_get(app_id):
 
     app = get_app(app_id)
     if not app:
-        return jsonify({"error": "应用不存在"}), 404
+        return jsonify({"error": _t("error.app_not_found")}), 404
     return jsonify(app)
 
 
@@ -3218,7 +3127,7 @@ def api_custom_update(app_id):
 
     app = update_app(app_id, **body)
     if not app:
-        return jsonify({"error": "应用不存在"}), 404
+        return jsonify({"error": _t("error.app_not_found")}), 404
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
 
@@ -3256,7 +3165,7 @@ def api_custom_delete(app_id):
         except Exception:
             pass
         return jsonify({"success": True})
-    return jsonify({"error": "应用不存在"}), 404
+    return jsonify({"error": _t("error.app_not_found")}), 404
 
 
 @flask_app.route("/api/apps/custom/<app_id>/run", methods=["POST"])
@@ -3271,11 +3180,11 @@ def api_custom_run(app_id):
     from apps.custom_app import build_message, get_app, save_report, set_last_run
 
     if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
+        return jsonify({"error": _t("error.nanobot_not_installed")}), 400
 
     app = get_app(app_id)
     if not app:
-        return jsonify({"error": "应用不存在"}), 404
+        return jsonify({"error": _t("error.app_not_found")}), 404
 
     body = request.json or {}
     param_groups = body.get("param_groups", None)
@@ -3393,7 +3302,7 @@ def api_custom_run(app_id):
                 if parsed.get("type") in ("done", "error"):
                     break
             except queue.Empty:
-                yield f"data: {json.dumps({'type': 'error', 'content': '请求超时'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': _t('error.request_timeout')})}\n\n"
                 break
 
     return Response(
@@ -3416,7 +3325,7 @@ def api_custom_report(app_id, key):
 
     report = get_report(app_id, key)
     if not report:
-        return jsonify({"error": "报告不存在"}), 404
+        return jsonify({"error": _t("error.report_not_found")}), 404
     mark_report_read(app_id, key)
     return jsonify(report)
 
@@ -3427,7 +3336,7 @@ def api_custom_report_delete(app_id, key):
 
     if delete_report(app_id, key):
         return jsonify({"success": True})
-    return jsonify({"error": "报告不存在"}), 404
+    return jsonify({"error": _t("error.report_not_found")}), 404
 
 
 @flask_app.route("/api/apps/custom/<app_id>/summary", methods=["POST"])
@@ -3437,15 +3346,15 @@ def api_custom_summary(app_id):
 
     app = get_app(app_id)
     if not app:
-        return jsonify({"error": "应用不存在"}), 404
+        return jsonify({"error": _t("error.app_not_found")}), 404
 
     prompt = build_summary_prompt(app)
     if not prompt:
-        return jsonify({"error": "无历史报告可用于总结"}), 400
+        return jsonify({"error": _t("error.app_no_prompt")}), 400
 
     mcfg = _get_model_config()
     if not mcfg.get("model") or not mcfg.get("api_key"):
-        return jsonify({"error": "未配置 LLM（请先在设置中填写 API Key）"}), 400
+        return jsonify({"error": _t("error.llm_not_configured")}), 400
 
     q: queue.Queue[str] = queue.Queue()
 
@@ -3453,7 +3362,7 @@ def api_custom_summary(app_id):
         try:
             q.put(
                 json.dumps(
-                    {"type": "progress", "content": "正在调用 LLM 生成总结…"}, ensure_ascii=False
+                    {"type": "progress", "content": _t("progress.generating_summary")}, ensure_ascii=False
                 )
             )
             import os
@@ -3523,7 +3432,7 @@ def api_custom_summary(app_id):
                 if parsed.get("type") in ("done", "error"):
                     break
             except queue.Empty:
-                yield f"data: {json.dumps({'type': 'error', 'content': '请求超时'})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': _t('error.request_timeout')})}\n\n"
                 break
 
     return Response(
@@ -3652,7 +3561,7 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
     _d_in = _snap_after["input"] - _snap_before["input"]
     _d_out = _snap_after["output"] - _snap_before["output"]
     _d_search = result.get("stats", {}).get("search_results", 0)
-    record_task_usage("app_每日私享", _d_in, _d_out, min(_d_search, 1) if _d_search else 0)
+    record_task_usage(f"app_{_t('app.daily_digest.name')}", _d_in, _d_out, min(_d_search, 1) if _d_search else 0)
     if result["status"] == "ok":
         today = slot.scheduled_for.strftime("%Y-%m-%d")
         registry = _load_apps_registry()
@@ -3662,13 +3571,12 @@ def _exec_daily_digest(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) 
         stats = result.get("stats", {})
         catchup_note = ""
         if trigger in ("startup", "resume"):
-            catchup_note = f"（补偿执行，原定 {sched_for}）"
+            catchup_note = _t("notification.daily_digest.catchup", scheduled=sched_for)
         _push_notification(
-            title=f"🎯 每日私享已更新{catchup_note}",
-            content=(
-                f"分析 {stats.get('filtered_count', 0)} 条浏览记录，"
-                f"搜索 {stats.get('search_results', 0)} 条推荐内容。"
-            ),
+            title=_t("notification.daily_digest.updated") + catchup_note,
+            content=_t("notification.daily_digest.content",
+                      filtered=stats.get('filtered_count', 0),
+                      results=stats.get('search_results', 0)),
             level="info",
         )
     else:
@@ -3695,7 +3603,7 @@ def _exec_email_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str)
     _snap_after = snapshot_today_tokens()
     _d_in = _snap_after["input"] - _snap_before["input"]
     _d_out = _snap_after["output"] - _snap_before["output"]
-    record_task_usage("app_邮件简报", _d_in, _d_out, 0)
+    record_task_usage(f"app_{_t('app.email_summary.name')}", _d_in, _d_out, 0)
     if result.get("success"):
         today = slot.scheduled_for.strftime("%Y-%m-%d")
         registry = _load_apps_registry()
@@ -3704,10 +3612,10 @@ def _exec_email_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str)
             _save_apps_registry(registry)
         catchup_note = ""
         if trigger in ("startup", "resume"):
-            catchup_note = f"（补偿执行，原定 {sched_for}）"
+            catchup_note = _t("notification.email_summary.catchup", scheduled=sched_for)
         _push_notification(
-            title=f"📧 邮件简报已生成{catchup_note}",
-            content=f"汇总了 {result.get('email_count', 0)} 封邮件",
+            title=_t("notification.email_summary.generated") + catchup_note,
+            content=_t("notification.email_summary.content", count=result.get('email_count', 0)),
             level="info",
         )
     else:
@@ -3763,10 +3671,12 @@ def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) ->
         finish_app_run(capp_id, success=True)
         catchup_note = ""
         if trigger in ("startup", "resume"):
-            catchup_note = f"（补偿执行，原定 {sched_for}）"
+            catchup_note = _t("notification.daily_digest.catchup", scheduled=sched_for)
         _push_notification(
-            title=f"{capp.get('icon', '🤖')} {capp['name']}{catchup_note}",
-            content=f"定时执行完成（{len(groups)} 组）",
+            title=_t("notification.custom_app.completed",
+                    icon=capp.get('icon', '🤖'),
+                    name=capp['name']) + catchup_note,
+            content=_t("notification.custom_app.content", groups=len(groups)),
             level="info",
         )
     except Exception as exc:
@@ -3834,8 +3744,8 @@ def _exec_custom_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str
     save_report(capp_id, content=content, params_used={}, report_type="summary")
     mark_triggered(capp_id, "summary")
     _push_notification(
-        title=f"📊 {capp['name']} 总结",
-        content="总结报告已生成",
+        title=_t("notification.custom_app.summary", name=capp['name']),
+        content=_t("notification.custom_app.summary_content"),
         level="info",
     )
 
@@ -3905,7 +3815,7 @@ def api_feedback():
     body = request.json or {}
     rating = body.get("rating")
     if rating not in ("like", "dislike"):
-        return jsonify({"error": "rating 必须为 like 或 dislike"}), 400
+        return jsonify({"error": _t("error.field_required", field="rating (like/dislike)")}), 400
 
     case = {
         "ts": datetime.now(timezone.utc).isoformat(),
