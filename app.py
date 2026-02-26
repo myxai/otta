@@ -59,9 +59,11 @@ if not hasattr(flask_app, 'extensions'):
 # ---------------------------------------------------------------------------
 from myxai_desk.web.gateway_routes import bp as gateway_bp
 from myxai_desk.web.scheduler_routes import bp as scheduler_bp
+from myxai_desk.web.config_routes import bp as config_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
+flask_app.register_blueprint(config_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -1382,42 +1384,12 @@ def api_onboard():
 
 
 # ---------------------------------------------------------------------------
-# Routes — config
+# Config 路由已迁移到 myxai_desk/web/config_routes.py
+# 配置服务已抽取到 myxai_desk/core/config_service.py
+# 旧路由定义已删除（PR-3）：
+#   - api_get_config()
+#   - api_save_config()
 # ---------------------------------------------------------------------------
-
-
-@flask_app.route("/api/config")
-def api_get_config():
-    if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
-    try:
-        from nanobot.config.loader import get_config_path
-
-        cp = get_config_path()
-        if not cp.exists():
-            return jsonify({"error": "配置文件不存在，请先初始化"}), 404
-        with open(cp, encoding="utf-8") as f:
-            cfg = json.load(f)
-        return jsonify(cfg)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@flask_app.route("/api/config", methods=["POST"])
-def api_save_config():
-    if not NANOBOT_AVAILABLE:
-        return jsonify({"error": "nanobot 未安装"}), 400
-    try:
-        from nanobot.config.loader import get_config_path
-
-        cp = get_config_path()
-        data = request.json
-        with open(cp, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-        _reset_agent()
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 # ---------------------------------------------------------------------------
