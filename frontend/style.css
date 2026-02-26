@@ -877,6 +877,32 @@ a:hover { text-decoration: underline; }
 .exec-step:last-child { border-bottom: none; }
 .exec-progress-wrap .message-body { width: 100%; }
 
+/* Tool call step styling */
+.tc-name {
+  font-weight: 600;
+  color: var(--accent);
+  font-size: 12px;
+  display: inline-block;
+  margin-bottom: 2px;
+}
+.tc-args {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 11px;
+  padding: 4px 8px;
+  margin-top: 2px;
+  background: var(--bg-surface0);
+  border-radius: 4px;
+  line-height: 1.6;
+  word-break: break-all;
+}
+.tc-arg-key {
+  color: var(--accent-alt, #7c8fd4);
+  font-weight: 500;
+}
+.tc-arg-val {
+  color: var(--text-dim);
+}
+
 /* Thinking indicator */
 .thinking-dots {
   display: inline-flex;
@@ -1566,6 +1592,81 @@ a:hover { text-decoration: underline; }
 }
 .badge-ok { background: rgba(166,227,161,.15); color: var(--green); }
 .badge-off { background: rgba(108,112,134,.15); color: var(--text-dim); }
+
+/* ── System Monitor Panel ──────────────────────────────────────────── */
+.system-monitor {
+  background: linear-gradient(135deg, var(--bg-mantle) 0%, var(--bg-surface0) 100%);
+}
+.monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 16px;
+  margin-top: 12px;
+}
+.monitor-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.monitor-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.monitor-value {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.monitor-bar-bg {
+  flex: 1;
+  height: 24px;
+  background: var(--bg-surface0);
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+.monitor-bar {
+  height: 100%;
+  border-radius: 12px;
+  transition: width 0.5s ease, background-color 0.3s ease;
+  position: relative;
+}
+.monitor-bar.low {
+  background: linear-gradient(90deg, var(--green) 0%, rgba(166,227,161,0.7) 100%);
+}
+.monitor-bar.medium {
+  background: linear-gradient(90deg, var(--yellow) 0%, rgba(249,226,175,0.7) 100%);
+}
+.monitor-bar.high {
+  background: linear-gradient(90deg, var(--red) 0%, rgba(243,139,168,0.7) 100%);
+}
+.monitor-percent {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 100px;
+  text-align: right;
+}
+.monitor-net-value {
+  display: flex;
+  gap: 24px;
+  padding: 6px 0;
+}
+.monitor-net-item {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.monitor-net-item span {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Gateway settings row ──────────────────────────────────────────── */
 .gateway-settings-row {

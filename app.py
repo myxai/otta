@@ -722,7 +722,8 @@ def _patch_agent_tool_history(agent):
                 if response.has_tool_calls:
                     if progress:
                         clean = self._strip_think(response.content)
-                        await progress(clean or self._tool_hint(response.tool_calls))
+                        if clean:
+                            await progress(clean)
 
                     tc_dicts = [
                         {
@@ -897,6 +898,12 @@ def _patch_agent_tool_history(agent):
                                 {"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True}
                             )
 
+                        if progress:
+                            await progress(_json.dumps({
+                                "__tool_call__": True,
+                                "name": tc.name,
+                                "arguments": tc.arguments,
+                            }, ensure_ascii=False))
                         print(f"[agent] result: {str(result)[:100]}")
                         messages = self.context.add_tool_result(
                             messages,
@@ -1755,22 +1762,29 @@ def api_status():
         from nanobot.providers.registry import PROVIDERS
 
         from myxai_desk.core.scheduler_service import get_scheduler_health
-        from myxai_desk.core.system_info import get_system_info
+        from myxai_desk.core.system_info import get_system_monitor
 
         cp = get_config_path()
         config = load_config()
         workspace = config.workspace_path
 
+        from myxai_desk.core.storage import secrets as _sec
         providers = []
         for spec in PROVIDERS:
             p = getattr(config.providers, spec.name, None)
             if p is None:
                 continue
+            is_oauth = getattr(spec, "is_oauth", False)
+            api_key = p.api_key or ""
+            # If stored as keyring ref, check whether real key exists
+            if api_key == _sec.SECRET_REF:
+                api_key = _sec.retrieve_provider_key(spec.name) or ""
+            if not api_key and not is_oauth:
+                continue
             providers.append(
                 {
                     "name": spec.name,
                     "label": getattr(spec, "display_name", spec.name),
-                    "configured": bool(p.api_key) or getattr(spec, "is_oauth", False),
                 }
             )
 
@@ -1787,8 +1801,9 @@ def api_status():
             "qq",
         ):
             ch = getattr(config.channels, name, None)
-            if ch:
-                channels.append({"name": name, "enabled": ch.enabled})
+            # Only include channels that are explicitly enabled
+            if ch and ch.enabled:
+                channels.append({"name": name})
 
         mcp_status = []
         for name, srv in config.tools.mcp_servers.items():
@@ -1816,8 +1831,8 @@ def api_status():
         # Include scheduler health
         scheduler_health = get_scheduler_health()
         
-        # Include system information
-        system_info = get_system_info()
+        # Include system monitoring data
+        system_monitor = get_system_monitor()
 
         return jsonify(
             {
@@ -1834,12 +1849,19 @@ def api_status():
                 "mcp_tool_names": mcp_tool_names,
                 "mcp_log": mcp_log_copy,
                 "scheduler": scheduler_health,
-                "system": system_info,
+                "monitor": system_monitor,
             }
         )
     except Exception as e:
         log.exception("[api] agent status query failed")
         return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/monitor")
+def api_monitor():
+    """Lightweight endpoint for real-time system monitoring (CPU/Memory/Disk/Network)."""
+    from myxai_desk.core.system_info import get_system_monitor
+    return jsonify(get_system_monitor())
 
 
 # ---------------------------------------------------------------------------

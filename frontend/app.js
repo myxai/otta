@@ -688,7 +688,12 @@ function switchPage(page) {
   });
   if (page === "settings") { loadConfig(); _syncGwSettings(); loadDeskSettings(); switchSettingsTab(_lastSettingsTab || "general"); }
   if (page === "stats") { loadTokenChart(_statsTimeRange); loadSearchChart(_statsTimeRange); loadCategoryCharts(_statsTimeRange); }
-  if (page === "status") loadStatus();
+  if (page === "status") {
+    loadStatus();
+    startStatusAutoRefresh();
+  } else {
+    stopStatusAutoRefresh();
+  }
   if (page === "gateway") loadGatewayStatus();
   if (page === "apps") loadApps();
   if (page === "reports") loadReportsPage();
@@ -936,12 +941,19 @@ function _startBackgroundChat(msgSessionId, text, thinkingId) {
           try {
             const data = JSON.parse(line.slice(6));
             if (data.type === "progress") {
+              let stepItem = data.content;
+              try {
+                const parsed = JSON.parse(data.content);
+                if (parsed && parsed.__tool_call__) {
+                  stepItem = { tool: parsed.name, args: parsed.arguments };
+                }
+              } catch (_e) { /* plain text step */ }
               if (isActive()) {
                 if (!progressBlockId) { removeElement(thinkingId); progressBlockId = appendProgressBlock(); }
-                progressSteps.push(data.content);
-                addProgressStep(progressBlockId, data.content);
+                progressSteps.push(stepItem);
+                addProgressStep(progressBlockId, stepItem);
               } else {
-                progressSteps.push(data.content);
+                progressSteps.push(stepItem);
               }
             } else if (data.type === "done") {
               finalContent = data.content;
@@ -1206,10 +1218,31 @@ function addProgressStep(blockId, content) {
   if (!steps) return;
   const step = document.createElement("div");
   step.className = "exec-step";
-  step.textContent = content;
+  if (content && typeof content === "object" && content.tool) {
+    step.innerHTML = _renderToolCallStep(content);
+  } else {
+    step.textContent = content;
+  }
   steps.appendChild(step);
   const container = document.getElementById("chat-messages");
   if (container) container.scrollTop = container.scrollHeight;
+}
+
+function _renderToolCallStep(tc) {
+  const name = escapeHtml(tc.tool);
+  let argsHtml = "";
+  if (tc.args && typeof tc.args === "object") {
+    const entries = Object.entries(tc.args);
+    if (entries.length) {
+      const parts = entries.map(([k, v]) => {
+        const val = typeof v === "string" ? v : JSON.stringify(v, null, 2);
+        const truncated = val.length > 300 ? val.slice(0, 300) + "…" : val;
+        return `<span class="tc-arg-key">${escapeHtml(k)}</span>: <span class="tc-arg-val">${escapeHtml(truncated)}</span>`;
+      });
+      argsHtml = `<div class="tc-args">${parts.join("<br>")}</div>`;
+    }
+  }
+  return `<span class="tc-name">🔧 ${name}</span>${argsHtml}`;
 }
 
 function closeProgressBlock(blockId, stepCount, audit) {
@@ -1230,9 +1263,15 @@ function renderProgressDetails(steps, open, audit) {
   const icon = open ? "⏳" : "✅";
   let label = open ? (t("chat.executing") || "执行中…") : (t("chat.execDone") || "执行完成") + ` (${steps.length} ${t("chat.steps") || "步"})`;
   if (!open && audit && audit.fingerprint) label += ` · fp:${audit.fingerprint}`;
+  const stepsHtml = steps.map(s => {
+    if (s && typeof s === "object" && s.tool) {
+      return `<div class="exec-step">${_renderToolCallStep(s)}</div>`;
+    }
+    return `<div class="exec-step">${escapeHtml(s)}</div>`;
+  }).join("");
   return `<details class="exec-details"${open ? " open" : ""}>
     <summary class="exec-summary"><span class="exec-summary-icon">${icon}</span> <span class="exec-summary-text">${label}</span></summary>
-    <div class="exec-steps">${steps.map(s => `<div class="exec-step">${escapeHtml(s)}</div>`).join("")}</div>
+    <div class="exec-steps">${stepsHtml}</div>
   </details>`;
 }
 
@@ -1744,6 +1783,92 @@ async function _syncGwSettings() {
 
 // ── Status ────────────────────────────────────────────────────────────
 
+let _monitorPrev = null;  // previous network sample for speed calc
+
+function _monitorBarClass(pct, highAt) { return pct > highAt ? 'high' : pct > 50 ? 'medium' : 'low'; }
+
+function _formatSpeed(bytesPerSec) {
+  if (bytesPerSec >= 1048576) return (bytesPerSec / 1048576).toFixed(1) + ' MB/s';
+  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(1) + ' KB/s';
+  return bytesPerSec.toFixed(0) + ' B/s';
+}
+
+function _buildMonitorHtml(mon) {
+  const upSpeed = mon._upSpeed !== undefined ? _formatSpeed(mon._upSpeed) : '—';
+  const downSpeed = mon._downSpeed !== undefined ? _formatSpeed(mon._downSpeed) : '—';
+  return `<div class="status-card system-monitor" id="monitor-panel" style="grid-column: 1 / -1">
+    <h3>💻 ${t("system.info")}</h3>
+    <div class="monitor-grid">
+      <div class="monitor-item">
+        <div class="monitor-label">${t("system.cpu")}</div>
+        <div class="monitor-value">
+          <div class="monitor-bar-bg"><div class="monitor-bar ${_monitorBarClass(mon.cpu_percent, 80)}" id="mon-cpu-bar" style="width:${mon.cpu_percent}%"></div></div>
+          <span class="monitor-percent" id="mon-cpu-text">${mon.cpu_percent.toFixed(1)}%</span>
+        </div>
+      </div>
+      <div class="monitor-item">
+        <div class="monitor-label">${t("system.memory")}</div>
+        <div class="monitor-value">
+          <div class="monitor-bar-bg"><div class="monitor-bar ${_monitorBarClass(mon.memory.percent, 80)}" id="mon-mem-bar" style="width:${mon.memory.percent}%"></div></div>
+          <span class="monitor-percent" id="mon-mem-text">${mon.memory.percent.toFixed(1)}% (${mon.memory.used_gb.toFixed(1)}/${mon.memory.total_gb.toFixed(1)} GB)</span>
+        </div>
+      </div>
+      <div class="monitor-item">
+        <div class="monitor-label">${t("system.disk")}</div>
+        <div class="monitor-value">
+          <div class="monitor-bar-bg"><div class="monitor-bar ${_monitorBarClass(mon.disk.percent, 85)}" id="mon-disk-bar" style="width:${mon.disk.percent}%"></div></div>
+          <span class="monitor-percent" id="mon-disk-text">${mon.disk.percent.toFixed(1)}% (${mon.disk.used_gb.toFixed(1)}/${mon.disk.total_gb.toFixed(1)} GB)</span>
+        </div>
+      </div>
+      <div class="monitor-item">
+        <div class="monitor-label">${t("system.network")}</div>
+        <div class="monitor-value monitor-net-value" id="mon-net-box">
+          <span class="monitor-net-item">↑ <span id="mon-net-up">${upSpeed}</span></span>
+          <span class="monitor-net-item">↓ <span id="mon-net-down">${downSpeed}</span></span>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function _updateMonitorDom(mon) {
+  const bar = (id, pct, highAt) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.style.width = pct + '%';
+    el.className = 'monitor-bar ' + _monitorBarClass(pct, highAt);
+  };
+  const txt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+
+  bar('mon-cpu-bar', mon.cpu_percent, 80);
+  txt('mon-cpu-text', mon.cpu_percent.toFixed(1) + '%');
+
+  bar('mon-mem-bar', mon.memory.percent, 80);
+  txt('mon-mem-text', `${mon.memory.percent.toFixed(1)}% (${mon.memory.used_gb.toFixed(1)}/${mon.memory.total_gb.toFixed(1)} GB)`);
+
+  bar('mon-disk-bar', mon.disk.percent, 85);
+  txt('mon-disk-text', `${mon.disk.percent.toFixed(1)}% (${mon.disk.used_gb.toFixed(1)}/${mon.disk.total_gb.toFixed(1)} GB)`);
+
+  if (mon._upSpeed !== undefined) {
+    txt('mon-net-up', _formatSpeed(mon._upSpeed));
+    txt('mon-net-down', _formatSpeed(mon._downSpeed));
+  }
+}
+
+function _calcNetSpeed(mon) {
+  if (!mon.network) return;
+  const now = Date.now();
+  if (_monitorPrev && _monitorPrev.network) {
+    const dt = (now - _monitorPrev._ts) / 1000;
+    if (dt > 0) {
+      mon._upSpeed = Math.max(0, (mon.network.bytes_sent - _monitorPrev.network.bytes_sent) / dt);
+      mon._downSpeed = Math.max(0, (mon.network.bytes_recv - _monitorPrev.network.bytes_recv) / dt);
+    }
+  }
+  mon._ts = now;
+  _monitorPrev = mon;
+}
+
 async function loadStatus() {
   const grid = document.getElementById("status-grid");
   grid.innerHTML = `<div class="status-card"><div class="status-label">${t("status.loading")}</div></div>`;
@@ -1753,29 +1878,42 @@ async function loadStatus() {
     if (data.error) { grid.innerHTML = `<div class="status-card"><div class="status-value err">${data.error}</div></div>`; return; }
 
     let html = "";
+
+    // Monitor panel placeholder (will be populated by first refresh)
+    if (data.monitor && data.monitor.available) {
+      _calcNetSpeed(data.monitor);
+      html += _buildMonitorHtml(data.monitor);
+    } else if (data.monitor && !data.monitor.available) {
+      html += `<div class="status-card" style="grid-column: 1 / -1">
+        <div style="padding:12px;background:var(--bg-dark);border-radius:6px;font-size:12px;color:var(--yellow)">
+          💡 ${t("system.info")}: <code>pip install psutil</code> ${_lang === 'zh' ? '启用实时监控' : 'to enable monitoring'}
+        </div>
+      </div>`;
+    }
+
     html += statusCard(t("status.configFile"), data.config_path, data.config_exists ? "ok" : "err");
     html += statusCard(t("status.workspace"), data.workspace, data.workspace_exists ? "ok" : "warn");
     html += statusCard(t("status.currentModel"), data.model, "ok");
 
-    let provHtml = '<div class="provider-list">';
-    (data.providers || []).forEach((p) => {
-      const badge = p.configured
-        ? `<span class="badge badge-ok">${t("status.configured")}</span>`
-        : `<span class="badge badge-off">${t("status.notConfigured")}</span>`;
-      provHtml += `<div class="provider-row"><span>${p.label || p.name}</span>${badge}</div>`;
-    });
-    provHtml += "</div>";
-    html += `<div class="status-card" style="grid-column: 1 / -1"><h3>${t("status.providers")}</h3>${provHtml}</div>`;
+    // LLM Providers — backend already filters to configured-only
+    if (data.providers && data.providers.length > 0) {
+      let provHtml = '<div class="provider-list">';
+      data.providers.forEach((p) => {
+        provHtml += `<div class="provider-row"><span>${p.label || p.name}</span><span class="badge badge-ok">${t("status.configured")}</span></div>`;
+      });
+      provHtml += "</div>";
+      html += `<div class="status-card" style="grid-column: 1 / -1"><h3>${t("status.providers")}</h3>${provHtml}</div>`;
+    }
 
-    let chHtml = '<div class="channel-list">';
-    (data.channels || []).forEach((c) => {
-      const badge = c.enabled
-        ? `<span class="badge badge-ok">${t("status.enabled")}</span>`
-        : `<span class="badge badge-off">${t("status.disabled")}</span>`;
-      chHtml += `<div class="channel-row"><span>${CHANNEL_NAMES[c.name] || c.name}</span>${badge}</div>`;
-    });
-    chHtml += "</div>";
-    html += `<div class="status-card" style="grid-column: 1 / -1"><h3>${t("status.channels")}</h3>${chHtml}</div>`;
+    // Channels — backend already filters to enabled-only
+    if (data.channels && data.channels.length > 0) {
+      let chHtml = '<div class="channel-list">';
+      data.channels.forEach((c) => {
+        chHtml += `<div class="channel-row"><span>${CHANNEL_NAMES[c.name] || c.name}</span><span class="badge badge-ok">${t("status.enabled")}</span></div>`;
+      });
+      chHtml += "</div>";
+      html += `<div class="status-card" style="grid-column: 1 / -1"><h3>${t("status.channels")}</h3>${chHtml}</div>`;
+    }
 
     if (data.mcp_servers && data.mcp_servers.length) {
       let connBadge;
@@ -1872,114 +2010,32 @@ async function loadStatus() {
       html += `<div class="status-card" style="grid-column: 1 / -1"><h3>${t("status.scheduler")} ${schedBadge}</h3>${schedHtml}</div>`;
     }
 
-    // System information
-    if (data.system) {
-      const sys = data.system;
-      let sysHtml = '<div class="provider-list">';
-      
-      // Device info
-      if (sys.hostname) {
-        sysHtml += `<div class="provider-row"><span>${t("system.hostname")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(sys.hostname)}</span></div>`;
-      }
-      if (sys.platform) {
-        const osText = `${sys.platform} ${sys.platform_release || ''}`.trim();
-        sysHtml += `<div class="provider-row"><span>${t("system.os")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(osText)}</span></div>`;
-      }
-      if (sys.architecture) {
-        sysHtml += `<div class="provider-row"><span>${t("system.architecture")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(sys.architecture)}</span></div>`;
-      }
-      if (sys.processor) {
-        sysHtml += `<div class="provider-row"><span>${t("system.processor")}</span><span style="font-size:12px;color:var(--text-dim);max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(sys.processor)}">${escapeHtml(sys.processor)}</span></div>`;
-      }
-      
-      // CPU info
-      if (sys.cpu && sys.psutil_available) {
-        const cpu = sys.cpu;
-        let cpuText = '';
-        if (cpu.physical_cores) cpuText += `${cpu.physical_cores} ${t("system.physical")}`;
-        if (cpu.logical_cores) cpuText += ` / ${cpu.logical_cores} ${t("system.logical")}`;
-        if (cpuText) {
-          sysHtml += `<div class="provider-row"><span>${t("system.cpu")} ${t("system.cores")}</span><span style="font-size:12px;color:var(--text-dim)">${cpuText}</span></div>`;
-        }
-        if (cpu.current_frequency) {
-          const freqText = cpu.current_frequency >= 1000 ? `${(cpu.current_frequency / 1000).toFixed(2)} GHz` : `${cpu.current_frequency.toFixed(0)} MHz`;
-          sysHtml += `<div class="provider-row"><span>${t("system.cpu")} ${t("system.frequency")}</span><span style="font-size:12px;color:var(--text-dim)">${freqText}</span></div>`;
-        }
-        if (cpu.usage_percent !== undefined) {
-          sysHtml += `<div class="provider-row"><span>${t("system.cpu")} ${t("system.usage")}</span><span class="badge ${cpu.usage_percent > 80 ? 'badge-off' : 'badge-ok'}">${cpu.usage_percent.toFixed(1)}%</span></div>`;
-        }
-      }
-      
-      // Memory info
-      if (sys.memory && sys.psutil_available) {
-        const mem = sys.memory;
-        const totalGB = (mem.total / (1024**3)).toFixed(1);
-        const usedGB = (mem.used / (1024**3)).toFixed(1);
-        const availGB = (mem.available / (1024**3)).toFixed(1);
-        sysHtml += `<div class="provider-row"><span>${t("system.memory")} ${t("system.total")}</span><span style="font-size:12px;color:var(--text-dim)">${totalGB} GB</span></div>`;
-        sysHtml += `<div class="provider-row"><span>${t("system.memory")} ${t("system.used")} / ${t("system.available")}</span><span class="badge ${mem.percent > 80 ? 'badge-off' : 'badge-ok'}">${usedGB} GB / ${availGB} GB (${mem.percent.toFixed(1)}%)</span></div>`;
-      }
-      
-      // Disk info
-      if (sys.disk && sys.psutil_available) {
-        const disk = sys.disk;
-        const totalGB = (disk.total / (1024**3)).toFixed(1);
-        const usedGB = (disk.used / (1024**3)).toFixed(1);
-        const freeGB = (disk.free / (1024**3)).toFixed(1);
-        sysHtml += `<div class="provider-row"><span>${t("system.disk")} ${t("system.total")}</span><span style="font-size:12px;color:var(--text-dim)">${totalGB} GB</span></div>`;
-        sysHtml += `<div class="provider-row"><span>${t("system.disk")} ${t("system.used")} / ${t("system.free")}</span><span class="badge ${disk.percent > 85 ? 'badge-off' : 'badge-ok'}">${usedGB} GB / ${freeGB} GB (${disk.percent.toFixed(1)}%)</span></div>`;
-      }
-      
-      // GPU info
-      if (sys.gpu && sys.gpu.length > 0) {
-        sys.gpu.forEach((gpu, idx) => {
-          const gpuLabel = sys.gpu.length > 1 ? `${t("system.gpu")} ${idx + 1}` : t("system.gpu");
-          sysHtml += `<div class="provider-row"><span>${gpuLabel}</span><span style="font-size:12px;color:var(--text-dim);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeAttr(gpu.name)}">${escapeHtml(gpu.name)}</span></div>`;
-          if (gpu.memory) {
-            sysHtml += `<div class="provider-row" style="padding-left:16px"><span>${t("system.memory")}</span><span style="font-size:12px;color:var(--text-dim)">${escapeHtml(gpu.memory)}</span></div>`;
-          }
-        });
-      } else if (sys.psutil_available) {
-        sysHtml += `<div class="provider-row"><span>${t("system.gpu")}</span><span style="font-size:12px;color:var(--text-dim)">${t("system.noGpu")}</span></div>`;
-      }
-      
-      // Network info
-      if (sys.network && sys.network.interfaces && sys.network.interfaces.length > 0 && sys.psutil_available) {
-        sysHtml += `<div class="provider-row"><span>${t("system.interfaces")}</span><span style="font-size:12px;color:var(--text-dim)">${sys.network.interfaces.map(i => `${escapeHtml(i.name)}: ${escapeHtml(i.address)}`).join(', ')}</span></div>`;
-        if (sys.network.bytes_sent !== undefined) {
-          const sentGB = (sys.network.bytes_sent / (1024**3)).toFixed(2);
-          const recvGB = (sys.network.bytes_recv / (1024**3)).toFixed(2);
-          sysHtml += `<div class="provider-row"><span>${t("system.network")}</span><span style="font-size:12px;color:var(--text-dim)">${t("system.sent")}: ${sentGB} GB, ${t("system.received")}: ${recvGB} GB</span></div>`;
-        }
-      }
-      
-      // Boot time / uptime
-      if (sys.boot_time && sys.psutil_available) {
-        const bootDate = new Date(sys.boot_time * 1000);
-        const uptime = Math.floor((Date.now() - bootDate.getTime()) / 1000);
-        const days = Math.floor(uptime / 86400);
-        const hours = Math.floor((uptime % 86400) / 3600);
-        const minutes = Math.floor((uptime % 3600) / 60);
-        let uptimeText = '';
-        if (days > 0) uptimeText += `${days}d `;
-        if (hours > 0) uptimeText += `${hours}h `;
-        uptimeText += `${minutes}m`;
-        sysHtml += `<div class="provider-row"><span>${t("system.uptime")}</span><span style="font-size:12px;color:var(--text-dim)">${uptimeText}</span></div>`;
-      }
-      
-      sysHtml += '</div>';
-      
-      if (!sys.psutil_available) {
-        sysHtml += `<div style="margin-top:8px;padding:8px;background:var(--bg-dark);border-radius:6px;font-size:11px;color:var(--yellow)">💡 ${t("system.info")}: <code>pip install psutil</code> ${_lang === 'zh' ? '获取详细系统信息' : 'for detailed system information'}</div>`;
-      }
-      
-      html += `<div class="status-card" style="grid-column: 1 / -1"><h3>💻 ${t("system.info")}</h3>${sysHtml}</div>`;
-    }
-
     grid.innerHTML = html;
   } catch (e) {
     grid.innerHTML = `<div class="status-card"><div class="status-value err">${t("status.loadFail")}${e.message}</div></div>`;
   }
+}
+
+async function _refreshMonitor() {
+  try {
+    const mon = await api("/api/monitor");
+    if (!mon || !mon.available) return;
+    _calcNetSpeed(mon);
+    _updateMonitorDom(mon);
+  } catch (_) {}
+}
+
+let _statusRefreshInterval = null;
+
+function startStatusAutoRefresh() {
+  stopStatusAutoRefresh();
+  _statusRefreshInterval = setInterval(() => {
+    if (currentPage === "status") _refreshMonitor();
+  }, 3000);
+}
+
+function stopStatusAutoRefresh() {
+  if (_statusRefreshInterval) { clearInterval(_statusRefreshInterval); _statusRefreshInterval = null; }
 }
 
 function statusCard(title, value, cls) {

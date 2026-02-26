@@ -117,7 +117,7 @@ def _resolve_scope(scope_patterns: list[str], workspace: str | None = None) -> l
             return []  # empty list == everything allowed
         expanded = pattern.replace("$HOME", str(Path.home()))
         if workspace:
-            expanded = expanded.replace("$WORKSPACE", workspace)
+            expanded = expanded.replace("$WORKSPACE", str(workspace))
         else:
             expanded = expanded.replace("$WORKSPACE", str(Path.cwd()))
         resolved.append(Path(expanded).resolve())
