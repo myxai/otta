@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import logging
 import json
 import queue
 import threading
@@ -13,6 +14,7 @@ from flask import Blueprint, Response, jsonify, request, stream_with_context
 from myxai_desk.web.apps_helpers import _t, inc_run_count
 from myxai_desk.web.migration_guards import mark
 
+log = logging.getLogger("myxai.web.apps_custom_routes")
 bp = Blueprint("apps_custom", __name__, url_prefix="/api/apps/custom")
 
 
@@ -55,7 +57,7 @@ def create():
             action_id="", result_summary=f"created {app.get('id', '')}",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for custom app create", exc_info=True)
     return jsonify(app)
 
 
@@ -106,7 +108,7 @@ def update(app_id):
             action_id="", result_summary="updated",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for custom app update", exc_info=True)
     return jsonify(app)
 
 
@@ -129,7 +131,7 @@ def delete(app_id):
                 action_id="", result_summary="deleted",
             )
         except Exception:
-            pass
+            log.warning("Failed to append audit entry for custom app delete", exc_info=True)
         return jsonify({"success": True})
     return jsonify({"error": _t("error.app_not_found")}), 404
 
@@ -234,7 +236,7 @@ def run(app_id):
                 from myxai_desk.core.runtime.app_governance import finish_app_run
                 finish_app_run(app_id, success=True)
             except Exception:
-                pass
+                log.warning("Failed to finish_app_run for %s", app_id, exc_info=True)
             _done_payload = {"type": "done", "content": ""}
             if _app_turn_input or _app_turn_output:
                 _done_payload["usage"] = {
@@ -243,6 +245,7 @@ def run(app_id):
                 }
             q.put(json.dumps(_done_payload, ensure_ascii=False))
         except Exception as exc:
+            log.exception("Custom app run failed for %s", app_id)
             if "original_tools" in dir():
                 agent.tools._tools = original_tools
             q.put(json.dumps({"type": "error", "content": str(exc)}, ensure_ascii=False))

@@ -8,9 +8,9 @@ import email.header
 import email.utils
 import imaplib
 import json
+import logging
 import re
-import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 try:
@@ -20,6 +20,8 @@ except ImportError:
         return datetime.now().strftime(fmt)
     def local_isoformat(dt=None):
         return datetime.now().astimezone().isoformat()
+
+log = logging.getLogger("myxai.apps.email_summary")
 
 _APP_DIR = Path.home() / ".nanobot" / "apps" / "email_summary"
 _REPORTS_DIR = _APP_DIR / "reports"
@@ -53,7 +55,7 @@ def _load_read_set() -> set[str]:
         if _READ_FILE.exists():
             return set(json.loads(_READ_FILE.read_text(encoding="utf-8")))
     except Exception:
-        pass
+        log.warning("_load_read_set: failed to load read reports", exc_info=True)
     return set()
 
 
@@ -85,7 +87,7 @@ def list_reports() -> list[dict]:
                 }
             )
         except Exception:
-            pass
+            log.debug("list_reports: failed to parse report %s", fp, exc_info=True)
     return reports
 
 
@@ -95,7 +97,7 @@ def get_report(date_str: str) -> dict | None:
         try:
             return json.loads(fp.read_text(encoding="utf-8"))
         except Exception:
-            pass
+            log.warning("get_report: failed to parse report %s", date_str, exc_info=True)
     return None
 
 
@@ -184,6 +186,7 @@ def test_connection(config: dict) -> dict:
         conn.logout()
         return {"success": True, "message": "连接成功"}
     except Exception as exc:
+        log.exception("test_connection: IMAP connection failed")
         return {"success": False, "message": str(exc)}
 
 
@@ -218,6 +221,7 @@ def _parse_email_date(date_str: str) -> datetime | None:
             parsed = parsed.replace(tzinfo=timezone.utc)
         return parsed
     except Exception:
+        log.debug("_parse_email_date: failed to parse date %r", date_str, exc_info=True)
         return None
 
 
@@ -268,6 +272,7 @@ def fetch_recent_emails(
                 }
             )
         except Exception:
+            log.debug("fetch_recent_emails: failed to process message %s", mid, exc_info=True)
             continue
 
     emails.reverse()
@@ -342,13 +347,13 @@ def _extract_json(text: str) -> dict | None:
             if isinstance(obj, dict) and "categories" in obj:
                 return obj
         except _json.JSONDecodeError:
-            pass
+            log.debug("_extract_json: JSONDecodeError parsing candidate", exc_info=True)
     try:
         obj = _json.loads(text)
         if isinstance(obj, dict):
             return obj
     except _json.JSONDecodeError:
-        pass
+        log.debug("_extract_json: JSONDecodeError parsing text", exc_info=True)
     return None
 
 
@@ -519,7 +524,6 @@ def run_email_summary(config: dict, model_config: dict | None = None) -> dict:
         return {"success": True, "email_count": len(emails_data), "date": date_str}
 
     except Exception as exc:
-        print(f"[email_summary] error: {exc}")
-        traceback.print_exc()
+        log.exception("[email_summary] pipeline error")
         _run_status.update(running=False, progress="", error=str(exc))
         return {"error": str(exc)}

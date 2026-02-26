@@ -76,9 +76,10 @@ def _make_tray_icon(size: int = 64) -> "Image.Image":
 class DeskManager:
     """Coordinates the main webview window and the system tray icon."""
 
-    def __init__(self, port: int = 19280):
+    def __init__(self, port: int = 19280, api_token: str | None = None):
         self.port = port
         self.base_url = f"http://127.0.0.1:{port}"
+        self.api_token = api_token
 
         self.main_window: object | None = None
         self._tray: object | None = None
@@ -374,6 +375,20 @@ class DeskManager:
         self.hide_main()
         return False
 
+    # ---- API token injection --------------------------------------------- #
+
+    def _inject_api_token(self):
+        """Inject the API token into the webview JS context.
+
+        Called on every ``loaded`` event so the token survives page
+        navigations and refreshes.
+        """
+        if self.main_window and self.api_token:
+            with contextlib.suppress(Exception):
+                self.main_window.evaluate_js(
+                    f"window.__myxai_token = '{self.api_token}';"
+                )
+
     # ---- webview entry point ---------------------------------------------- #
 
     def run(self, start_func=None):
@@ -401,6 +416,10 @@ class DeskManager:
 
         with contextlib.suppress(Exception):
             self.main_window.events.closing += self.on_main_closing
+
+        if self.api_token:
+            with contextlib.suppress(Exception):
+                self.main_window.events.loaded += self._inject_api_token
 
         self.start_tray()
         self.start_resume_listener()

@@ -3,7 +3,11 @@
 迁移自 app.py 的 /api/reports/* 路由。
 """
 
+import logging
+
 from flask import Blueprint, jsonify, request
+
+log = logging.getLogger("myxai.web.reports_routes")
 
 from myxai_desk.web.apps_helpers import _t
 from myxai_desk.web.migration_guards import mark
@@ -43,7 +47,7 @@ def all_reports():
                 if rpt and rpt.get("content"):
                     summary = _html_to_summary(rpt["content"])
             except Exception:
-                pass
+                log.debug("Failed to load digest report for date %s", date, exc_info=True)
             result.append({
                 "app_id": "daily_digest",
                 "app_name": _t("app.daily_digest.name"),
@@ -53,7 +57,7 @@ def all_reports():
                 "read": r.get("read", False), "summary": summary,
             })
     except Exception:
-        pass
+        log.debug("Optional daily_digest reports unavailable", exc_info=True)
 
     try:
         from apps.email_summary import get_report as email_get
@@ -71,7 +75,7 @@ def all_reports():
                     if rpt and rpt.get("content"):
                         summary = _html_to_summary(rpt["content"])
                 except Exception:
-                    pass
+                    log.debug("Failed to load email report for date %s", date, exc_info=True)
             result.append({
                 "app_id": "email_summary",
                 "app_name": _t("app.email_summary.name"),
@@ -81,7 +85,7 @@ def all_reports():
                 "read": r.get("read", False), "summary": summary,
             })
     except Exception:
-        pass
+        log.debug("Optional email_summary reports unavailable", exc_info=True)
 
     try:
         from apps.custom_app import get_report as custom_get
@@ -100,7 +104,7 @@ def all_reports():
                     if rpt and rpt.get("content"):
                         summary = _html_to_summary(rpt["content"])
                 except Exception:
-                    pass
+                    log.debug("Failed to load custom report %s/%s", app_id, key, exc_info=True)
                 result.append({
                     "app_id": app_id, "app_name": app_name,
                     "app_icon": app_icon, "date": r.get("date", ""),
@@ -109,7 +113,7 @@ def all_reports():
                     "read": r.get("read", True), "summary": summary,
                 })
     except Exception:
-        pass
+        log.debug("Optional custom_app reports unavailable", exc_info=True)
 
     result.sort(key=lambda x: x.get("generated_at") or x.get("date") or "", reverse=True)
     return jsonify(result)
@@ -124,17 +128,17 @@ def unread_count():
         from apps.custom_app import all_unread_counts
         total += sum(all_unread_counts().values())
     except Exception:
-        pass
+        log.debug("Optional custom_app unread counts unavailable", exc_info=True)
     try:
         from apps.daily_digest import list_reports as _dl
         total += sum(1 for r in _dl(limit=60) if not r.get("read"))
     except Exception:
-        pass
+        log.debug("Optional daily_digest unread counts unavailable", exc_info=True)
     try:
         from apps.email_summary import list_reports as _el
         total += sum(1 for r in _el() if not r.get("read"))
     except Exception:
-        pass
+        log.debug("Optional email_summary unread counts unavailable", exc_info=True)
     return jsonify({"total": total})
 
 
@@ -151,7 +155,7 @@ def mark_all_read():
                 if not r.get("read"):
                     mark_report_read(app["id"], r.get("key", ""))
     except Exception:
-        pass
+        log.debug("Optional custom_app mark_all_read unavailable", exc_info=True)
     try:
         from apps.daily_digest import list_reports as digest_list
         from apps.daily_digest import mark_report_read as digest_mark
@@ -160,7 +164,7 @@ def mark_all_read():
             if not r.get("read"):
                 digest_mark(r.get("date", ""))
     except Exception:
-        pass
+        log.debug("Optional daily_digest mark_all_read unavailable", exc_info=True)
     try:
         from apps.email_summary import list_reports as email_list
         from apps.email_summary import mark_report_read as email_mark
@@ -169,7 +173,7 @@ def mark_all_read():
             if not r.get("read"):
                 email_mark(r.get("date", ""))
     except Exception:
-        pass
+        log.debug("Optional email_summary mark_all_read unavailable", exc_info=True)
     return jsonify({"ok": True})
 
 

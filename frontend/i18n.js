@@ -46,7 +46,9 @@ class I18N {
      */
     async loadMessages(locale) {
         try {
-            const response = await fetch(`/api/i18n/messages?locale=${locale}`);
+            const headers = {};
+            if (window.__myxai_token) headers["X-MyxAI-Token"] = window.__myxai_token;
+            const response = await fetch(`/api/i18n/messages?locale=${locale}`, { headers });
             if (response.ok) {
                 this.messages = await response.json();
             } else {

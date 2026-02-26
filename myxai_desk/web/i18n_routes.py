@@ -3,9 +3,13 @@
 提供前端语言资源和语言切换功能。
 """
 
+import logging
+
 from flask import Blueprint, jsonify, request
 
 from myxai_desk.web.migration_guards import mark
+
+log = logging.getLogger("myxai.web.i18n_routes")
 from myxai_desk.core.i18n import get_translator
 
 bp = Blueprint("i18n", __name__, url_prefix="/api/i18n")
@@ -40,6 +44,7 @@ def get_messages():
         return jsonify(messages)
     
     except Exception as e:
+        log.exception("Failed to get i18n messages")
         return jsonify({"error": str(e)}), 500
 
 
@@ -71,6 +76,7 @@ def set_locale():
         })
     
     except Exception as e:
+        log.exception("Failed to set locale")
         return jsonify({"error": str(e)}), 500
 
 
@@ -84,4 +90,5 @@ def get_locale():
         return jsonify({"locale": t.locale})
     
     except Exception as e:
+        log.exception("Failed to get locale")
         return jsonify({"error": str(e)}), 500

@@ -3,10 +3,13 @@
 迁移自 app.py 的 /api/security/* 路由。
 """
 
+import logging
+
 from flask import Blueprint, jsonify, request
 
 from myxai_desk.web.migration_guards import mark
 
+log = logging.getLogger("myxai.web.security_routes")
 bp = Blueprint("security", __name__, url_prefix="/api/security")
 
 
@@ -55,7 +58,7 @@ def mode_set():
         return jsonify({"error": f"模式 {mode_str} 不可直接选择"}), 400
 
     set_current_mode(mode)
-    print(f"[security] Global mode switched to {mode.value}")
+    log.info("Global mode switched to %s", mode.value)
     try:
         from myxai_desk.core.audit.ledger import AuditLedger
 
@@ -66,7 +69,7 @@ def mode_set():
             result_summary=f"global → {mode.value}",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for security mode switch", exc_info=True)
     return jsonify(mode_policy_as_dict(mode))
 
 
@@ -180,7 +183,7 @@ def app_mode_set(app_id):
             result_summary=f"{app_id} → {target.value}",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for app mode set", exc_info=True)
     return jsonify(
         {
             "app_id": app_id,
@@ -256,7 +259,7 @@ def dev_enable():
             result_summary=f"dev enabled, policy={expiry_policy}",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for dev mode enable", exc_info=True)
     return jsonify(result)
 
 
@@ -277,5 +280,5 @@ def dev_disable():
             result_summary=f"dev disabled, reverted to {result.get('reverted_to', '')}",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for dev mode disable", exc_info=True)
     return jsonify(result)

@@ -3,9 +3,13 @@
 迁移自 app.py 的 /api/config 路由。
 """
 
+import logging
+
 from flask import Blueprint, jsonify, request, current_app
 
 from myxai_desk.web.migration_guards import mark
+
+log = logging.getLogger("myxai.web.config_routes")
 from myxai_desk.core.config_service import get_config, save_config
 
 bp = Blueprint("config", __name__, url_prefix="/api/config")
@@ -27,6 +31,7 @@ def get():
     except FileNotFoundError as e:
         return jsonify({"error": str(e)}), 404
     except Exception as e:
+        log.exception("Failed to get config")
         return jsonify({"error": str(e)}), 500
 
 
@@ -54,4 +59,5 @@ def save():
         
         return jsonify({"success": True})
     except Exception as e:
+        log.exception("Failed to save config")
         return jsonify({"error": str(e)}), 500

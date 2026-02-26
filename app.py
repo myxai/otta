@@ -11,7 +11,9 @@ os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 # Import the new package so its subsystems are initialised on startup.
 import asyncio
 import json
+import logging
 import queue
+import secrets
 import shutil
 import subprocess
 import sys
@@ -19,6 +21,8 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+
+log = logging.getLogger("myxai")
 
 from flask import (
     Flask,
@@ -50,6 +54,49 @@ except ImportError:
 # ---------------------------------------------------------------------------
 flask_app = Flask(__name__, static_folder="frontend", static_url_path="/static")
 flask_app.config["JSON_AS_ASCII"] = False
+
+
+_ALLOWED_HOSTS = frozenset()
+
+
+@flask_app.before_request
+def _check_host_header():
+    """Block requests whose Host header does not match the local server.
+
+    This is the primary defence against DNS-rebinding attacks: even if an
+    attacker resolves their domain to 127.0.0.1, the browser will send
+    ``Host: evil.com`` which will be rejected here.
+    """
+    if _ALLOWED_HOSTS and request.host not in _ALLOWED_HOSTS:
+        log.warning("Rejected request with unexpected Host header: %s", request.host)
+        return jsonify({"error": "Forbidden"}), 403
+
+
+@flask_app.before_request
+def _check_api_token():
+    """Reject /api/* requests that lack a valid X-MyxAI-Token header.
+
+    Protects the localhost Flask server against DNS-rebinding and
+    localhost-CSRF attacks by requiring a per-session random token that
+    is injected into the webview at startup.
+
+    OPTIONS (CORS preflight) is exempt because browsers send preflights
+    without custom headers; the actual request that follows will still
+    be validated.
+    """
+    if not request.path.startswith("/api/"):
+        return None
+    if request.method == "OPTIONS":
+        return None
+    token = flask_app.config.get("MYXAI_API_TOKEN")
+    if not token:
+        return None
+    req_token = request.headers.get("X-MyxAI-Token")
+    if req_token and req_token == token:
+        return None
+    log.warning("Rejected API request without valid token: %s %s", request.method, request.path)
+    return jsonify({"error": "Forbidden"}), 403
+
 
 # 初始化 i18n
 flask_app.i18n = init_i18n()
@@ -208,7 +255,7 @@ def _reset_agent():
             try:
                 await old._mcp_stack.aclose()
             except Exception:
-                pass
+                log.debug("MCP stack close failed", exc_info=True)
 
         _ensure_loop()
         asyncio.run_coroutine_threadsafe(_close(), _async_loop)
@@ -315,7 +362,7 @@ def _tool_to_capability(tool_name: str, arguments: dict) -> tuple[str, str]:
         if metadata:
             return metadata.capability.value, metadata.operation.value
     except Exception:
-        pass  # Fall back to string matching
+        log.debug("Tool registry lookup failed, falling back to string matching", exc_info=True)
 
     # Fallback: string matching (legacy, gradually being replaced)
     tn = tool_name.lower()
@@ -427,7 +474,7 @@ def _try_execute_pending() -> str | None:
                   args=str(pa.tool_args)[:300],
                   result=str(result)[:2000])
     except Exception as exc:
-        print(f"[policy] Pending execution error: {exc}")
+        log.exception("[policy] Pending execution error")
         return _t("policy.exec_failed", error=str(exc))
 
 
@@ -532,7 +579,7 @@ def _patch_agent_tool_history(agent):
                 if persona_text:
                     persona_block = "\n" + persona_text
         except Exception:
-            pass
+            log.warning("Failed to load persona/profile for system prompt", exc_info=True)
 
         return base + mode_hint + persona_block
 
@@ -849,7 +896,7 @@ def _patch_agent_tool_history(agent):
                     final_content = text
                     break
         except Exception as _loop_err:
-            print(f"[agent] error: {_loop_err}")
+            log.exception("[agent] error during message processing loop")
             if final_content is None:
                 final_content = f"Error during processing: {_loop_err}"
 
@@ -896,7 +943,7 @@ def _patch_agent_tool_history(agent):
                 },
             )
         except Exception:
-            pass  # Don't break if migration fails
+            log.warning("Legacy dict migration failed", exc_info=True)
 
         # ── Turn-level audit: minimal key events + fingerprint + ref ──
         if _turn_events:
@@ -926,7 +973,7 @@ def _patch_agent_tool_history(agent):
                     f"[audit] chat.turn fp={_fingerprint} events={len(_turn_events)} hash={_audit_hash[:12]}…"
                 )
             except Exception as _ae:
-                print(f"[audit] turn audit failed: {_ae}")
+                log.exception("[audit] turn audit failed")
 
         return OutboundMessage(
             channel=msg.channel,
@@ -1010,7 +1057,7 @@ def _get_or_create_agent():
             ]
             print(f"[agent] web_search: API engines = {_active or ['none (no keys)']}")
         except Exception as _ws_err:
-            print(f"[agent] failed to replace web_search: {_ws_err}")
+            log.exception("[agent] failed to replace web_search")
 
         # Wrap exec tool: intercept deletion commands → safe_remove (recoverable)
         _exec_tool = _agent.tools._tools.get("exec")
@@ -1210,6 +1257,7 @@ async def _connect_mcp_safe(agent, progress_cb=None):
         except asyncio.TimeoutError:
             _mcp_record(name, "error", "Connection timed out")
         except Exception as e:
+            log.warning("MCP server %s connection error: %s", name, e, exc_info=True)
             _mcp_record(name, "error", f"{type(e).__name__}: {e}")
 
     if total_registered:
@@ -1294,7 +1342,7 @@ def _filter_tools_by_policy(
             if d.action in ("ALLOW", "REQUIRE_COOLDOWN", "REQUIRE_SANDBOX"):
                 allowed[name] = tool
         except Exception:
-            pass
+            log.warning("Policy decision failed for tool %s", name, exc_info=True)
 
     return allowed
 
@@ -1361,6 +1409,7 @@ def _run_agent_with_prompt(
             with _last_usage_lock:
                 result_holder["usage"] = _last_usage.pop(session_key, {})
         except Exception as exc:
+            log.exception("[agent] direct execution failed")
             error_holder.append(exc)
 
     _ensure_loop()
@@ -1368,6 +1417,7 @@ def _run_agent_with_prompt(
     try:
         future.result(timeout=timeout)
     except Exception as exc:
+        log.exception("[agent] direct execution future timed out or failed")
         error_holder.append(exc)
 
     if error_holder:
@@ -1405,7 +1455,7 @@ def api_check():
             config_path = str(cp)
             config_exists = cp.exists()
         except Exception:
-            pass
+            log.debug("Config path check failed", exc_info=True)
     return jsonify(
         {
             "nanobot_installed": NANOBOT_AVAILABLE,
@@ -1438,6 +1488,7 @@ def api_onboard():
             {"success": True, "config_path": str(config_path), "workspace": str(workspace)}
         )
     except Exception as e:
+        log.exception("[api] onboard failed")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1510,6 +1561,7 @@ def api_plan_confirm(action_id):
         post_execution_undo(pa.capability, pa.op, pa.tool_args, result)
         return jsonify({"success": True, "result": str(result)[:500]})
     except Exception as e:
+        log.exception("[api] plan approve/execute failed")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1601,6 +1653,7 @@ def api_search_usage():
             data["engines"][eng]["has_key"] = key_map.get(eng, False)
         return jsonify(data)
     except Exception as e:
+        log.exception("[api] search usage query failed")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1725,6 +1778,7 @@ def api_status():
             }
         )
     except Exception as e:
+        log.exception("[api] agent status query failed")
         return jsonify({"error": str(e)}), 500
 
 
@@ -1772,9 +1826,12 @@ def api_tools():
 # ---------------------------------------------------------------------------
 
 
-@flask_app.route("/api/notifications")
+@flask_app.route("/api/notifications", methods=["POST"])
 def api_notifications():
-    """Return unread notifications and mark them read."""
+    """Return unread notifications and mark them read.
+
+    Uses POST because reading notifications has a side effect (mark-as-read).
+    """
     with _notifications_lock:
         unread = [n for n in _notifications if not n["read"]]
         for n in unread:
@@ -1873,6 +1930,7 @@ def api_chat():
                 }
             q.put(json.dumps(_done_payload, ensure_ascii=False))
         except Exception as exc:
+            log.exception("[chat] streaming message processing failed")
             q.put(json.dumps({"type": "error", "content": str(exc)}, ensure_ascii=False))
 
     _ensure_loop()
@@ -1924,6 +1982,7 @@ def _load_all_history() -> dict:
         try:
             return json.loads(f.read_text(encoding="utf-8"))
         except Exception:
+            log.warning("Failed to load session history from %s", f, exc_info=True)
             return {}
     return {}
 
@@ -2042,7 +2101,7 @@ def _get_model_config() -> dict:
                 raw.get("tools", {}).get("web", {}).get("search", {}).get("baiduApiKey") or None
             )
         except Exception:
-            pass
+            log.debug("Failed to read baidu API key from config", exc_info=True)
         return {
             "model": model,
             "api_key": p.api_key if p else None,
@@ -2051,6 +2110,7 @@ def _get_model_config() -> dict:
             "baidu_api_key": baidu_key or None,
         }
     except Exception:
+        log.warning("Failed to load model config", exc_info=True)
         return {}
 
 
@@ -2300,7 +2360,7 @@ def _exec_custom_app(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) ->
             level="info",
         )
     except Exception as exc:
-        print(f"[scheduler] custom app '{capp['name']}' error: {exc}")
+        log.exception("[scheduler] custom app '%s' error", capp['name'])
         finish_app_run(capp_id, success=False, error=str(exc))
         raise
 
@@ -2396,7 +2456,7 @@ def _start_app_scheduler():
         try:
             _scheduler_svc.tick()
         except Exception as exc:
-            print(f"[scheduler] tick error: {exc}")
+            log.exception("[scheduler] tick error")
         _app_scheduler_timer = threading.Timer(60, _tick)
         _app_scheduler_timer.daemon = True
         _app_scheduler_timer.start()
@@ -2480,7 +2540,7 @@ def api_cases_stats():
                     }
                 )
             except Exception:
-                pass
+                log.debug("Skipping malformed feedback line", exc_info=True)
         result.reverse()
         return result
 
@@ -2556,7 +2616,7 @@ def _shutdown():
             _kill_process_tree(_gateway_process.pid)
             _gateway_process.wait(timeout=3)
         except Exception:
-            pass
+            log.debug("Gateway process cleanup failed", exc_info=True)
         _gateway_process = None
 
     # 2. Close MCP connections & async loop
@@ -2571,7 +2631,7 @@ def _shutdown():
                 f = asyncio.run_coroutine_threadsafe(_close_mcp(), _async_loop)
                 f.result(timeout=5)
             except Exception:
-                pass
+                log.debug("MCP close during shutdown failed", exc_info=True)
     _agent = None
 
     if _async_loop is not None and _async_loop.is_running():
@@ -2593,6 +2653,10 @@ atexit.register(_shutdown)
 
 def main():
     global _desk_manager
+
+    # --- Localhost API token guard ---------------------------------------- #
+    _api_token = secrets.token_hex(32)
+    flask_app.config["MYXAI_API_TOKEN"] = _api_token
 
     _start_app_scheduler()
 
@@ -2623,6 +2687,13 @@ def main():
 
     port = 19280
 
+    # --- Host header allowlist (DNS-rebinding defence) -------------------- #
+    global _ALLOWED_HOSTS
+    _ALLOWED_HOSTS = frozenset({
+        f"127.0.0.1:{port}",
+        f"localhost:{port}",
+    })
+
     # --- fallback: no pywebview ------------------------------------------- #
     try:
         import webview  # noqa: F401
@@ -2638,7 +2709,14 @@ def main():
             daemon=True,
         ).start()
         time.sleep(1)
-        webbrowser.open(f"http://127.0.0.1:{port}")
+        _dev_mode = os.environ.get("MYXAI_DEV") == "1"
+        if _dev_mode:
+            log.warning("[security] DEV MODE: API token exposed via URL param")
+            webbrowser.open(f"http://127.0.0.1:{port}/?token={_api_token}")
+        else:
+            print("⚠ 浏览器模式下 API 受 token 保护，功能受限。")
+            print("  如需完整功能请安装 pywebview，或设置 MYXAI_DEV=1 以开发模式运行。")
+            webbrowser.open(f"http://127.0.0.1:{port}")
         try:
             while True:
                 time.sleep(1)
@@ -2657,17 +2735,23 @@ def main():
 
     import urllib.request
 
+    _health_req = urllib.request.Request(
+        f"http://127.0.0.1:{port}/api/check",
+        headers={"X-MyxAI-Token": _api_token},
+    )
     for _attempt in range(80):
         try:
-            urllib.request.urlopen(f"http://127.0.0.1:{port}/api/check", timeout=1)
+            urllib.request.urlopen(_health_req, timeout=1)
             break
         except Exception:
+            if _attempt == 79:
+                log.warning("Flask server did not become ready after 80 attempts")
             time.sleep(0.05)
 
     # --- DeskManager (tray) ------------------------------------------------ #
     from desk_manager import DeskManager
 
-    _desk_manager = DeskManager(port=port)
+    _desk_manager = DeskManager(port=port, api_token=_api_token)
 
     def _unread_count():
         total = 0
@@ -2680,19 +2764,19 @@ def main():
 
             total += sum(all_unread_counts().values())
         except Exception:
-            pass
+            log.debug("Failed to get custom app unread counts", exc_info=True)
         try:
             from apps.daily_digest import list_reports as _dl
 
             total += sum(1 for r in _dl(limit=60) if not r.get("read"))
         except Exception:
-            pass
+            log.debug("Failed to get daily digest unread counts", exc_info=True)
         try:
             from apps.email_summary import list_reports as _el
 
             total += sum(1 for r in _el() if not r.get("read"))
         except Exception:
-            pass
+            log.debug("Failed to get email summary unread counts", exc_info=True)
         return total
 
     _desk_manager._get_unread_count = _unread_count
@@ -2730,7 +2814,7 @@ def main():
 
             bv.Invoke(Func[Type](_setup))
         except Exception as e:
-            print(f"[webview] auto-allow permissions failed: {e}")
+            log.warning("[webview] auto-allow permissions failed: %s", e)
 
     _desk_manager.run(start_func=_grant_media_permissions)
     _shutdown()

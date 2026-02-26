@@ -4,6 +4,7 @@
 """
 
 import asyncio
+import logging
 import contextlib
 import shutil
 
@@ -11,6 +12,7 @@ from flask import Blueprint, current_app, jsonify
 
 from myxai_desk.web.migration_guards import mark
 
+log = logging.getLogger("myxai.web.mcp_routes")
 bp = Blueprint("mcp", __name__, url_prefix="/api/mcp")
 
 
@@ -84,6 +86,7 @@ def test():
             except asyncio.TimeoutError:
                 entry["message"] = "Connection timed out (90s)"
             except Exception as e:
+                log.warning("MCP test failed for server %s: %s", name, e, exc_info=True)
                 entry["message"] = f"{type(e).__name__}: {e}"
             results.append(entry)
 
@@ -94,6 +97,7 @@ def test():
     try:
         future.result(timeout=180)
     except Exception as e:
+        log.exception("MCP test timed out")
         return jsonify({"error": f"Test timed out: {e}"}), 500
 
     return jsonify({"results": results})
@@ -142,6 +146,7 @@ def reconnect():
     try:
         future.result(timeout=180)
     except Exception as e:
+        log.exception("MCP reconnect failed")
         return jsonify({"error": str(e)}), 500
 
     mcp_tools = [n for n in agent.tools._tools if n.startswith("mcp_")]

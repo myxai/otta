@@ -3,9 +3,12 @@
 迁移自 app.py 的 /api/apps 基础路由。
 """
 
+import logging
 from datetime import datetime, timezone
 
 from flask import Blueprint, jsonify, request
+
+log = logging.getLogger("myxai.web.apps_routes")
 
 from myxai_desk.web.apps_helpers import (
     APP_CATALOG,
@@ -118,7 +121,7 @@ def install(app_id):
             result_summary="installed",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for app install", exc_info=True)
     return jsonify({"success": True})
 
 
@@ -146,7 +149,7 @@ def uninstall(app_id):
             result_summary="uninstalled",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for app uninstall", exc_info=True)
     return jsonify({"success": True})
 
 
@@ -174,7 +177,7 @@ def enable(app_id):
             result_summary="enabled",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for app enable", exc_info=True)
     return jsonify({"success": True})
 
 
@@ -202,7 +205,7 @@ def disable(app_id):
             result_summary="disabled",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for app disable", exc_info=True)
     return jsonify({"success": True})
 
 
@@ -262,5 +265,5 @@ def save_config(app_id):
             result_summary="config_updated",
         )
     except Exception:
-        pass
+        log.warning("Failed to append audit entry for app config save", exc_info=True)
     return jsonify({"success": True})

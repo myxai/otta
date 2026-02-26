@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import logging
+
+log = logging.getLogger("myxai.core.i18n.locale")
+
 
 def detect_locale_from_browser(accept_language: str | None = None) -> str:
     """Detect user locale from browser Accept-Language header.
@@ -46,4 +50,5 @@ def get_system_locale() -> str:
             return "zh"
         return "en"
     except Exception:
+        log.warning("Failed to get system locale, defaulting to zh", exc_info=True)
         return "zh"

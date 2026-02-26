@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+log = logging.getLogger("myxai.core.i18n.loader")
 
 
 def load_locale(locale: str) -> dict[str, str]:
@@ -30,6 +33,7 @@ def load_locale(locale: str) -> dict[str, str]:
         with open(locale_file, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
+        log.warning("Failed to load locale file %s", locale_file, exc_info=True)
         return {}
 
 

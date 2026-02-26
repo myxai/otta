@@ -21,6 +21,7 @@ Pipeline:
 """
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -39,6 +40,8 @@ except ImportError:
         return datetime.now().astimezone().isoformat()
 from pathlib import Path
 from urllib.parse import urlparse
+
+log = logging.getLogger("myxai.apps.daily_digest")
 
 # ---------------------------------------------------------------------------
 # Browser history paths (Windows)
@@ -650,8 +653,8 @@ def read_browser_history(hours: int = 24, browser: str = "auto") -> list[dict]:
                     }
                 )
             conn.close()
-        except Exception as exc:
-            print(f"[daily_digest] read error ({hist_path}): {exc}")
+        except Exception:
+            log.exception("read_browser_history: failed to read %s", hist_path)
         finally:
             try:
                 from apps.safe_fs import safe_remove
@@ -701,6 +704,7 @@ def read_chat_history(hours: int = 72) -> list[dict]:
     try:
         data = json.loads(_CHAT_HISTORY_FILE.read_text(encoding="utf-8"))
     except Exception:
+        log.warning("read_chat_history: failed to parse sessions.json", exc_info=True)
         return []
 
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
@@ -712,6 +716,7 @@ def read_chat_history(hours: int = 72) -> list[dict]:
         try:
             ts = datetime.fromisoformat(updated.replace("Z", "+00:00"))
         except Exception:
+            log.debug("read_chat_history: failed to parse updated_at %r", updated, exc_info=True)
             continue
         if ts < cutoff:
             continue
@@ -1092,16 +1097,16 @@ def llm_analyze_interests(
             }
         total_q = sum(len(v["queries"]) for v in result.values())
         if total_q == 0:
-            print("[daily_digest] LLM returned zero queries — falling back to rules")
+            log.info("[daily_digest] LLM returned zero queries — falling back to rules")
             return None
 
-        print(
-            "[daily_digest] LLM analysis: "
-            + ", ".join(f"{c}={len(v['queries'])}q" for c, v in result.items())
+        log.info(
+            "[daily_digest] LLM analysis: %s",
+            ", ".join(f"{c}={len(v['queries'])}q" for c, v in result.items()),
         )
         return result
-    except Exception as exc:
-        print(f"[daily_digest] LLM analysis failed: {exc}")
+    except Exception:
+        log.exception("[daily_digest] LLM analysis failed")
         return None
 
 
@@ -1134,10 +1139,10 @@ def _web_search(
             count=count,
         )
         if results:
-            print(f"[daily_digest] search OK via {engine}: {len(results)} results")
+            log.info("[daily_digest] search OK via %s: %d results", engine, len(results))
         return results
-    except Exception as exc:
-        print(f"[daily_digest] search failed for '{query[:60]}': {exc}")
+    except Exception:
+        log.exception("[daily_digest] search failed for %r", query[:60])
         return []
 
 
@@ -1295,6 +1300,7 @@ def _load_interest_history(days: int = 7) -> str:
             if day_kws:
                 lines.append(f"- {f.stem}: {', '.join(day_kws)}")
         except Exception:
+            log.debug("_load_interest_history: failed to parse report %s", f, exc_info=True)
             pass
     return "\n".join(lines)
 
@@ -1304,8 +1310,10 @@ def _update_user_profile(interests: dict) -> None:
     _DIGEST_DIR.mkdir(parents=True, exist_ok=True)
     profile: dict = {}
     if _PROFILE_FILE.exists():
-        with contextlib.suppress(Exception):
+        try:
             profile = json.loads(_PROFILE_FILE.read_text(encoding="utf-8"))
+        except Exception:
+            log.warning("_update_user_profile: failed to load profile file", exc_info=True)
 
     kw_counts: dict = profile.get("keyword_counts", {})
     for cat in ("work", "study", "life"):
@@ -1531,13 +1539,13 @@ def _extract_json_from_llm(text: str) -> dict | None:
                 if isinstance(obj, dict) and "sections" in obj:
                     return obj
             except json.JSONDecodeError:
-                pass
+                log.debug("_extract_json_from_llm: JSONDecodeError parsing candidate", exc_info=True)
     try:
         obj = json.loads(text)
         if isinstance(obj, dict):
             return obj
     except json.JSONDecodeError:
-        pass
+        log.debug("_extract_json_from_llm: JSONDecodeError parsing text", exc_info=True)
     return None
 
 
@@ -1683,7 +1691,7 @@ def _load_read_set() -> set[str]:
         if _READ_FILE.exists():
             return set(json.loads(_READ_FILE.read_text(encoding="utf-8")))
     except Exception:
-        pass
+        log.warning("_load_read_set: failed to load read reports", exc_info=True)
     return set()
 
 
@@ -1715,6 +1723,7 @@ def list_reports(limit: int = 30) -> list[dict]:
                 }
             )
         except Exception:
+            log.debug("list_reports: failed to parse report %s", f, exc_info=True)
             pass
     return reports
 
@@ -1918,8 +1927,8 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
                 api_base,
                 date_str=date_str,
             )
-        except Exception as exc:
-            print(f"[daily_digest] LLM report error, falling back: {exc}")
+        except Exception:
+            log.exception("[daily_digest] LLM report error, falling back")
             report_text = generate_report_fallback(
                 categories,
                 search_results,
@@ -1943,8 +1952,8 @@ def run_daily_digest(config: dict, progress_cb=None) -> dict:
     )
     try:
         _update_user_profile(interests_summary)
-    except Exception as exc:
-        print(f"[daily_digest] profile update error: {exc}")
+    except Exception:
+        log.exception("[daily_digest] profile update error")
 
     return {
         "status": "ok",

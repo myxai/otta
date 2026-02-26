@@ -34,7 +34,7 @@ from myxai_desk.core.timeutil import local_date_str, now_local, now_utc, to_loca
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-log = logging.getLogger("scheduler")
+log = logging.getLogger("myxai.scheduler")
 
 # ── Types ──────────────────────────────────────────────────────────────
 
@@ -130,6 +130,7 @@ def record_run_start(
         rows = db.execute("SELECT last_insert_rowid() AS rid", readonly=True)
         return rows[0]["rid"] if rows else None
     except Exception:
+        log.warning("Failed to record run start for task %s", task_id, exc_info=True)
         return None
 
 
@@ -296,7 +297,7 @@ def _compute_exact_match(task: TaskDescriptor, now: datetime | None = None) -> l
                 if (now_cmp - last_dt_cmp).days < interval:
                     return []
             except Exception:
-                pass
+                log.debug("Failed to parse last_triggered for interval check", exc_info=True)
 
     key = make_idempotency_key(task.task_id, now, mode)
     if has_successful_run(key):
@@ -327,6 +328,7 @@ def _compute_cron_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot]:
     try:
         anchor = datetime.fromisoformat(anchor_str).replace(tzinfo=None)
     except Exception:
+        log.debug("Failed to parse anchor %r for cron slots, using fallback", anchor_str, exc_info=True)
         anchor = now_naive - timedelta(hours=task.catchup_window_hours)
 
     window_start = now_naive - timedelta(hours=task.catchup_window_hours)
@@ -385,6 +387,7 @@ def _compute_interval_slots(task: TaskDescriptor, now: datetime) -> list[DueSlot
     try:
         anchor = datetime.fromisoformat(anchor_str).replace(tzinfo=None)
     except Exception:
+        log.debug("Failed to parse anchor %r for interval slots, using fallback", anchor_str, exc_info=True)
         anchor = now_naive - timedelta(hours=task.catchup_window_hours)
 
     window_start = now_naive - timedelta(hours=task.catchup_window_hours)

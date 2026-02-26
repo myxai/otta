@@ -3,9 +3,12 @@
 迁移自 app.py 的 /api/apps/daily_digest/* 路由。
 """
 
+import logging
 import threading
 
 from flask import Blueprint, jsonify, request
+
+log = logging.getLogger("myxai.web.apps_digest_routes")
 
 from myxai_desk.web.apps_helpers import (
     _t,
@@ -79,12 +82,12 @@ def run():
                     {"status": "done" if result["status"] == "ok" else "error", "result": result}
                 )
         except Exception as exc:
-            print(f"[daily_digest] run error: {exc}")
+            log.exception("Daily digest run error: %s", exc)
             try:
                 from myxai_desk.core.runtime.app_governance import finish_app_run
                 finish_app_run("daily_digest", success=False, error=str(exc))
             except Exception:
-                pass
+                log.warning("Failed to finish_app_run after digest error", exc_info=True)
             with digest_task_lock:
                 digest_task_status.update({"status": "error", "result": {"message": str(exc)}})
 

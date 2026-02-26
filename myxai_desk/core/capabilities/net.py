@@ -7,9 +7,12 @@ rules; this module only performs the actual HTTP operations.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any
 from urllib.parse import urlparse
+
+log = logging.getLogger("myxai.core.capabilities.net")
 
 
 def _new_action_id() -> str:
@@ -52,6 +55,7 @@ class Net:
                     "action_id": action_id,
                 }
         except Exception as e:
+            log.warning("HTTP GET failed for %s: %s", url, e, exc_info=True)
             result = {"error": str(e), "action_id": action_id}
 
         self._log(url, "GET", action_id)
@@ -87,6 +91,7 @@ class Net:
                     "action_id": action_id,
                 }
         except Exception as e:
+            log.warning("HTTP POST failed for %s: %s", url, e, exc_info=True)
             result = {"error": str(e), "action_id": action_id}
 
         self._log(url, "POST", action_id)
@@ -107,6 +112,7 @@ class Net:
                 "action_id": action_id,
             }
         except Exception as e:
+            log.warning("Download failed for %s: %s", url, e, exc_info=True)
             result = {"error": str(e), "action_id": action_id}
 
         self._log(url, "DOWNLOAD", action_id)

@@ -4,6 +4,7 @@
 """
 
 import contextlib
+import logging
 import os
 import shutil
 import subprocess
@@ -13,6 +14,7 @@ from flask import Blueprint, jsonify, current_app
 from myxai_desk.web.state import get_state
 from myxai_desk.web.migration_guards import mark
 
+log = logging.getLogger("myxai.web.gateway_routes")
 bp = Blueprint("gateway", __name__, url_prefix="/api/gateway")
 
 
@@ -75,6 +77,7 @@ def start():
             )
             return jsonify({"success": True, "pid": state.gateway_process.pid})
         except Exception as e:
+            log.exception("Failed to start gateway process")
             state.gateway_process = None
             return jsonify({"error": str(e)}), 500
 
@@ -133,4 +136,5 @@ def logs():
                     break
             return jsonify({"logs": "".join(lines)})
         except Exception:
+            log.warning("Failed to read gateway logs", exc_info=True)
             return jsonify({"logs": ""})

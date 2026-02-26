@@ -5,11 +5,14 @@ Execution is 100% delegated to the nanobot agent (same path as chat).
 """
 
 import json
+import logging
 import re
 import uuid
 from pathlib import Path
 
 from myxai_desk.core.timeutil import local_date_str, local_isoformat, now_local
+
+log = logging.getLogger("myxai.apps.custom_app")
 
 _BASE_DIR = Path.home() / ".nanobot" / "apps" / "custom"
 _PARAM_RE = re.compile(r"\{\{([^}]+)\}\}")
@@ -148,7 +151,7 @@ def create_app(
 
             set_app_mode(app_id, SecurityMode(security_mode))
         except Exception:
-            pass
+            log.debug("create_app: failed to set security mode for %s", app_id, exc_info=True)
     return app
 
 
@@ -196,7 +199,7 @@ def update_app(app_id: str, **kwargs) -> dict | None:
             else:
                 clear_app_mode(app_id)
         except Exception:
-            pass
+            log.debug("update_app: failed to set security mode for %s", app_id, exc_info=True)
     _save(app)
     return app
 
@@ -218,8 +221,10 @@ def list_apps() -> list[dict]:
     _ensure_dirs()
     apps = []
     for fp in _BASE_DIR.glob("capp_*.json"):
-        with contextlib.suppress(Exception):
+        try:
             apps.append(json.loads(fp.read_text(encoding="utf-8")))
+        except Exception:
+            log.debug("list_apps: failed to load app file %s", fp, exc_info=True)
     apps.sort(key=lambda a: a.get("created_at", ""), reverse=True)
     return apps
 
@@ -230,7 +235,7 @@ def get_app(app_id: str) -> dict | None:
         try:
             return json.loads(fp.read_text(encoding="utf-8"))
         except Exception:
-            pass
+            log.warning("get_app: failed to parse app file %s", app_id, exc_info=True)
     return None
 
 
@@ -323,6 +328,7 @@ def should_trigger(schedule: dict, now: None = None) -> bool:
             delta = (local_now - last_dt).days
             return delta >= interval
         except Exception:
+            log.debug("should_trigger: failed to parse last_triggered %r", last, exc_info=True)
             return True
 
     return False
@@ -467,7 +473,7 @@ def list_reports(app_id: str, report_type: str | None = None) -> list[dict]:
                 }
             )
         except Exception:
-            pass
+            log.debug("list_reports: failed to parse report %s", fp, exc_info=True)
     return reports
 
 
@@ -477,7 +483,7 @@ def get_report(app_id: str, key: str) -> dict | None:
         try:
             return json.loads(fp.read_text(encoding="utf-8"))
         except Exception:
-            pass
+            log.warning("get_report: failed to parse report %s for app %s", key, app_id, exc_info=True)
     return None
 
 
@@ -564,7 +570,7 @@ def build_summary_prompt(app: dict, max_reports: int = 30) -> str | None:
                 content = content[:3000] + "…（截断）"
             excerpts.append(f"### {r['date']}\n{content}")
         except Exception:
-            pass
+            log.debug("build_summary_prompt: failed to load report %s", r.get("key"), exc_info=True)
 
     if not excerpts:
         return None

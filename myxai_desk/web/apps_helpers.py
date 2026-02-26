@@ -5,6 +5,7 @@ apps_email_routes / apps_custom_routes 共用。
 """
 
 import json
+import logging
 import threading
 from pathlib import Path
 
@@ -15,6 +16,8 @@ APPS_DIR = Path.home() / ".nanobot" / "apps"
 APPS_REGISTRY = APPS_DIR / "registry.json"
 APPS_PREFS = APPS_DIR / "prefs.json"
 
+log = logging.getLogger("myxai.web.apps_helpers")
+
 
 # ── 注册表 I/O ────────────────────────────────────────────────────
 
@@ -24,7 +27,7 @@ def load_apps_registry() -> dict:
         try:
             return json.loads(APPS_REGISTRY.read_text(encoding="utf-8"))
         except Exception:
-            pass
+            log.warning("Failed to load apps registry (invalid JSON)", exc_info=True)
     return {}
 
 
@@ -40,7 +43,7 @@ def load_apps_prefs() -> dict:
         try:
             return json.loads(APPS_PREFS.read_text(encoding="utf-8"))
         except Exception:
-            pass
+            log.warning("Failed to load apps prefs (invalid JSON)", exc_info=True)
     return {}
 
 
@@ -63,6 +66,7 @@ def _t(key: str, **kwargs) -> str:
         from myxai_desk.core.i18n import get_translator
         return get_translator().t(key, **kwargs)
     except Exception:
+        log.debug("Translation failed for key %s, returning key", key, exc_info=True)
         return key
 
 

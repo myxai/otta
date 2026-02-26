@@ -8,7 +8,7 @@ import threading
 from datetime import date, timedelta
 from pathlib import Path
 
-log = logging.getLogger("llm_utils")
+log = logging.getLogger("myxai.apps.llm_utils")
 
 _KNOWN_LITELLM_PREFIXES = (
     "openai/",
@@ -56,6 +56,7 @@ def _ensure_loaded():
                 elif isinstance(v, dict):
                     _token_data[k] = v
         except Exception:
+            log.warning("_ensure_loaded: failed to load token file", exc_info=True)
             _token_data = {}
     _loaded = True
 
@@ -68,7 +69,7 @@ def _persist():
             encoding="utf-8",
         )
     except Exception:
-        pass
+        log.warning("_persist: failed to save token usage", exc_info=True)
 
 
 def record_tokens(prompt_tokens: int = 0, completion_tokens: int = 0):
@@ -118,6 +119,7 @@ def _ensure_task_loaded():
         try:
             _task_data = json.loads(_TASK_FILE.read_text(encoding="utf-8"))
         except Exception:
+            log.warning("_ensure_task_loaded: failed to load task file", exc_info=True)
             _task_data = {}
     _task_loaded = True
 
@@ -129,8 +131,8 @@ def _persist_task():
             json.dumps(_task_data, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
-    except Exception as e:
-        print(f"[llm_utils] _persist_task error: {e}")
+    except Exception:
+        log.exception("[llm_utils] _persist_task error")
 
 
 def record_task_usage(
@@ -151,11 +153,13 @@ def record_task_usage(
             cat["search"] += search_calls
             cat["count"] += 1
             _persist_task()
-        print(
-            f"[llm_utils] record_task_usage: {category} +{prompt_tokens}/{completion_tokens} (file={'exists' if _TASK_FILE.exists() else 'MISSING'})"
+        log.debug(
+            "[llm_utils] record_task_usage: %s +%d/%d (file=%s)",
+            category, prompt_tokens, completion_tokens,
+            "exists" if _TASK_FILE.exists() else "MISSING",
         )
-    except Exception as e:
-        print(f"[llm_utils] record_task_usage error: {e}")
+    except Exception:
+        log.exception("[llm_utils] record_task_usage error")
 
 
 def get_category_usage(days: int = 7) -> dict:

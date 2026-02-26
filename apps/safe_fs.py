@@ -11,6 +11,7 @@ deletion, ever.
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 import sys
@@ -35,6 +36,8 @@ except ImportError:
         p.mkdir(parents=True, exist_ok=True)
         return p
 
+
+log = logging.getLogger("myxai.apps.safe_fs")
 
 # ── Delegate to myxai_desk where possible ─────────────────────────
 
@@ -96,7 +99,7 @@ def safe_remove(path: Path | str) -> Path | None:
             result_summary=f"moved to trash: {dest.name}",
         )
     except Exception:
-        pass
+        log.debug("safe_remove: audit ledger unavailable for path %s", p, exc_info=True)
     return dest
 
 

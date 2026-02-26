@@ -2,6 +2,27 @@
    MyxAI Desk — Frontend Logic
    =================================================================== */
 
+// ── API token guard (localhost CSRF / DNS-rebinding protection) ────
+// Token is injected by pywebview (window.__myxai_token) or via URL
+// query param (?token=...) in browser-fallback mode.
+(function _bootstrapToken() {
+  if (window.__myxai_token) return;
+  const p = new URLSearchParams(window.location.search);
+  const t = p.get("token");
+  if (t) {
+    window.__myxai_token = t;
+    // Strip token from URL to avoid leaking it in Referer headers
+    const clean = window.location.pathname + window.location.hash;
+    window.history.replaceState(null, "", clean);
+  }
+})();
+
+function authHeaders(extra) {
+  const h = extra ? Object.assign({}, extra) : {};
+  if (window.__myxai_token) h["X-MyxAI-Token"] = window.__myxai_token;
+  return h;
+}
+
 // ── Load i18n module ───────────────────────────────────────────────
 // i18n.js will be loaded first via <script> tag in index.html
 
@@ -409,7 +430,7 @@ function setLanguage(val) {
   const radio = document.querySelector(`input[name="lang-radio"][value="${val}"]`);
   if (radio) radio.checked = true;
   applyLanguage();
-  fetch("/api/desk/lang", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({lang: _lang})}).catch(()=>{});
+  fetch("/api/desk/lang", {method:"POST", headers:authHeaders({"Content-Type":"application/json"}), body: JSON.stringify({lang: _lang})}).catch(()=>{});
 }
 
 function applyLanguage() {
@@ -1866,7 +1887,7 @@ function stopGwPoll() { if (gwPollTimer) { clearInterval(gwPollTimer); gwPollTim
 // ── Utilities ─────────────────────────────────────────────────────────
 
 async function api(url, method = "GET", body = null) {
-  const opts = { method, headers: {} };
+  const opts = { method, headers: authHeaders() };
   if (body) { opts.headers["Content-Type"] = "application/json"; opts.body = JSON.stringify(body); }
   const res = await fetch(url, opts);
   return res.json();
