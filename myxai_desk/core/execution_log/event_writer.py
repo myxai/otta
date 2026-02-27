@@ -1,4 +1,4 @@
-﻿"""Write tool-call step events to SQLite for execution radar analytics.
+"""Write tool-call step events to SQLite for execution radar analytics.
 
 Each call to ``record_step`` inserts one row into the ``exec_steps`` table.
 The table is auto-created on first use.
@@ -37,19 +37,27 @@ def _ensure_exec_steps_table() -> None:
         result_preview TEXT DEFAULT '',
         duration_ms INTEGER DEFAULT 0,
         created_at TEXT NOT NULL,
-        local_date TEXT DEFAULT ''
+        local_date TEXT DEFAULT '',
+        progress INTEGER DEFAULT -1,
+        state_sig TEXT DEFAULT ''
         """,
     )
-    # Backfill: if table exists but lacks local_date column, add it
-    try:
-        execute("SELECT local_date FROM exec_steps LIMIT 1", readonly=True)
-    except Exception:
+    # Backfill: add columns that may be missing on older databases
+    _backfill_columns = [
+        ("local_date", "TEXT DEFAULT ''"),
+        ("progress", "INTEGER DEFAULT -1"),
+        ("state_sig", "TEXT DEFAULT ''"),
+    ]
+    for col_name, col_type in _backfill_columns:
         try:
-            from myxai_desk.core.storage.sqlite import connect
-            with connect() as conn:
-                conn.execute("ALTER TABLE exec_steps ADD COLUMN local_date TEXT DEFAULT ''")
+            execute(f"SELECT {col_name} FROM exec_steps LIMIT 1", readonly=True)
         except Exception:
-            pass
+            try:
+                from myxai_desk.core.storage.sqlite import connect
+                with connect() as conn:
+                    conn.execute(f"ALTER TABLE exec_steps ADD COLUMN {col_name} {col_type}")
+            except Exception:
+                pass
     _TABLE_READY = True
 
 
@@ -63,6 +71,8 @@ def record_step(
     action: str = "EXEC",
     result_preview: str = "",
     duration_ms: int = 0,
+    progress: int = -1,
+    state_sig: str = "",
 ) -> str | None:
     """Insert a single step event and return the generated step id."""
     try:
@@ -74,8 +84,9 @@ def record_step(
         execute(
             """INSERT INTO exec_steps
                (id, session_id, tool_name, args_json, status, error_code,
-                action, result_preview, duration_ms, created_at, local_date)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                action, result_preview, duration_ms, created_at, local_date,
+                progress, state_sig)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 step_id,
                 session_id,
@@ -88,12 +99,17 @@ def record_step(
                 duration_ms,
                 now,
                 local_date,
+                progress,
+                state_sig[:200],
             ),
         )
         return step_id
     except Exception:
         log.warning("[exec_log] record_step failed", exc_info=True)
         return None
+
+
+_last_state_sig: dict[str, str] = {}
 
 
 def record_step_from_event(
@@ -124,6 +140,19 @@ def record_step_from_event(
 
     duration_ms = int((time.time() - started_at) * 1000) if started_at else 0
 
+    # PR-4: detect progress
+    progress = -1
+    state_sig = ""
+    try:
+        from myxai_desk.core.execution_log.progress_detector import detect_progress
+        args_dict = args if isinstance(args, dict) else {}
+        prev_sig = _last_state_sig.get(session_id, "")
+        progress, state_sig = detect_progress(tool_name, args_dict, result, prev_sig)
+        if state_sig:
+            _last_state_sig[session_id] = state_sig
+    except Exception:
+        pass
+
     return record_step(
         session_id=session_id,
         tool_name=tool_name,
@@ -133,4 +162,6 @@ def record_step_from_event(
         action=action,
         result_preview=str(result)[:500] if result else "",
         duration_ms=duration_ms,
+        progress=progress,
+        state_sig=state_sig,
     )

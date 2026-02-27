@@ -140,6 +140,7 @@ from myxai_desk.web.apps_email_routes import bp as apps_email_bp
 from myxai_desk.web.apps_custom_routes import bp as apps_custom_bp
 from myxai_desk.web.reports_routes import bp as reports_bp
 from myxai_desk.apps.execution_radar.api import bp as execution_radar_bp
+from myxai_desk.apps.intent_engine.api import bp as intent_engine_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
@@ -154,6 +155,7 @@ flask_app.register_blueprint(apps_email_bp)
 flask_app.register_blueprint(apps_custom_bp)
 flask_app.register_blueprint(reports_bp)
 flask_app.register_blueprint(execution_radar_bp)
+flask_app.register_blueprint(intent_engine_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -730,9 +732,37 @@ def _patch_agent_tool_history(agent):
         max_nudges = 0 if _gcm() in (_SM.OPERATOR, _SM.DEVELOPER) else 1
 
         all_tool_defs = self.tools.get_definitions()
-        tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
+        _ie_result = None
+        try:
+            from myxai_desk.core.intent_engine.config import routing_enabled as _ie_routing_enabled
+            if _ie_routing_enabled():
+                from myxai_desk.core.intent_engine import predict as _ie_predict
+                _mcp_names = [d.get("function", {}).get("name", "") for d in all_tool_defs
+                              if d.get("function", {}).get("name", "").startswith("mcp_")]
+                _ie_result = _ie_predict(
+                    msg.content,
+                    context={"session_id": key, "exec_mode": exec_mode,
+                             "history_len": len(clean_history)},
+                    all_tool_defs=all_tool_defs,
+                    mcp_tool_names=_mcp_names,
+                )
+                tool_defs = _ie_result.filter_tools(all_tool_defs)
+                _ie_result.save(session_id=key, user_text=msg.content,
+                                context={"exec_mode": exec_mode})
+            else:
+                tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
+        except Exception:
+            tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
+        # ── Intent Engine: inject case hints into system message ──
+        if _ie_result and _ie_result.hints:
+            _hint_block = f"\n\n[EXPERIENCE HINTS]\n{_ie_result.hints}"
+            if messages and messages[0].get("role") == "system":
+                messages[0] = {**messages[0], "content": messages[0]["content"] + _hint_block}
+
         print(
             f"[agent] exec_mode={exec_mode}, tools={len(tool_defs)}/{len(all_tool_defs)}, "
+            f"ie={'on' if _ie_result else 'off'}, "
+            f"hints={'yes' if (_ie_result and _ie_result.hints) else 'no'}, "
             f"history={n_initial}, model={self.model}"
         )
 
@@ -749,8 +779,25 @@ def _patch_agent_tool_history(agent):
 
             _cap_guard = CapabilityGuard(self._cap_manager)
 
+        # ── PR-3: PlanRunner — reuse cached plan, skip LLM ──
+        _skip_llm_loop = False
+        if _ie_result and _ie_result.decision == "reuse_plan" and _ie_result.plan_steps:
+            try:
+                from myxai_desk.core.intent_engine.plan_runner import run_plan as _run_plan
+                _plan_result = await _run_plan(
+                    _ie_result.plan_steps, self.tools, key, progress,
+                )
+                tools_used = [
+                    s["tool_name"] for s in _plan_result.results if s.get("tool_name")
+                ]
+                final_content = _plan_result.final_summary
+                _skip_llm_loop = True
+                print(f"[agent] plan_runner: success={_plan_result.success}, steps={_plan_result.steps_executed}")
+            except Exception:
+                log.warning("[agent] plan_runner failed, falling through to LLM", exc_info=True)
+
         try:
-            while iteration < self.max_iterations:
+            while not _skip_llm_loop and iteration < self.max_iterations:
                 iteration += 1
                 response = await self.provider.chat(
                     messages=messages,
@@ -1087,6 +1134,38 @@ def _patch_agent_tool_history(agent):
         from apps.llm_utils import record_task_usage
 
         record_task_usage("chat", _turn_input, _turn_output, _turn_search)
+
+        # ── Intent Engine: write back outcome + collect case ──
+        if _ie_result is not None:
+            try:
+                _has_hard_fail = any(
+                    e.get("action") == "HARD_FAIL" for e in _turn_events
+                )
+                if _has_hard_fail:
+                    _ie_outcome = "fail"
+                elif tools_used:
+                    _ie_outcome = "success"
+                else:
+                    _ie_outcome = "unknown"
+                _ie_result.write_outcome(_ie_outcome)
+
+                from myxai_desk.core.intent_engine.config import case_retrieval_enabled as _ie_case_on
+                if _ie_case_on() and tools_used:
+                    from myxai_desk.core.intent_engine.case_store import save_case
+                    _plan_steps = [
+                        {"tool_name": e.get("tool", ""), "action": e.get("action", "")}
+                        for e in _turn_events if e.get("tool")
+                    ]
+                    save_case(
+                        task_text=msg.content,
+                        route_label=",".join(_ie_result.route_labels),
+                        plan_steps=_plan_steps,
+                        outcome=_ie_outcome,
+                        pitfalls="" if _ie_outcome == "success" else str(final_content)[:200],
+                        fail_reason="" if _ie_outcome == "success" else str(locals().get("_loop_err", ""))[:200],
+                    )
+            except Exception:
+                pass
 
         session.add_message("user", msg.content)
         session.add_message(
@@ -2809,16 +2888,48 @@ def _exec_execution_radar(task: "_TaskDescriptor", slot: "_DueSlot", trigger: st
     run_execution_radar(task, slot, trigger)
 
 
+def _load_intent_engine_tasks() -> list["_TaskDescriptor"]:
+    """Build a TaskDescriptor for daily intent engine training."""
+    registry = load_apps_registry()
+    app = registry.get("intent_engine", {})
+    if not app.get("enabled"):
+        return []
+    config = app.get("config", {})
+    schedule_time = config.get("schedule_time", "03:30")
+    hh, mm = schedule_time.split(":")[:2]
+    cron_expr = f"{mm} {hh} * * *"
+    return [
+        _TaskDescriptor(
+            task_id="daily_ie_training",
+            schedule={"enabled": True, "mode": "daily", "time": schedule_time},
+            cron_expr=cron_expr,
+            created_at=app.get("installed_at", "2026-01-01T00:00:00"),
+            last_success_at=app.get("last_run"),
+            catchup_policy="LATEST_ONLY",
+            catchup_window_hours=48,
+            max_catchup_runs=1,
+            extra={"kind": "intent_engine"},
+        )
+    ]
+
+
+def _exec_intent_engine(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
+    from myxai_desk.core.intent_engine.trainer.scheduler_job import run_ie_training
+    run_ie_training(task, slot, trigger)
+
+
 def _init_scheduler_service():
     """Register task loaders and executors with the global SchedulerService."""
     _scheduler_svc.register_task_loader(_load_official_tasks)
     _scheduler_svc.register_task_loader(_load_custom_tasks)
     _scheduler_svc.register_task_loader(_load_execution_radar_tasks)
+    _scheduler_svc.register_task_loader(_load_intent_engine_tasks)
     _scheduler_svc.register_executor("daily_digest", _exec_daily_digest)
     _scheduler_svc.register_executor("email_summary", _exec_email_summary)
     _scheduler_svc.register_executor("custom", _exec_custom_app)
     _scheduler_svc.register_executor("custom_summary", _exec_custom_summary)
     _scheduler_svc.register_executor("execution_radar", _exec_execution_radar)
+    _scheduler_svc.register_executor("intent_engine", _exec_intent_engine)
 
 
 def _start_app_scheduler():

@@ -120,6 +120,18 @@ APP_CATALOG = {
         "category": "analytics",
         "min_mode": "Observer",
     },
+    "intent_engine": {
+        "id": "intent_engine",
+        "name": _t("app.intent_engine.name"),
+        "name_en": "Intent Engine",
+        "icon": "🧠",
+        "description": _t("app.intent_engine.desc"),
+        "description_en": "Intent classification, tool routing, case retrieval, plan reuse — closed-loop execution intelligence",
+        "version": "1.0.0",
+        "author": "nanobot",
+        "category": "analytics",
+        "min_mode": "Observer",
+    },
 }
 
 DEFAULT_DIGEST_CONFIG = {
@@ -132,6 +144,13 @@ DEFAULT_DIGEST_CONFIG = {
 
 DEFAULT_EXECUTION_RADAR_CONFIG = {
     "schedule_time": "02:00",
+}
+
+DEFAULT_INTENT_ENGINE_CONFIG = {
+    "routing_enabled": True,
+    "case_retrieval_enabled": False,
+    "plan_reuse_enabled": False,
+    "schedule_time": "03:30",
 }
 
 DEFAULT_EMAIL_CONFIG = {

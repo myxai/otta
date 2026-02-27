@@ -290,16 +290,14 @@ def _classify_action_error(action: str, tool_name: str) -> str:
 def verify(tasks: list[dict]) -> list[dict]:
     """Apply success / hit_rate / effective judgement to each task.
 
-    Definitions (per user spec):
+    Definitions:
     - **success**: whether the task ultimately completed (last step ok).
-    - **effective_count**: number of distinct tool types used.
-      Same tool called multiple times = retries, only last call of each tool
-      is "effective". Different tools = pipeline steps, each effective.
+    - **effective_count**: when progress data is available, count steps with
+      progress==1; otherwise fall back to the legacy distinct-tool-type method.
     - **hit_rate**: effective_count / total_steps.
     - **single** task: successful & effective_count == 1.
     - **multi** task: successful & effective_count > 1.
-    - Ineffective steps get error_code ``E_RETRY`` — the tool ran but its
-      result was insufficient, causing a retry.
+    - Ineffective steps get error_code ``E_RETRY``.
     """
     for task in tasks:
         steps = task.get("steps", [])
@@ -313,7 +311,11 @@ def verify(tasks: list[dict]) -> list[dict]:
         task["success"] = last_ok
 
         if last_ok:
-            effective_count, effective_indices = _compute_effective_steps(steps)
+            has_progress = any(s.get("progress", -1) >= 0 for s in steps)
+            if has_progress:
+                effective_count, effective_indices = _compute_effective_by_progress(steps)
+            else:
+                effective_count, effective_indices = _compute_effective_steps(steps)
             task["effective_count"] = effective_count
             for i, s in enumerate(steps):
                 s["effective"] = i in effective_indices
@@ -338,15 +340,15 @@ def verify(tasks: list[dict]) -> list[dict]:
     return tasks
 
 
+def _compute_effective_by_progress(steps: list[dict]) -> tuple[int, set[int]]:
+    """Count steps where progress == 1 as effective."""
+    effective_indices = {i for i, s in enumerate(steps) if s.get("progress") == 1}
+    return len(effective_indices), effective_indices
+
+
 def _compute_effective_steps(steps: list[dict]) -> tuple[int, set[int]]:
-    """Determine which steps are effective.
-
-    Rule: each unique tool type contributes 1 effective step — the LAST
-    occurrence of that tool in the sequence. Repeated calls to the same tool
-    are treated as retries; only the final one counts.
-
-    Returns (effective_count, set_of_effective_indices).
-    """
+    """Legacy: each unique tool type contributes 1 effective step — the LAST
+    occurrence of that tool in the sequence."""
     last_index_by_tool: dict[str, int] = {}
     for i, s in enumerate(steps):
         tool = s.get("tool_name", "")

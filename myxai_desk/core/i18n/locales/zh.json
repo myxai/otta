@@ -48,6 +48,8 @@
   "app.email_summary.desc": "连接邮箱，AI 分类归纳生成每日邮件简报",
   "app.execution_radar.name": "执行雷达",
   "app.execution_radar.desc": "每日执行质量分析——命中率、错误趋势、工具诊断",
+  "app.intent_engine.name": "意图引擎",
+  "app.intent_engine.desc": "意图分类、工具路由、Case 检索、计划复用——闭环执行智能",
   
   "notification.daily_digest.updated": "🎯 每日私享已更新",
   "notification.daily_digest.content": "分析 {filtered} 条浏览记录，搜索 {results} 条推荐内容。",
