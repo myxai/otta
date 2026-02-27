@@ -217,7 +217,15 @@
               <div class="form-grid">
                 <div class="form-group">
                   <label data-i18n="settings.modelName">模型名称</label>
-                  <input type="text" id="cfg-model" placeholder="例如: anthropic/claude-opus-4-5" />
+                  <input type="text" id="cfg-model" placeholder="例如: qwen-plus, deepseek-chat" />
+                </div>
+                <div class="form-group">
+                  <label>API Base URL</label>
+                  <input type="text" id="cfg-custom-base" placeholder="https://dashscope.aliyuncs.com/compatible-mode/v1" />
+                </div>
+                <div class="form-group">
+                  <label>API Key</label>
+                  <input type="password" id="cfg-custom-key" placeholder="sk-xxx" />
                 </div>
                 <div class="form-group">
                   <label>Temperature <span class="label-value" id="temp-value">0.7</span></label>

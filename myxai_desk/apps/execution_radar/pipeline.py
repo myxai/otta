@@ -551,16 +551,33 @@ def _pick_fail_samples(tasks: list[dict], max_count: int = 3) -> list[dict]:
 def _get_model_config_safe() -> dict | None:
     """Try to load model config; return None if unavailable."""
     try:
-        from nanobot.config.loader import get_config_path, load_config
-        config = load_config()
-        model = config.agents.defaults.model
-        p = config.get_provider(model)
-        if not model or not p.api_key:
+        from myxai_desk.core.config_service import get_config
+        
+        config = get_config()  # Use config_service which merges keyring secrets
+        model = config.get("agents", {}).get("defaults", {}).get("model")
+        if not model:
             return None
+            
+        # Use nanobot's matching logic to find the right provider
+        from nanobot.config.loader import load_config
+        nb_config = load_config()  # This returns a Config object
+        provider_name = nb_config.get_provider_name(model)
+        
+        if not provider_name:
+            return None
+            
+        # Get the actual config with decrypted keys from config_service
+        providers = config.get("providers", {})
+        p_cfg = providers.get(provider_name, {})
+        api_key = p_cfg.get("apiKey", "")
+        
+        if not api_key or api_key == "<<KEYRING>>":
+            return None
+            
         return {
             "model": model,
-            "api_key": p.api_key,
-            "api_base": getattr(p, "api_base", None),
+            "api_key": api_key,
+            "api_base": p_cfg.get("apiBase"),
         }
     except Exception:
         return None

@@ -1471,6 +1471,8 @@ function fillConfigForm(cfg) {
   document.getElementById("cfg-max-tokens").value = get(cfg, ["agents", "defaults", "maxTokens"]) || "";
   document.getElementById("cfg-max-iterations").value = get(cfg, ["agents", "defaults", "maxToolIterations"]) || "";
   document.getElementById("cfg-memory-window").value = get(cfg, ["agents", "defaults", "memoryWindow"]) || "";
+  document.getElementById("cfg-custom-base").value = get(cfg, ["providers", "openai", "apiBase"]) || "";
+  document.getElementById("cfg-custom-key").value = get(cfg, ["providers", "openai", "apiKey"]) || "";
   
   // Load token cost config from separate API
   loadTokenCostConfig();
@@ -1498,7 +1500,19 @@ function fillConfigForm(cfg) {
 
   renderMcpServers(cfg);
 
-  document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
+  const cfgForJson = JSON.parse(JSON.stringify(cfg));
+  const maskKeys = (obj) => {
+    if (!obj || typeof obj !== "object") return;
+    for (const k of Object.keys(obj)) {
+      if (/api_?key/i.test(k) && typeof obj[k] === "string" && obj[k]) {
+        obj[k] = obj[k].slice(0, 3) + "***" + obj[k].slice(-3);
+      } else if (typeof obj[k] === "object") {
+        maskKeys(obj[k]);
+      }
+    }
+  };
+  maskKeys(cfgForJson);
+  document.getElementById("cfg-json-raw").value = JSON.stringify(cfgForJson, null, 2);
 }
 
 // ── Search API Usage ────────────────────────────────────────────────────
@@ -1670,6 +1684,9 @@ function collectConfigForm() {
   if (memWin) set(cfg, ["agents", "defaults", "memoryWindow"], memWin); else del(cfg, ["agents", "defaults", "memoryWindow"]);
   
   PROVIDER_FIELDS.forEach(({ id, path }) => { setOrDel(path, document.getElementById(id).value); });
+  setOrDel(["providers", "openai", "apiBase"], document.getElementById("cfg-custom-base").value);
+  const customKey = document.getElementById("cfg-custom-key").value;
+  if (customKey) set(cfg, ["providers", "openai", "apiKey"], customKey);
   setOrDel(["tools", "web", "search", "baiduApiKey"], document.getElementById("cfg-baidu-key").value);
   setOrDel(["tools", "web", "search", "apiKey"], document.getElementById("cfg-brave-key").value);
   set(cfg, ["tools", "web", "search", "quotaOnly"], document.getElementById("cfg-quota-only").checked);
@@ -1690,7 +1707,7 @@ async function saveConfig() {
     const res = await api("/api/config", "POST", cfg);
     if (res.success) {
       configCache = cfg;
-      document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
+      fillConfigForm(cfg);
       
       // Save token cost config separately
       await saveTokenCostConfig();
