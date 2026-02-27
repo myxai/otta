@@ -27,7 +27,7 @@ class QuotaManager:
     """Per-engine daily usage / limit tracker."""
 
     def __init__(self, limits: dict[str, int] | None = None):
-        self._limits = limits or {"brave": 1000, "baidu": 1000}
+        self._limits = limits or {"brave": 1000, "baidu": 100}
         self._file = USAGE_DIR / "search_usage.json"
 
     def _load(self) -> dict:

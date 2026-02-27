@@ -10,9 +10,12 @@ from myxai_desk.web.state import get_state
 bp = Blueprint("scheduler", __name__, url_prefix="/api/scheduler")
 
 # Official app display names / icons
+_ER_META = {"name_zh": "执行雷达", "name_en": "Execution Radar", "icon": "📡"}
 _OFFICIAL_APP_META = {
     "daily_digest": {"name_zh": "每日私享", "name_en": "Daily Briefing", "icon": "🎯"},
     "email_summary": {"name_zh": "邮件简报", "name_en": "Email Briefing", "icon": "📧"},
+    "daily_execution_radar": _ER_META,
+    "daily_healthcheck": _ER_META,  # legacy alias
 }
 
 
@@ -83,13 +86,13 @@ def today():
         get_today_runs,
     )
     from myxai_desk.core.timeutil import local_date_str, now_local
-    from app import _load_official_tasks, _load_custom_tasks
+    from app import _load_official_tasks, _load_custom_tasks, _load_execution_radar_tasks
     
     now = now_local()
     today_str = local_date_str()
     
     # Collect all task descriptors
-    tasks = _load_official_tasks() + _load_custom_tasks()
+    tasks = _load_official_tasks() + _load_custom_tasks() + _load_execution_radar_tasks()
     
     # Build a lookup: task_id -> (name_zh, name_en, icon, schedule_time)
     task_meta: dict[str, dict] = {}
@@ -138,10 +141,20 @@ def today():
     # 1) Tasks with existing runs today
     for task_id, runs in run_by_task.items():
         seen_tasks.add(task_id)
-        meta = task_meta.get(
-            task_id,
-            {"name_zh": task_id, "name_en": task_id, "icon": "🤖", "time": "", "mode": "daily"},
-        )
+        meta = task_meta.get(task_id)
+        if not meta:
+            # Check legacy mappings in _OFFICIAL_APP_META
+            official_meta = _OFFICIAL_APP_META.get(task_id)
+            if official_meta:
+                meta = {
+                    "name_zh": official_meta["name_zh"],
+                    "name_en": official_meta["name_en"],
+                    "icon": official_meta["icon"],
+                    "time": "",
+                    "mode": "daily",
+                }
+            else:
+                meta = {"name_zh": task_id, "name_en": task_id, "icon": "🤖", "time": "", "mode": "daily"}
         latest = runs[-1]
         items.append(
             {

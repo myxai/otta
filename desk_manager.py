@@ -101,7 +101,7 @@ class DeskManager:
             "quit": "退出",
             "unread": "📬 未读消息: {}",
             "no_unread": "📭 无未读消息",
-            "tokens": "🔥 今日 Token: {}",
+            "tokens": "{} 今日 Token: {}",
             "tokens_na": "🔥 今日 Token: --",
             "wan": "{}万",
         },
@@ -110,7 +110,7 @@ class DeskManager:
             "quit": "Quit",
             "unread": "📬 Unread: {}",
             "no_unread": "📭 No unread messages",
-            "tokens": "🔥 Today Token: {}",
+            "tokens": "{} Today Token: {}",
             "tokens_na": "🔥 Today Token: --",
             "wan": "{}万",
         },
@@ -188,11 +188,28 @@ class DeskManager:
             if self._get_token_usage:
                 usage = self._get_token_usage()
                 total = usage.get("total_tokens", 0)
+                cost = usage.get("cost", 0)
+                alert_level = usage.get("alert_level", "green")
+                
+                # Select indicator emoji based on alert level
+                if alert_level == "red":
+                    indicator = "🔴"
+                elif alert_level == "yellow":
+                    indicator = "🟡"
+                else:
+                    indicator = "🟢"
+                
+                # Format token display
                 if total >= 10000:
                     display = self._t("wan").format(f"{total / 10000:.1f}")
                 else:
                     display = f"{total:,}"
-                return self._t("tokens").format(display)
+                
+                # Add cost if configured
+                if cost > 0:
+                    display += f" ¥{cost:.2f}"
+                
+                return self._t("tokens").format(indicator, display)
             return self._t("tokens_na")
         except Exception:
             return self._t("tokens_na")

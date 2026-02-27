@@ -306,10 +306,26 @@ a:hover { text-decoration: underline; }
   font-size: 11px;
   color: var(--text-sub);
   cursor: default;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 .sidebar-stat-sep {
   font-size: 11px;
   color: var(--text-dim);
+}
+.token-alert-indicator {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green, #a6e3a1);
+}
+.token-alert-indicator.yellow {
+  background: var(--yellow, #f9e2af);
+}
+.token-alert-indicator.red {
+  background: var(--red, #f38ba8);
 }
 
 /* ── Task Nav Button & Badge ──────────────────────────────────────── */
@@ -3758,31 +3774,36 @@ a:hover { text-decoration: underline; }
 }
 
 /* ── Execution Radar App ──────────────────────────────────────── */
-.hc-card {
+.er-card {
   background: var(--bg-surface0);
   border: 1px solid var(--bg-surface1);
   border-radius: 10px;
   padding: 14px 16px;
   text-align: center;
 }
-.hc-card-label {
+.er-card-label {
   font-size: 11px;
   color: var(--subtext0);
   margin-bottom: 4px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
-.hc-card-value {
+.er-card-value {
   font-size: 22px;
   font-weight: 700;
   color: var(--text);
 }
-.hc-table {
+.er-card-sub {
+  font-size: 11px;
+  color: var(--subtext0);
+  margin-top: 2px;
+}
+.er-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
 }
-.hc-table th {
+.er-table th {
   text-align: left;
   padding: 8px 10px;
   border-bottom: 2px solid var(--bg-surface1);
@@ -3791,20 +3812,20 @@ a:hover { text-decoration: underline; }
   font-size: 11px;
   text-transform: uppercase;
 }
-.hc-table td {
+.er-table td {
   padding: 7px 10px;
   border-bottom: 1px solid var(--bg-surface0);
 }
-.hc-table tr:hover td {
+.er-table tr:hover td {
   background: var(--bg-surface0);
 }
-.hc-table code {
+.er-table code {
   background: var(--bg-mantle);
   padding: 1px 6px;
   border-radius: 4px;
   font-size: 12px;
 }
-.hc-table-placeholder {
+.er-table-placeholder {
   text-align: center;
   padding: 24px;
   color: var(--subtext0);
@@ -3841,17 +3862,17 @@ a:hover { text-decoration: underline; }
   border: 2px solid transparent;
   border-top-color: currentColor;
   border-radius: 50%;
-  animation: hc-spin 0.6s linear infinite;
+  animation: er-spin 0.6s linear infinite;
   vertical-align: middle;
 }
-@keyframes hc-spin {
+@keyframes er-spin {
   to { transform: rotate(360deg); }
 }
 
 /* Task detail table */
-.hc-task-row { transition: background 0.15s; }
-.hc-task-row:hover td { background: var(--bg-surface0); }
-.hc-arrow {
+.er-task-row { transition: background 0.15s; }
+.er-task-row:hover td { background: var(--bg-surface0); }
+.er-arrow {
   display: inline-block;
   font-size: 10px;
   color: var(--subtext0);
@@ -3859,14 +3880,14 @@ a:hover { text-decoration: underline; }
   width: 14px;
   text-align: center;
 }
-.hc-steps-container {
+.er-steps-container {
   padding: 6px 8px 6px 28px;
   background: var(--bg-mantle);
   border-radius: 6px;
   margin: 4px 0;
 }
-.hc-steps-inner { font-size: 12px; }
-.hc-steps-inner th {
+.er-steps-inner { font-size: 12px; }
+.er-steps-inner th {
   font-size: 10px;
   color: var(--subtext0);
   text-transform: uppercase;
@@ -3874,11 +3895,11 @@ a:hover { text-decoration: underline; }
   padding: 4px 8px;
   border-bottom: 1px solid var(--bg-surface0);
 }
-.hc-steps-inner td {
+.er-steps-inner td {
   padding: 4px 8px;
   border-bottom: 1px solid var(--bg-surface0);
 }
-.hc-args-cell {
+.er-args-cell {
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3886,7 +3907,7 @@ a:hover { text-decoration: underline; }
   font-size: 11px;
   color: var(--subtext0);
 }
-.hc-badge {
+.er-badge {
   display: inline-block;
   padding: 1px 8px;
   border-radius: 4px;
@@ -3894,15 +3915,15 @@ a:hover { text-decoration: underline; }
   font-weight: 600;
   line-height: 1.6;
 }
-.hc-badge-ok {
+.er-badge-ok {
   background: rgba(166,227,161,0.15);
   color: var(--green, #a6e3a1);
 }
-.hc-badge-fail {
+.er-badge-fail {
   background: rgba(243,139,168,0.15);
   color: var(--red, #f38ba8);
 }
-.hc-badge-dim {
+.er-badge-dim {
   background: var(--bg-surface0);
   color: var(--subtext0);
 }

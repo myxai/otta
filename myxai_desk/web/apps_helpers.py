@@ -25,9 +25,15 @@ def load_apps_registry() -> dict:
     APPS_DIR.mkdir(parents=True, exist_ok=True)
     if APPS_REGISTRY.exists():
         try:
-            return json.loads(APPS_REGISTRY.read_text(encoding="utf-8"))
+            data = json.loads(APPS_REGISTRY.read_text(encoding="utf-8"))
         except Exception:
             log.warning("Failed to load apps registry (invalid JSON)", exc_info=True)
+            return {}
+        if "healthcheck" in data and "execution_radar" not in data:
+            data["execution_radar"] = data.pop("healthcheck")
+            save_apps_registry(data)
+            log.info("Migrated registry key 'healthcheck' → 'execution_radar'")
+        return data
     return {}
 
 
@@ -41,9 +47,14 @@ def save_apps_registry(data: dict):
 def load_apps_prefs() -> dict:
     if APPS_PREFS.exists():
         try:
-            return json.loads(APPS_PREFS.read_text(encoding="utf-8"))
+            data = json.loads(APPS_PREFS.read_text(encoding="utf-8"))
         except Exception:
             log.warning("Failed to load apps prefs (invalid JSON)", exc_info=True)
+            return {}
+        if "healthcheck" in data and "execution_radar" not in data:
+            data["execution_radar"] = data.pop("healthcheck")
+            save_apps_prefs(data)
+        return data
     return {}
 
 
@@ -97,12 +108,12 @@ APP_CATALOG = {
         "category": "productivity",
         "min_mode": "Assistant",
     },
-    "healthcheck": {
-        "id": "healthcheck",
-        "name": _t("app.healthcheck.name"),
+    "execution_radar": {
+        "id": "execution_radar",
+        "name": _t("app.execution_radar.name"),
         "name_en": "Execution Radar",
         "icon": "📡",
-        "description": _t("app.healthcheck.desc"),
+        "description": _t("app.execution_radar.desc"),
         "description_en": "Daily execution quality analytics — hit rates, error trends, tool diagnostics",
         "version": "1.0.0",
         "author": "nanobot",
@@ -117,6 +128,10 @@ DEFAULT_DIGEST_CONFIG = {
     "schedule_time": "22:00",
     "push_notification": True,
     "push_email": "",
+}
+
+DEFAULT_EXECUTION_RADAR_CONFIG = {
+    "schedule_time": "02:00",
 }
 
 DEFAULT_EMAIL_CONFIG = {

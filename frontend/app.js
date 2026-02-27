@@ -82,9 +82,13 @@ const FALLBACK_I18N = {
     "settings.closeBehavior":"关闭窗口时","settings.closeMinimize":"最小化到托盘（后台运行）","settings.closeQuit":"完全退出",
     "settings.model":"模型设置","settings.modelName":"模型名称",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"最大工具迭代次数","settings.memoryWindow":"记忆窗口大小",
+    "settings.tokenCost":"Token 成本与预警","settings.inputPrice":"输入单价 (元/百万token)","settings.outputPrice":"输出单价 (元/百万token)",
+    "settings.dailyLimit":"日使用量预警 (百万token)","settings.monthlyLimit":"月使用量预警 (百万token)",
     "settings.apiKeys":"API 密钥",
     "settings.searchTools":"搜索与工具","settings.baiduKey":"百度搜索 API Key","settings.braveKey":"Brave Search API Key",
     "settings.quotaOnly":"仅使用免费额度","settings.usageToday":"今日已用","settings.quotaExhausted":"额度已用完",
+    "settings.searchQuota":"搜索 API 额度","settings.braveQuota":"免费额度","settings.baiduQuota":"免费额度",
+    "settings.toolSettings":"工具设置",
     "settings.shellTimeout":"Shell 超时 (秒)","settings.restrictWorkspace":"限制工具在工作区内操作",
     "settings.channels":"频道",
     "settings.advancedJson":"高级 JSON 编辑","settings.toggleJson":"展开/折叠","settings.applyJson":"应用 JSON",
@@ -180,8 +184,9 @@ const FALLBACK_I18N = {
     "reports.title":"报告","reports.unread":"未读","reports.24h":"24小时","reports.3d":"3天","reports.7d":"7天","reports.30d":"30天","reports.all":"全部",
     "reports.empty":"暂无报告","reports.allRead":"全部已读，去看看其他时间段吧","reports.viewReport":"查看",
     "reports.markAllRead":"全部已读","reports.delete":"删除","reports.deleteOk":"已删除","reports.deleteFail":"删除失败",
-    "nav.stats":"统计","stats.todayPrefix":"今日","stats.tokenTitle":"Token 消耗","stats.searchTitle":"搜索 API 调用",
-    "stats.rangeTotal":"累计","stats.tokenTip":"今日 LLM Token 消耗量","stats.searchTip":"今日各搜索引擎用量 / 额度",
+    "nav.stats":"统计","stats.todayPrefix":"今日","stats.tokenTitle":"Token 消耗","stats.searchTitle":"搜索 API 调用","stats.costTitle":"消费成本",
+    "stats.rangeTotal":"累计","stats.tokenTip":"今日 LLM Token 消耗量","stats.searchTip":"今日各搜索引擎用量 / 额度","stats.costTip":"今日消费成本",
+    "stats.noPricing":"未设置 Token 单价","stats.noPricingHint":"请在「设置 → 模型」中配置输入/输出单价",
     "stats.categoryTitle":"分类消耗","stats.categoryPieTitle":"消耗构成","stats.categoryBarTitle":"平均单次消耗","stats.catChat":"对话","stats.avgTokens":"平均 Token","stats.noData":"暂无数据，使用后自动生成",
     "apps.title":"应用中心","apps.search":"搜索应用…","apps.back":"返回",
     "apps.sortRecommended":"推荐","apps.sortFrequency":"使用频率","apps.sortCreated":"创建时间","apps.sortName":"名称",
@@ -264,24 +269,27 @@ const FALLBACK_I18N = {
     "custom.step1":"类型与任务","custom.step2":"定时与总结","custom.step3":"基本信息",
     "custom.next":"下一步","custom.prev":"上一步","custom.cancel":"取消",
     "custom.badge":"自定义",
-    "healthcheck.title":"执行雷达","healthcheck.summary":"今日雷达","healthcheck.runNow":"立即运行",
-    "healthcheck.totalTasks":"任务数","healthcheck.successRate":"成功率",
-    "healthcheck.singleHitRate":"单任务命中率","healthcheck.multiHitRate":"多任务命中率",
-    "healthcheck.avgAttempts":"平均尝试次数","healthcheck.avgTokens":"平均 Token",
-    "healthcheck.trends":"趋势","healthcheck.hitRateTrend":"命中率趋势","healthcheck.attemptsTrend":"试错与成本趋势",
-    "healthcheck.topErrors":"Top 错误码","healthcheck.topTools":"Top 工具",
-    "healthcheck.errorCode":"错误码","healthcheck.count":"次数","healthcheck.pct":"占比",
-    "healthcheck.toolName":"工具名称","healthcheck.failCount":"失败次数",
-    "healthcheck.loading":"加载中…","healthcheck.noData":"暂无数据",
-    "healthcheck.running":"正在扫描…","healthcheck.runStarted":"雷达扫描已启动，数据将在几秒后更新",
-    "healthcheck.runFailed":"扫描失败","healthcheck.runDone":"扫描完成，数据已更新","healthcheck.runTimeout":"扫描仍在进行中，请稍后手动刷新",
-    "healthcheck.taskDetail":"评价详情","healthcheck.taskContent":"任务内容",
-    "healthcheck.totalSteps":"步数","healthcheck.effectiveSteps":"有效数",
-    "healthcheck.hitRateCol":"命中率","healthcheck.successCol":"是否成功",
-    "healthcheck.yes":"成功","healthcheck.no":"失败",
-    "healthcheck.stepIndex":"步骤","healthcheck.stepArgs":"参数",
-    "healthcheck.stepStatus":"状态","healthcheck.stepEffective":"判定",
-    "healthcheck.effective":"有效","healthcheck.ineffective":"无效",
+    "er.title":"执行雷达","er.summary":"今日雷达","er.runNow":"立即运行",
+    "er.totalTasks":"任务数","er.successRate":"成功率",
+    "er.singleHitRate":"单任务命中率","er.multiHitRate":"多任务命中率",
+    "er.avgAttempts":"平均尝试次数","er.avgTokens":"平均 Token",
+    "er.trends":"趋势","er.hitRateTrend":"命中率趋势","er.attemptsTrend":"尝试次数趋势",
+    "er.topErrors":"Top 错误码","er.topTools":"Top 工具",
+    "er.errorCode":"错误码","er.count":"次数","er.pct":"占比",
+    "er.toolName":"工具名称","er.failCount":"失败次数",
+    "er.loading":"加载中…","er.noData":"暂无数据",
+    "er.running":"正在扫描…","er.runStarted":"雷达扫描已启动，数据将在几秒后更新",
+    "er.runFailed":"扫描失败","er.runDone":"扫描完成，数据已更新","er.runTimeout":"扫描仍在进行中，请稍后手动刷新",
+    "er.noErrors":"本日无错误，全部执行成功",
+    "er.avgPrefix":"平均","er.avgSuffix":"次/任务","er.avgSuffixPerEff":"次/{n}有效步",
+    "er.taskDetail":"评价详情","er.taskContent":"任务内容",
+    "er.totalSteps":"步数","er.effectiveSteps":"有效数",
+    "er.hitRateCol":"命中率","er.successCol":"是否成功",
+    "er.yes":"成功","er.no":"失败",
+    "er.stepIndex":"步骤","er.stepArgs":"参数",
+    "er.stepStatus":"状态","er.stepEffective":"判定",
+    "er.effective":"有效","er.ineffective":"无效",
+    "er.config":"设置","er.scheduleTime":"每日扫描时间","er.saveConfig":"保存设置","er.configSaved":"设置已保存","er.configFail":"保存失败",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
@@ -304,9 +312,13 @@ const FALLBACK_I18N = {
     "settings.closeBehavior":"On Window Close","settings.closeMinimize":"Minimize to tray (run in background)","settings.closeQuit":"Quit completely",
     "settings.model":"Model Settings","settings.modelName":"Model Name",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"Max Tool Iterations","settings.memoryWindow":"Memory Window Size",
+    "settings.tokenCost":"Token Cost & Alerts","settings.inputPrice":"Input Price (¥/M tokens)","settings.outputPrice":"Output Price (¥/M tokens)",
+    "settings.dailyLimit":"Daily Alert (M tokens)","settings.monthlyLimit":"Monthly Alert (M tokens)",
     "settings.apiKeys":"API Keys",
     "settings.searchTools":"Search & Tools","settings.baiduKey":"Baidu Search API Key","settings.braveKey":"Brave Search API Key",
     "settings.quotaOnly":"Free quota only","settings.usageToday":"Used today","settings.quotaExhausted":"Quota exhausted",
+    "settings.searchQuota":"Search API Quota","settings.braveQuota":"Free Quota","settings.baiduQuota":"Free Quota",
+    "settings.toolSettings":"Tool Settings",
     "settings.shellTimeout":"Shell Timeout (sec)","settings.restrictWorkspace":"Restrict tools to workspace",
     "settings.channels":"Channels",
     "settings.advancedJson":"Advanced JSON Editor","settings.toggleJson":"Toggle","settings.applyJson":"Apply JSON",
@@ -402,8 +414,9 @@ const FALLBACK_I18N = {
     "reports.title":"Reports","reports.unread":"Unread","reports.24h":"24h","reports.3d":"3 Days","reports.7d":"7 Days","reports.30d":"30 Days","reports.all":"All",
     "reports.empty":"No reports yet","reports.allRead":"All caught up! Try another time range","reports.viewReport":"View",
     "reports.markAllRead":"Mark all read","reports.delete":"Delete","reports.deleteOk":"Deleted","reports.deleteFail":"Delete failed",
-    "nav.stats":"Statistics","stats.todayPrefix":"Today","stats.tokenTitle":"Token Usage","stats.searchTitle":"Search API Calls",
-    "stats.rangeTotal":"Total","stats.tokenTip":"Today's LLM token usage","stats.searchTip":"Today's search usage / quota per engine",
+    "nav.stats":"Statistics","stats.todayPrefix":"Today","stats.tokenTitle":"Token Usage","stats.searchTitle":"Search API Calls","stats.costTitle":"Cost",
+    "stats.rangeTotal":"Total","stats.tokenTip":"Today's LLM token usage","stats.searchTip":"Today's search usage / quota per engine","stats.costTip":"Today's cost",
+    "stats.noPricing":"Token Pricing Not Set","stats.noPricingHint":"Please configure input/output pricing in Settings → Model",
     "stats.categoryTitle":"Category Usage","stats.categoryPieTitle":"Usage Breakdown","stats.categoryBarTitle":"Avg. per Task","stats.catChat":"Chat","stats.avgTokens":"Avg Tokens","stats.noData":"No data yet",
     "apps.title":"App Center","apps.search":"Search apps…","apps.back":"Back",
     "apps.sortRecommended":"Recommended","apps.sortFrequency":"Most used","apps.sortCreated":"Newest","apps.sortName":"Name",
@@ -486,24 +499,27 @@ const FALLBACK_I18N = {
     "custom.step1":"Type & Task","custom.step2":"Schedule & Summary","custom.step3":"App Info",
     "custom.next":"Next","custom.prev":"Back","custom.cancel":"Cancel",
     "custom.badge":"Custom",
-    "healthcheck.title":"Execution Radar","healthcheck.summary":"Today's Radar","healthcheck.runNow":"Run Now",
-    "healthcheck.totalTasks":"Tasks","healthcheck.successRate":"Success Rate",
-    "healthcheck.singleHitRate":"Single Hit Rate","healthcheck.multiHitRate":"Multi Hit Rate",
-    "healthcheck.avgAttempts":"Avg Attempts","healthcheck.avgTokens":"Avg Tokens",
-    "healthcheck.trends":"Trends","healthcheck.hitRateTrend":"Hit Rate Trend","healthcheck.attemptsTrend":"Attempts & Cost Trend",
-    "healthcheck.topErrors":"Top Errors","healthcheck.topTools":"Top Tools",
-    "healthcheck.errorCode":"Error Code","healthcheck.count":"Count","healthcheck.pct":"Pct",
-    "healthcheck.toolName":"Tool Name","healthcheck.failCount":"Fail Count",
-    "healthcheck.loading":"Loading…","healthcheck.noData":"No data yet",
-    "healthcheck.running":"Scanning…","healthcheck.runStarted":"Radar scan started, data will update shortly",
-    "healthcheck.runFailed":"Scan failed","healthcheck.runDone":"Scan complete, data updated","healthcheck.runTimeout":"Scan still running, refresh later",
-    "healthcheck.taskDetail":"Task Detail","healthcheck.taskContent":"Task",
-    "healthcheck.totalSteps":"Steps","healthcheck.effectiveSteps":"Effective",
-    "healthcheck.hitRateCol":"Hit Rate","healthcheck.successCol":"Success",
-    "healthcheck.yes":"Yes","healthcheck.no":"No",
-    "healthcheck.stepIndex":"#","healthcheck.stepArgs":"Args",
-    "healthcheck.stepStatus":"Status","healthcheck.stepEffective":"Verdict",
-    "healthcheck.effective":"Effective","healthcheck.ineffective":"Ineffective",
+    "er.title":"Execution Radar","er.summary":"Today's Radar","er.runNow":"Run Now",
+    "er.totalTasks":"Tasks","er.successRate":"Success Rate",
+    "er.singleHitRate":"Single Hit Rate","er.multiHitRate":"Multi Hit Rate",
+    "er.avgAttempts":"Avg Attempts","er.avgTokens":"Avg Tokens",
+    "er.trends":"Trends","er.hitRateTrend":"Hit Rate Trend","er.attemptsTrend":"Attempts Trend",
+    "er.topErrors":"Top Errors","er.topTools":"Top Tools",
+    "er.errorCode":"Error Code","er.count":"Count","er.pct":"Pct",
+    "er.toolName":"Tool Name","er.failCount":"Fail Count",
+    "er.loading":"Loading…","er.noData":"No data yet",
+    "er.running":"Scanning…","er.runStarted":"Radar scan started, data will update shortly",
+    "er.runFailed":"Scan failed","er.runDone":"Scan complete, data updated","er.runTimeout":"Scan still running, refresh later",
+    "er.noErrors":"No errors today — all executions succeeded",
+    "er.avgPrefix":"avg","er.avgSuffix":"steps/task","er.avgSuffixPerEff":"steps/{n}eff",
+    "er.taskDetail":"Task Detail","er.taskContent":"Task",
+    "er.totalSteps":"Steps","er.effectiveSteps":"Effective",
+    "er.hitRateCol":"Hit Rate","er.successCol":"Success",
+    "er.yes":"Yes","er.no":"No",
+    "er.stepIndex":"#","er.stepArgs":"Args",
+    "er.stepStatus":"Status","er.stepEffective":"Verdict",
+    "er.effective":"Effective","er.ineffective":"Ineffective",
+    "er.config":"Settings","er.scheduleTime":"Daily Scan Time","er.saveConfig":"Save Settings","er.configSaved":"Settings saved","er.configFail":"Save failed",
   },
 };
 
@@ -723,7 +739,7 @@ function switchPage(page) {
     n.classList.toggle("active", np === page || (np === "apps" && page === "app-detail"));
   });
   if (page === "settings") { loadConfig(); _syncGwSettings(); loadDeskSettings(); switchSettingsTab(_lastSettingsTab || "general"); }
-  if (page === "stats") { loadTokenChart(_statsTimeRange); loadSearchChart(_statsTimeRange); loadCategoryCharts(_statsTimeRange); }
+  if (page === "stats") { loadTokenChart(_statsTimeRange); loadSearchChart(_statsTimeRange); loadCostChart(_statsTimeRange); loadCategoryCharts(_statsTimeRange); }
   if (page === "status") {
     loadStatus();
     startStatusAutoRefresh();
@@ -1405,6 +1421,28 @@ async function loadConfig() {
   } catch (e) { toast(t("settings.loadFail"), "error"); }
 }
 
+async function loadTokenCostConfig() {
+  try {
+    const data = await api("/api/token/cost_config");
+    document.getElementById("cfg-input-price").value = data.inputPrice || "";
+    document.getElementById("cfg-output-price").value = data.outputPrice || "";
+    document.getElementById("cfg-daily-limit").value = data.dailyLimit || "";
+    document.getElementById("cfg-monthly-limit").value = data.monthlyLimit || "";
+  } catch (e) {
+    console.warn("Failed to load token cost config", e);
+  }
+}
+
+async function loadSearchQuotaConfig() {
+  try {
+    const data = await api("/api/search/quota_config");
+    document.getElementById("cfg-brave-quota").value = data.brave || 1000;
+    document.getElementById("cfg-baidu-quota").value = data.baidu || 100;
+  } catch (e) {
+    console.warn("Failed to load search quota config", e);
+  }
+}
+
 function fillConfigForm(cfg) {
   const get = (obj, path) => path.reduce((o, k) => (o && o[k] !== undefined ? o[k] : ""), obj);
   document.getElementById("cfg-model").value = get(cfg, ["agents", "defaults", "model"]) || "";
@@ -1413,6 +1451,13 @@ function fillConfigForm(cfg) {
   document.getElementById("cfg-max-tokens").value = get(cfg, ["agents", "defaults", "maxTokens"]) || "";
   document.getElementById("cfg-max-iterations").value = get(cfg, ["agents", "defaults", "maxToolIterations"]) || "";
   document.getElementById("cfg-memory-window").value = get(cfg, ["agents", "defaults", "memoryWindow"]) || "";
+  
+  // Load token cost config from separate API
+  loadTokenCostConfig();
+  
+  // Load search quota config from separate API
+  loadSearchQuotaConfig();
+  
   PROVIDER_FIELDS.forEach(({ id, path }) => { document.getElementById(id).value = get(cfg, path) || ""; });
   document.getElementById("cfg-baidu-key").value = get(cfg, ["tools", "web", "search", "baiduApiKey"]) || "";
   document.getElementById("cfg-brave-key").value = get(cfg, ["tools", "web", "search", "apiKey"]) || "";
@@ -1603,6 +1648,7 @@ function collectConfigForm() {
   if (maxIter) set(cfg, ["agents", "defaults", "maxToolIterations"], maxIter); else del(cfg, ["agents", "defaults", "maxToolIterations"]);
   const memWin = parseInt(document.getElementById("cfg-memory-window").value);
   if (memWin) set(cfg, ["agents", "defaults", "memoryWindow"], memWin); else del(cfg, ["agents", "defaults", "memoryWindow"]);
+  
   PROVIDER_FIELDS.forEach(({ id, path }) => { setOrDel(path, document.getElementById(id).value); });
   setOrDel(["tools", "web", "search", "baiduApiKey"], document.getElementById("cfg-baidu-key").value);
   setOrDel(["tools", "web", "search", "apiKey"], document.getElementById("cfg-brave-key").value);
@@ -1620,13 +1666,49 @@ function collectConfigForm() {
 async function saveConfig() {
   const cfg = collectConfigForm();
   try {
+    // Save nanobot config
     const res = await api("/api/config", "POST", cfg);
     if (res.success) {
       configCache = cfg;
       document.getElementById("cfg-json-raw").value = JSON.stringify(cfg, null, 2);
+      
+      // Save token cost config separately
+      await saveTokenCostConfig();
+      
+      // Save search quota config separately
+      await saveSearchQuotaConfig();
+      
       toast(t("settings.saved"), "success");
     } else { toast(res.error || t("settings.saveFail"), "error"); }
   } catch (e) { toast(t("settings.saveFail") + ": " + e.message, "error"); }
+}
+
+async function saveTokenCostConfig() {
+  const config = {
+    inputPrice: parseFloat(document.getElementById("cfg-input-price").value) || 0,
+    outputPrice: parseFloat(document.getElementById("cfg-output-price").value) || 0,
+    dailyLimit: parseFloat(document.getElementById("cfg-daily-limit").value) || 0,
+    monthlyLimit: parseFloat(document.getElementById("cfg-monthly-limit").value) || 0,
+  };
+  try {
+    await api("/api/token/cost_config", "POST", config);
+  } catch (e) {
+    console.warn("Failed to save token cost config", e);
+    throw e;
+  }
+}
+
+async function saveSearchQuotaConfig() {
+  const config = {
+    brave: parseInt(document.getElementById("cfg-brave-quota").value) || 1000,
+    baidu: parseInt(document.getElementById("cfg-baidu-quota").value) || 100,
+  };
+  try {
+    await api("/api/search/quota_config", "POST", config);
+  } catch (e) {
+    console.warn("Failed to save search quota config", e);
+    throw e;
+  }
 }
 
 function toggleJsonEditor() {
@@ -1654,6 +1736,7 @@ function updateStatsTimeRange(days) {
   });
   loadTokenChart(days);
   loadSearchChart(days);
+  loadCostChart(days);
   loadCategoryCharts(days);
 }
 
@@ -1716,6 +1799,96 @@ async function loadSearchChart(days) {
   }
 }
 
+async function loadCostChart(days) {
+  const canvas = document.getElementById("cost-chart-canvas");
+  const totalEl = document.getElementById("cost-chart-total");
+  if (!canvas) return;
+  
+  // Destroy existing chart
+  if (window._costChart) {
+    window._costChart.destroy();
+    window._costChart = null;
+  }
+  
+  try {
+    const data = await api(`/api/token/history?days=${days || _statsTimeRange}`);
+    const history = data.cost_history || [];
+    const total = data.total_cost || 0;
+    
+    // Check if pricing is configured (any non-zero cost in history)
+    const hasPricing = history.length > 0 && history.some(d => d.cost > 0);
+    
+    if (!hasPricing) {
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.font = '14px sans-serif';
+      ctx.fillStyle = 'var(--text-sub)';
+      ctx.textAlign = 'center';
+      ctx.fillText('💡 ' + t("stats.noPricing"), canvas.width / 2, canvas.height / 2 - 10);
+      ctx.font = '12px sans-serif';
+      ctx.fillStyle = 'var(--text-dim)';
+      ctx.fillText(t("stats.noPricingHint"), canvas.width / 2, canvas.height / 2 + 10);
+      if (totalEl) totalEl.textContent = "";
+      return;
+    }
+    
+    if (totalEl) totalEl.textContent = `${t("stats.rangeTotal")} ¥${total.toFixed(2)}`;
+    
+    const labels = history.map(d => d.date.slice(5));
+    const costs = history.map(d => d.cost || 0);
+    
+    const isDark = document.body.classList.contains('dark-theme');
+    
+    window._costChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: t("stats.costTitle"),
+          data: costs,
+          borderColor: '#f38ba8',
+          backgroundColor: 'rgba(243,139,168,0.1)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: 3,
+          pointHoverRadius: 5,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => `¥${ctx.parsed.y.toFixed(4)}`
+            }
+          }
+        },
+        scales: {
+          x: {
+            ticks: { color: isDark ? '#a6adc8' : '#666', font: { size: 11 } },
+            grid: { display: false }
+          },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: isDark ? '#a6adc8' : '#666',
+              font: { size: 11 },
+              callback: (val) => '¥' + val.toFixed(2)
+            },
+            grid: { color: isDark ? 'rgba(69,71,90,0.4)' : 'rgba(0,0,0,0.1)' }
+          }
+        }
+      }
+    });
+  } catch (e) {
+    console.warn('loadCostChart error:', e);
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
 // ── Category charts (Chart.js) ────────────────────────────────────────
 
 let _categoryPieChart = null;
@@ -1728,7 +1901,16 @@ const _CHART_COLORS = [
 
 function _catLabel(key) {
   if (key === 'chat') return t('stats.catChat');
-  if (key.startsWith('app_')) return key.slice(4);
+  if (key === 'persona') return '画像更新';
+  if (key.startsWith('app_')) {
+    const appKey = key.slice(4);
+    // Map English app names to localized names
+    const appNameMap = {
+      'execution_radar': '执行雷达',
+      'healthcheck': '执行雷达',  // legacy
+    };
+    return appNameMap[appKey] || appKey;
+  }
   return key;
 }
 
@@ -1751,8 +1933,11 @@ async function loadCategoryCharts(days) {
     const labels = [], values = [], avgValues = [], colors = [];
     let ci = 0;
     for (const [k, v] of Object.entries(cats)) {
-      labels.push(_catLabel(k));
       const total = (v.input || 0) + (v.output || 0);
+      // Skip categories with zero usage
+      if (total === 0) continue;
+      
+      labels.push(_catLabel(k));
       values.push(total);
       avgValues.push(Math.round(total / (v.count || 1)));
       colors.push(_CHART_COLORS[ci % _CHART_COLORS.length]);
@@ -2706,7 +2891,7 @@ async function uninstallApp(appId) {
 async function openAppDetail(appId) {
   if (appId === "daily_digest") { await openDigestDetail(); return; }
   if (appId === "email_summary") { await openEmailDetail(); return; }
-  if (appId === "healthcheck") { await openHealthcheckDetail(); return; }
+  if (appId === "execution_radar") { await openExecutionRadarDetail(); return; }
   if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
 }
@@ -2724,259 +2909,278 @@ async function openAppReports(appId) {
 }
 
 // ── Execution Radar Detail ────────────────────────────────────────────
-let _hcChart1 = null, _hcChart2 = null;
+let _erChart1 = null, _erChart2 = null;
 
-async function openHealthcheckDetail() {
-  document.getElementById("app-detail-title").textContent = `📡 ${t("healthcheck.title")}`;
+async function openExecutionRadarDetail() {
+  document.getElementById("app-detail-title").textContent = `📡 ${t("er.title")}`;
   switchPage("app-detail");
   const container = document.getElementById("app-detail-content");
+
+  let hcConfig = {};
+  try { hcConfig = await api("/api/apps/execution_radar/config"); } catch (_) {}
+  const scheduleTime = hcConfig.schedule_time || "02:00";
 
   container.innerHTML = `
     <div class="app-detail-section" style="margin-bottom:18px">
       <div class="digest-status-bar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-        <span style="font-weight:600">${t("healthcheck.summary")}</span>
-        <input type="date" id="hc-date-picker" value="${new Date().toISOString().slice(0,10)}" style="padding:4px 8px;border-radius:6px;border:1px solid var(--bg-surface1);background:var(--bg-surface0);color:var(--text);font-size:12px" onchange="switchHcDate(this.value)">
-        <button class="btn btn-sm" id="hc-run-btn" onclick="runHealthcheck()">${t("healthcheck.runNow")}</button>
-        <span id="hc-run-indicator" style="font-size:12px;color:var(--subtext0);display:none"></span>
+        <span style="font-weight:600">${t("er.summary")}</span>
+        <input type="date" id="er-date-picker" value="${new Date().toISOString().slice(0,10)}" style="padding:4px 8px;border-radius:6px;border:1px solid var(--bg-surface1);background:var(--bg-surface0);color:var(--text);font-size:12px" onchange="switchErDate(this.value)">
+        <button class="btn btn-sm" id="er-run-btn" onclick="runExecutionRadar()">${t("er.runNow")}</button>
+        <span id="er-run-indicator" style="font-size:12px;color:var(--subtext0);display:none"></span>
       </div>
     </div>
 
-    <div class="digest-config-grid" id="hc-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:22px">
-      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.totalTasks")}</div><div class="hc-card-value" id="hc-total-tasks">--</div></div>
-      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.successRate")}</div><div class="hc-card-value" id="hc-success-rate">--</div></div>
-      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.singleHitRate")}</div><div class="hc-card-value" id="hc-single-hit">--</div></div>
-      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.multiHitRate")}</div><div class="hc-card-value" id="hc-multi-hit">--</div></div>
-      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.avgAttempts")}</div><div class="hc-card-value" id="hc-avg-attempts">--</div></div>
-      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.avgTokens")}</div><div class="hc-card-value" id="hc-avg-tokens">--</div></div>
+    <div class="digest-config-grid" id="er-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:22px">
+      <div class="er-card"><div class="er-card-label">${t("er.totalTasks")}</div><div class="er-card-value" id="er-total-tasks">--</div></div>
+      <div class="er-card"><div class="er-card-label">${t("er.successRate")}</div><div class="er-card-value" id="er-success-rate">--</div></div>
+      <div class="er-card"><div class="er-card-label">${t("er.singleHitRate")}</div><div class="er-card-value" id="er-single-hit">--</div><div class="er-card-sub" id="er-single-avg">--</div></div>
+      <div class="er-card"><div class="er-card-label">${t("er.multiHitRate")}</div><div class="er-card-value" id="er-multi-hit">--</div><div class="er-card-sub" id="er-multi-avg">--</div></div>
     </div>
 
-    <div id="hc-report-text" style="display:none;margin-bottom:18px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary);font-size:13px;line-height:1.6"></div>
+    <div id="er-report-text" style="display:none;margin-bottom:18px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary);font-size:13px;line-height:1.6"></div>
+
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;cursor:pointer" onclick="toggleErTaskDetail()">
+        <span style="font-weight:600">${t("er.taskDetail")}</span>
+        <span id="er-task-detail-toggle" style="font-size:12px;color:var(--subtext0)">▼</span>
+      </div>
+      <div id="er-task-detail" style="display:none"><div class="er-table-placeholder">${t("er.loading")}</div></div>
+    </div>
+
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <h3>${t("er.config")}</h3>
+      <div class="digest-config-grid">
+        <div class="form-group">
+          <label>${t("er.scheduleTime")}</label>
+          <input type="time" id="er-schedule-time" value="${_escAttr(scheduleTime)}" />
+        </div>
+      </div>
+      <div class="digest-actions" style="margin-top:10px">
+        <button class="btn btn-primary" onclick="saveErConfig()">${t("er.saveConfig")}</button>
+      </div>
+    </div>
 
     <div class="app-detail-section" style="margin-bottom:18px">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-        <span style="font-weight:600">${t("healthcheck.trends")}</span>
-        <button class="btn btn-xs hc-window-btn active" data-w="7" onclick="switchHcWindow(7)">7d</button>
-        <button class="btn btn-xs hc-window-btn" data-w="30" onclick="switchHcWindow(30)">30d</button>
+        <span style="font-weight:600">${t("er.trends")}</span>
+        <button class="btn btn-xs er-window-btn active" data-w="7" onclick="switchErWindow(7)">7d</button>
+        <button class="btn btn-xs er-window-btn" data-w="30" onclick="switchErWindow(30)">30d</button>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
-        <div style="position:relative;height:260px"><canvas id="hc-chart-hitrate"></canvas></div>
-        <div style="position:relative;height:260px"><canvas id="hc-chart-attempts"></canvas></div>
+        <div style="position:relative;height:260px"><canvas id="er-chart-hitrate"></canvas></div>
+        <div style="position:relative;height:260px"><canvas id="er-chart-attempts"></canvas></div>
       </div>
     </div>
 
     <div class="app-detail-section">
       <div style="display:flex;gap:8px;margin-bottom:10px">
-        <button class="btn btn-xs hc-tab-btn active" data-tab="errors" onclick="switchHcTab('errors')">${t("healthcheck.topErrors")}</button>
-        <button class="btn btn-xs hc-tab-btn" data-tab="tools" onclick="switchHcTab('tools')">${t("healthcheck.topTools")}</button>
+        <span style="font-weight:600">${t("er.topTools")}</span>
       </div>
-      <div id="hc-tab-errors" class="hc-tab-panel"><div class="hc-table-placeholder">${t("healthcheck.loading")}</div></div>
-      <div id="hc-tab-tools" class="hc-tab-panel" style="display:none"><div class="hc-table-placeholder">${t("healthcheck.loading")}</div></div>
-    </div>
-
-    <div class="app-detail-section" style="margin-top:18px">
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
-        <span style="font-weight:600">${t("healthcheck.taskDetail")}</span>
-      </div>
-      <div id="hc-task-detail"><div class="hc-table-placeholder">${t("healthcheck.loading")}</div></div>
+      <div id="er-tab-tools" class="er-tab-panel"><div class="er-table-placeholder">${t("er.loading")}</div></div>
     </div>
   `;
 
-  await _refreshAllHcPanels();
+  await _refreshAllErPanels();
 }
 
-function _getHcDate() {
-  const picker = document.getElementById("hc-date-picker");
+async function saveErConfig() {
+  const config = {
+    schedule_time: document.getElementById("er-schedule-time").value || "02:00",
+  };
+  try {
+    const res = await api("/api/apps/execution_radar/config", "POST", config);
+    if (res.success) {
+      toast(t("er.configSaved"), "success");
+      const app = _appsCache.find(a => a.id === "execution_radar");
+      if (app) app.config = config;
+    } else {
+      toast(res.error || t("er.configFail"), "error");
+    }
+  } catch (e) { toast(t("er.configFail") + ": " + e.message, "error"); }
+}
+
+function _getErDate() {
+  const picker = document.getElementById("er-date-picker");
   return picker ? picker.value : new Date().toISOString().slice(0,10);
 }
 
-async function _refreshAllHcPanels() {
-  const d = _getHcDate();
-  await loadHcSummary(d);
-  const activeW = document.querySelector(".hc-window-btn.active");
-  await loadHcTrends(activeW ? parseInt(activeW.dataset.w) : 7);
-  await loadHcTopErrors(d);
-  await loadHcTopTools(d);
-  await loadHcTaskDetail(d);
+async function _refreshAllErPanels() {
+  const d = _getErDate();
+  await loadErSummary(d);
+  const activeW = document.querySelector(".er-window-btn.active");
+  await loadErTrends(activeW ? parseInt(activeW.dataset.w) : 7);
+  await loadErTopTools(d);
+  await loadErTaskDetail(d);
 }
 
-function switchHcDate(dateStr) {
-  _refreshAllHcPanels();
+function switchErDate(dateStr) {
+  _refreshAllErPanels();
 }
 
-async function loadHcSummary(dateStr) {
+async function loadErSummary(dateStr) {
   try {
-    const dt = dateStr || _getHcDate();
-    const d = await api(`/api/apps/healthcheck/summary?date=${dt}`);
+    const dt = dateStr || _getErDate();
+    const d = await api(`/api/apps/execution_radar/summary?date=${dt}`);
     const inst = d.instrumented_tasks || 0;
     const total = d.total_tasks || 0;
-    document.getElementById("hc-total-tasks").textContent = inst > 0 ? (inst < total ? `${inst} / ${total}` : `${inst}`) : (total > 0 ? `0 / ${total}` : "0");
-    document.getElementById("hc-success-rate").textContent = (d.success_rate || 0) + "%";
-    document.getElementById("hc-single-hit").textContent = (d.single_hit_rate || 0) + "%";
-    document.getElementById("hc-multi-hit").textContent = (d.multi_hit_rate || 0) + "%";
-    document.getElementById("hc-avg-attempts").textContent = d.avg_attempts || 0;
-    document.getElementById("hc-avg-tokens").textContent = d.avg_tokens || 0;
-    const reportEl = document.getElementById("hc-report-text");
+    document.getElementById("er-total-tasks").textContent = inst > 0 ? (inst < total ? `${inst} / ${total}` : `${inst}`) : (total > 0 ? `0 / ${total}` : "0");
+    document.getElementById("er-success-rate").textContent = (d.success_rate || 0) + "%";
+    document.getElementById("er-single-hit").textContent = (d.single_hit_rate || 0) + "%";
+    const sa = d.single_avg_attempts || 0;
+    document.getElementById("er-single-avg").textContent = sa > 0 ? `${t("er.avgPrefix")} ${sa} ${t("er.avgSuffix")}` : "-";
+    document.getElementById("er-multi-hit").textContent = (d.multi_hit_rate || 0) + "%";
+    const ma = d.multi_avg_attempts || 0;
+    const mae = d.multi_avg_effective || 0;
+    document.getElementById("er-multi-avg").textContent = ma > 0 ? `${t("er.avgPrefix")} ${ma} ${t("er.avgSuffixPerEff").replace("{n}", mae)}` : "-";
+    const reportEl = document.getElementById("er-report-text");
     if (d.report_text) {
       reportEl.style.display = "block";
       reportEl.textContent = d.report_text;
     } else {
       reportEl.style.display = "none";
     }
-  } catch (e) { console.warn("hc summary", e); }
+  } catch (e) { console.warn("er summary", e); }
 }
 
-async function loadHcTrends(window) {
+async function loadErTrends(window) {
   try {
-    const d = await api(`/api/apps/healthcheck/trends?window=${window}`);
-    _renderHcHitRateChart(d);
-    _renderHcAttemptsChart(d);
-  } catch (e) { console.warn("hc trends", e); }
+    const dt = _getErDate();
+    const d = await api(`/api/apps/execution_radar/trends?window=${window}&date=${dt}`);
+    _renderErHitRateChart(d);
+    _renderErAttemptsChart(d);
+  } catch (e) { console.warn("er trends", e); }
 }
 
-function _renderHcHitRateChart(d) {
-  const canvas = document.getElementById("hc-chart-hitrate");
+function _renderErHitRateChart(d) {
+  const canvas = document.getElementById("er-chart-hitrate");
   if (!canvas) return;
-  if (_hcChart1) { _hcChart1.destroy(); _hcChart1 = null; }
+  if (_erChart1) { _erChart1.destroy(); _erChart1 = null; }
   const labels = (d.dates || []).map(x => x.slice(5));
-  _hcChart1 = new Chart(canvas, {
+  _erChart1 = new Chart(canvas, {
     type: "line",
     data: {
       labels,
       datasets: [
-        { label: t("healthcheck.singleHitRate"), data: d.single_hit_rates || [], borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
-        { label: t("healthcheck.multiHitRate"), data: d.multi_hit_rates || [], borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
+        { label: t("er.singleHitRate"), data: d.single_hit_rates || [], borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
+        { label: t("er.multiHitRate"), data: d.multi_hit_rates || [], borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 10, font: { size: 11 } } },
-                 title: { display: true, text: t("healthcheck.hitRateTrend"), font: { size: 13 } } },
+                 title: { display: true, text: t("er.hitRateTrend"), font: { size: 13 } } },
       scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + "%" } } },
     },
   });
 }
 
-function _renderHcAttemptsChart(d) {
-  const canvas = document.getElementById("hc-chart-attempts");
+function _renderErAttemptsChart(d) {
+  const canvas = document.getElementById("er-chart-attempts");
   if (!canvas) return;
-  if (_hcChart2) { _hcChart2.destroy(); _hcChart2 = null; }
+  if (_erChart2) { _erChart2.destroy(); _erChart2 = null; }
   const labels = (d.dates || []).map(x => x.slice(5));
-  _hcChart2 = new Chart(canvas, {
+  _erChart2 = new Chart(canvas, {
     type: "line",
     data: {
       labels,
       datasets: [
-        { label: t("healthcheck.avgAttempts"), data: d.avg_attempts || [], borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
-        { label: t("healthcheck.avgTokens"), data: d.avg_tokens || [], borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.08)", tension: 0.3, fill: true, pointRadius: 3, hidden: true },
+        { label: t("er.avgAttempts"), data: d.avg_attempts || [], borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
       ],
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 10, font: { size: 11 } } },
-                 title: { display: true, text: t("healthcheck.attemptsTrend"), font: { size: 13 } } },
+                 title: { display: true, text: t("er.attemptsTrend"), font: { size: 13 } } },
       scales: { y: { beginAtZero: true } },
     },
   });
 }
 
-async function loadHcTopErrors(dateStr) {
+async function loadErTopTools(dateStr) {
   try {
-    const dt = dateStr || _getHcDate();
-    const d = await api(`/api/apps/healthcheck/top_errors?date=${dt}`);
-    const el = document.getElementById("hc-tab-errors");
-    if (!d.errors || d.errors.length === 0) {
-      el.innerHTML = `<div class="hc-table-placeholder">${t("healthcheck.noData")}</div>`;
-      return;
-    }
-    let html = `<table class="hc-table"><thead><tr><th>#</th><th>${t("healthcheck.errorCode")}</th><th>${t("healthcheck.count")}</th><th>${t("healthcheck.pct")}</th></tr></thead><tbody>`;
-    d.errors.forEach((e, i) => {
-      html += `<tr><td>${i+1}</td><td><code>${e.error_code || e.code}</code></td><td>${e.cnt}</td><td>${e.pct || 0}%</td></tr>`;
-    });
-    html += "</tbody></table>";
-    el.innerHTML = html;
-  } catch (e) { console.warn("hc errors", e); }
-}
-
-async function loadHcTopTools(dateStr) {
-  try {
-    const dt = dateStr || _getHcDate();
-    const d = await api(`/api/apps/healthcheck/top_tools?date=${dt}`);
-    const el = document.getElementById("hc-tab-tools");
+    const dt = dateStr || _getErDate();
+    const d = await api(`/api/apps/execution_radar/top_tools?date=${dt}`);
+    const el = document.getElementById("er-tab-tools");
     if (!d.tools || d.tools.length === 0) {
-      el.innerHTML = `<div class="hc-table-placeholder">${t("healthcheck.noData")}</div>`;
+      el.innerHTML = `<div class="er-table-placeholder">${t("er.noData")}</div>`;
       return;
     }
-    let html = `<table class="hc-table"><thead><tr><th>#</th><th>${t("healthcheck.toolName")}</th><th>${t("healthcheck.count")}</th><th>${t("healthcheck.failCount")}</th></tr></thead><tbody>`;
+    let html = `<table class="er-table"><thead><tr><th>#</th><th>${t("er.toolName")}</th><th>${t("er.count")}</th><th>${t("er.failCount")}</th></tr></thead><tbody>`;
     d.tools.forEach((e, i) => {
       html += `<tr><td>${i+1}</td><td><code>${e.tool_name}</code></td><td>${e.cnt}</td><td>${e.fail_cnt || 0}</td></tr>`;
     });
     html += "</tbody></table>";
     el.innerHTML = html;
-  } catch (e) { console.warn("hc tools", e); }
+  } catch (e) { console.warn("er tools", e); }
 }
 
-function switchHcWindow(w) {
-  document.querySelectorAll(".hc-window-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.w) === w));
-  loadHcTrends(w);
+function switchErWindow(w) {
+  document.querySelectorAll(".er-window-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.w) === w));
+  loadErTrends(w);
 }
 
-function switchHcTab(tab) {
-  document.querySelectorAll(".hc-tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
-  document.querySelectorAll(".hc-tab-panel").forEach(p => p.style.display = "none");
-  const panel = document.getElementById(`hc-tab-${tab}`);
-  if (panel) panel.style.display = "block";
+function toggleErTaskDetail() {
+  const panel = document.getElementById("er-task-detail");
+  const toggle = document.getElementById("er-task-detail-toggle");
+  if (panel.style.display === "none") {
+    panel.style.display = "block";
+    toggle.textContent = "▲";
+  } else {
+    panel.style.display = "none";
+    toggle.textContent = "▼";
+  }
 }
 
-async function loadHcTaskDetail(dateStr) {
+async function loadErTaskDetail(dateStr) {
   try {
-    const dt = dateStr || _getHcDate();
-    const d = await api(`/api/apps/healthcheck/tasks?date=${dt}`);
-    const el = document.getElementById("hc-task-detail");
+    const dt = dateStr || _getErDate();
+    const d = await api(`/api/apps/execution_radar/tasks?date=${dt}`);
+    const el = document.getElementById("er-task-detail");
     if (!d.tasks || d.tasks.length === 0) {
-      el.innerHTML = `<div class="hc-table-placeholder">${t("healthcheck.noData")}</div>`;
+      el.innerHTML = `<div class="er-table-placeholder">${t("er.noData")}</div>`;
       return;
     }
-    let html = `<table class="hc-table hc-task-table"><thead><tr>
+    let html = `<table class="er-table er-task-table"><thead><tr>
       <th style="width:30px"></th>
       <th>#</th>
-      <th>${t("healthcheck.taskContent")}</th>
-      <th>${t("healthcheck.totalSteps")}</th>
-      <th>${t("healthcheck.effectiveSteps")}</th>
-      <th>${t("healthcheck.hitRateCol")}</th>
-      <th>${t("healthcheck.successCol")}</th>
+      <th>${t("er.taskContent")}</th>
+      <th>${t("er.totalSteps")}</th>
+      <th>${t("er.effectiveSteps")}</th>
+      <th>${t("er.hitRateCol")}</th>
+      <th>${t("er.successCol")}</th>
     </tr></thead><tbody>`;
     d.tasks.forEach((task, i) => {
       const hasSteps = task.steps && task.steps.length > 0;
-      const toggleAttr = hasSteps ? `onclick="toggleHcSteps(this)" style="cursor:pointer"` : "";
-      const arrow = hasSteps ? `<span class="hc-arrow">▶</span>` : `<span class="hc-arrow" style="visibility:hidden">▶</span>`;
-      const successIcon = task.success ? `<span class="hc-badge hc-badge-ok">${t("healthcheck.yes")}</span>` : `<span class="hc-badge hc-badge-fail">${t("healthcheck.no")}</span>`;
-      const hitStr = task.total_steps > 0 ? task.hit_rate + "%" : "-";
+      const toggleAttr = hasSteps ? `onclick="toggleErSteps(this)" style="cursor:pointer"` : "";
+      const arrow = hasSteps ? `<span class="er-arrow">▶</span>` : `<span class="er-arrow" style="visibility:hidden">▶</span>`;
+      const successIcon = task.success ? `<span class="er-badge er-badge-ok">${t("er.yes")}</span>` : `<span class="er-badge er-badge-fail">${t("er.no")}</span>`;
+      const hitStr = task.success && task.total_steps > 0 ? task.hit_rate + "%" : "-";
       const userText = _escHtml((task.user_text || "").slice(0, 60));
-      html += `<tr class="hc-task-row" ${toggleAttr}>
+      html += `<tr class="er-task-row" ${toggleAttr}>
         <td>${arrow}</td>
         <td>${i + 1}</td>
         <td title="${_escHtml(task.user_text || "")}">${userText}</td>
         <td>${task.total_steps}</td>
-        <td>${task.effective_count}</td>
+        <td>${task.success ? task.effective_count : "-"}</td>
         <td>${hitStr}</td>
         <td>${successIcon}</td>
       </tr>`;
       if (hasSteps) {
-        html += `<tr class="hc-steps-row" style="display:none"><td colspan="7"><div class="hc-steps-container">`;
-        html += `<table class="hc-table hc-steps-inner"><thead><tr>
-          <th>${t("healthcheck.stepIndex")}</th>
-          <th>${t("healthcheck.toolName")}</th>
-          <th>${t("healthcheck.stepArgs")}</th>
-          <th>${t("healthcheck.stepStatus")}</th>
-          <th>${t("healthcheck.stepEffective")}</th>
+        html += `<tr class="er-steps-row" style="display:none"><td colspan="7"><div class="er-steps-container">`;
+        html += `<table class="er-table er-steps-inner"><thead><tr>
+          <th>${t("er.stepIndex")}</th>
+          <th>${t("er.toolName")}</th>
+          <th>${t("er.stepArgs")}</th>
+          <th>${t("er.stepStatus")}</th>
+          <th>${t("er.stepEffective")}</th>
         </tr></thead><tbody>`;
         task.steps.forEach(s => {
           const statusBadge = s.status === "ok"
-            ? `<span class="hc-badge hc-badge-ok">OK</span>`
-            : `<span class="hc-badge hc-badge-fail">${s.error_code || s.status}</span>`;
+            ? `<span class="er-badge er-badge-ok">OK</span>`
+            : `<span class="er-badge er-badge-fail">${s.error_code || s.status}</span>`;
           const effBadge = s.effective
-            ? `<span class="hc-badge hc-badge-ok">${t("healthcheck.effective")}</span>`
-            : `<span class="hc-badge hc-badge-dim">${t("healthcheck.ineffective")}</span>`;
+            ? `<span class="er-badge er-badge-ok">${t("er.effective")}</span>`
+            : `<span class="er-badge er-badge-dim">${t("er.ineffective")}</span>`;
           let argsPreview = "";
           try {
             const parsed = JSON.parse(s.args || "{}");
@@ -2989,7 +3193,7 @@ async function loadHcTaskDetail(dateStr) {
           html += `<tr>
             <td>${s.index + 1}</td>
             <td><code>${s.tool || "-"}</code></td>
-            <td class="hc-args-cell" title="${_escHtml(s.args || "")}">${_escHtml(argsPreview)}</td>
+            <td class="er-args-cell" title="${_escHtml(s.args || "")}">${_escHtml(argsPreview)}</td>
             <td>${statusBadge}</td>
             <td>${effBadge}</td>
           </tr>`;
@@ -2999,15 +3203,15 @@ async function loadHcTaskDetail(dateStr) {
     });
     html += "</tbody></table>";
     el.innerHTML = html;
-  } catch (e) { console.warn("hc task detail", e); }
+  } catch (e) { console.warn("er task detail", e); }
 }
 
-function toggleHcSteps(rowEl) {
+function toggleErSteps(rowEl) {
   const stepsRow = rowEl.nextElementSibling;
-  if (!stepsRow || !stepsRow.classList.contains("hc-steps-row")) return;
+  if (!stepsRow || !stepsRow.classList.contains("er-steps-row")) return;
   const isHidden = stepsRow.style.display === "none";
   stepsRow.style.display = isHidden ? "table-row" : "none";
-  const arrow = rowEl.querySelector(".hc-arrow");
+  const arrow = rowEl.querySelector(".er-arrow");
   if (arrow) arrow.textContent = isHidden ? "▼" : "▶";
 }
 
@@ -3017,19 +3221,19 @@ function _escHtml(str) {
   return d.innerHTML;
 }
 
-async function runHealthcheck() {
-  const btn = document.getElementById("hc-run-btn");
-  const indicator = document.getElementById("hc-run-indicator");
+async function runExecutionRadar() {
+  const btn = document.getElementById("er-run-btn");
+  const indicator = document.getElementById("er-run-indicator");
   if (!btn) return;
   const origText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = t("healthcheck.running");
+  btn.textContent = t("er.running");
   btn.classList.add("btn-loading");
   if (indicator) { indicator.style.display = "inline"; indicator.textContent = ""; }
 
   try {
-    const dateStr = _getHcDate();
-    await api("/api/apps/healthcheck/run", "POST", { date: dateStr });
+    const dateStr = _getErDate();
+    await api("/api/apps/execution_radar/run", "POST", { date: dateStr });
 
     let done = false;
     for (let i = 0; i < 15; i++) {
@@ -3037,11 +3241,11 @@ async function runHealthcheck() {
       const elapsed = (i + 1) * 2;
       if (indicator) indicator.textContent = `${elapsed}s`;
       try {
-        const st = await api("/api/apps/healthcheck/status");
+        const st = await api("/api/apps/execution_radar/status");
         if (!st.running) {
           done = true;
           if (st.error) {
-            toast(t("healthcheck.runFailed") + ": " + st.error, "error");
+            toast(t("er.runFailed") + ": " + st.error, "error");
           }
           break;
         }
@@ -3053,15 +3257,15 @@ async function runHealthcheck() {
     btn.disabled = false;
     if (indicator) { indicator.style.display = "none"; }
 
-    await _refreshAllHcPanels();
+    await _refreshAllErPanels();
 
     if (done) {
-      toast(t("healthcheck.runDone"), "success");
+      toast(t("er.runDone"), "success");
     } else {
-      toast(t("healthcheck.runTimeout"), "warning");
+      toast(t("er.runTimeout"), "warning");
     }
   } catch (e) {
-    toast(t("healthcheck.runFailed") + ": " + e.message, "error");
+    toast(t("er.runFailed") + ": " + e.message, "error");
     btn.textContent = origText;
     btn.classList.remove("btn-loading");
     btn.disabled = false;
@@ -4867,6 +5071,7 @@ function _startBadgePoll() {
 async function updateSidebarStats() {
   const tokEl = document.getElementById("stat-tokens");
   const searchEl = document.getElementById("stat-search");
+  const alertInd = document.getElementById("token-alert-ind");
   if (!tokEl || !searchEl) return;
   try {
     const [tok, search] = await Promise.all([
@@ -4876,8 +5081,38 @@ async function updateSidebarStats() {
     if (tok) {
       const inp = tok.input_tokens || 0;
       const out = tok.output_tokens || 0;
-      tokEl.textContent = `${t("stats.todayPrefix")} ↓${_fmtNum(inp)} ↑${_fmtNum(out)}`;
-      tokEl.title = t("stats.tokenTip");
+      const cost = tok.cost || 0;
+      const alertLevel = tok.alert_level || "green";
+      
+      // Update alert indicator
+      if (alertInd) {
+        alertInd.className = `token-alert-indicator ${alertLevel}`;
+      }
+      
+      // Build display text
+      let displayText = `${t("stats.todayPrefix")} ↓${_fmtNum(inp)} ↑${_fmtNum(out)}`;
+      if (cost > 0) {
+        displayText += ` ¥${cost.toFixed(2)}`;
+      }
+      
+      // Update text (keep indicator at front)
+      const indicator = tokEl.querySelector('.token-alert-indicator');
+      tokEl.textContent = displayText;
+      if (indicator) tokEl.prepend(indicator);
+      
+      // Build tooltip
+      let tooltip = t("stats.tokenTip");
+      if (cost > 0) {
+        tooltip += `\n${t("stats.costTip")}: ¥${cost.toFixed(2)}`;
+      }
+      if (tok.daily_limit > 0) {
+        const dailyUsage = (inp + out) / 1000000;  // convert to M tokens
+        tooltip += `\n日使用: ${dailyUsage.toFixed(2)}M/${tok.daily_limit}M token (${tok.daily_usage_pct.toFixed(1)}%)`;
+      }
+      if (tok.monthly_limit > 0 && tok.monthly_cost !== undefined) {
+        tooltip += `\n月预警: ${tok.monthly_usage_pct.toFixed(1)}%`;
+      }
+      tokEl.title = tooltip;
     }
     if (search && search.engines) {
       const parts = [];

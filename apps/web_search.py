@@ -53,7 +53,7 @@ def _strip_tags(html_str: str) -> str:
 # ── Quota tracking ─────────────────────────────────────────────────
 
 _DEFAULT_DAILY_LIMITS = {
-    "baidu": 1000,
+    "baidu": 100,
     "brave": 1000,
 }
 
@@ -71,10 +71,22 @@ class QuotaManager:
         self._lock = threading.Lock()
         self._date: str = ""
         self._counts: dict[str, int] = {}
-        self._limits: dict[str, int] = dict(_DEFAULT_DAILY_LIMITS)
+        self._limits: dict[str, int] = self._load_limits_from_config()
         self._quota_only: bool = True
         self._loaded = False
         self._history: dict[str, int] = {}
+
+    def _load_limits_from_config(self) -> dict[str, int]:
+        """Load quota limits from config file or use defaults."""
+        try:
+            from myxai_desk.core.search_quota_service import get_search_quota_config
+            config = get_search_quota_config()
+            return {
+                "brave": config.get("brave", 1000),
+                "baidu": config.get("baidu", 100),
+            }
+        except Exception:
+            return dict(_DEFAULT_DAILY_LIMITS)
 
     def _ensure_loaded(self):
         if self._loaded:

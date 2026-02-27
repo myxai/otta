@@ -1,1 +1,1 @@
-"""Tool result verifiers for execution healthcheck."""
+﻿"""Tool result verifiers for execution radar."""

@@ -1,4 +1,4 @@
-"""Daily healthcheck pipeline: Extract → Normalize → Verify → Aggregate → Report.
+"""Daily execution radar pipeline: Extract → Normalize → Verify → Aggregate → Report.
 
 Each stage is a pure function operating on intermediate data structures so that
 individual steps can be retried or tested in isolation.
@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from myxai_desk.apps.healthcheck.dao import (
+from myxai_desk.apps.execution_radar.dao import (
     delete_date_data,
     save_daily_metrics,
     upsert_steps,
@@ -32,13 +32,13 @@ _HISTORY_DIR = Path.home() / ".nanobot" / "desktop_history"
 # ── Public entry point ─────────────────────────────────────────────
 
 
-def run_daily_healthcheck(run_date: str | None = None, *, skip_report: bool = False) -> dict:
+def run_daily_radar(run_date: str | None = None, *, skip_report: bool = False) -> dict:
     """Main entry point — called by the scheduler executor.
 
     *run_date* defaults to yesterday (local date).
     """
     date_str = run_date or (date.today() - timedelta(days=1)).isoformat()
-    log.info("[healthcheck] pipeline start for %s", date_str)
+    log.info("[execution_radar] pipeline start for %s", date_str)
 
     raw = extract(date_str)
     tasks = normalize(raw, date_str)
@@ -61,7 +61,7 @@ def run_daily_healthcheck(run_date: str | None = None, *, skip_report: bool = Fa
         if all_steps:
             upsert_steps(all_steps)
 
-    log.info("[healthcheck] pipeline done for %s — %d tasks, %d with steps",
+    log.info("[execution_radar] pipeline done for %s — %d tasks, %d with steps",
              date_str, len(tasks), sum(1 for t in tasks if t.get("total_steps", 0) > 0))
     return metrics
 
@@ -72,7 +72,7 @@ def run_daily_healthcheck(run_date: str | None = None, *, skip_report: bool = Fa
 def extract(date_str: str) -> dict:
     """Pull session history for the target date."""
     sessions = _load_sessions_for_date(date_str)
-    log.info("[healthcheck] extract: %d sessions found for %s", len(sessions), date_str)
+    log.info("[execution_radar] extract: %d sessions found for %s", len(sessions), date_str)
     return {"sessions": sessions, "date": date_str}
 
 
@@ -90,7 +90,7 @@ def _load_sessions_for_date(date_str: str) -> dict:
     try:
         all_data: dict = json.loads(history_file.read_text(encoding="utf-8"))
     except Exception:
-        log.warning("[healthcheck] failed to read sessions.json", exc_info=True)
+        log.warning("[execution_radar] failed to read sessions.json", exc_info=True)
         return {}
 
     try:
@@ -178,7 +178,7 @@ def normalize(raw: dict, date_str: str) -> list[dict]:
                 "final_error_code": "",
             })
 
-    log.info("[healthcheck] normalize: %d tasks extracted, %d with tool steps",
+    log.info("[execution_radar] normalize: %d tasks extracted, %d with tool steps",
              len(tasks), sum(1 for t in tasks if t.get("total_steps", 0) > 0))
     return tasks
 
@@ -298,6 +298,8 @@ def verify(tasks: list[dict]) -> list[dict]:
     - **hit_rate**: effective_count / total_steps.
     - **single** task: successful & effective_count == 1.
     - **multi** task: successful & effective_count > 1.
+    - Ineffective steps get error_code ``E_RETRY`` — the tool ran but its
+      result was insufficient, causing a retry.
     """
     for task in tasks:
         steps = task.get("steps", [])
@@ -315,6 +317,9 @@ def verify(tasks: list[dict]) -> list[dict]:
             task["effective_count"] = effective_count
             for i, s in enumerate(steps):
                 s["effective"] = i in effective_indices
+                if not s["effective"]:
+                    s["status"] = "retry"
+                    s["error_code"] = "E_RETRY"
         else:
             task["effective_count"] = 0
             for s in steps:
@@ -380,31 +385,42 @@ def aggregate(tasks: list[dict], date_str: str) -> dict:
     single_hit_rate = round(_avg_hit_rate(single_tasks) * 100, 1)
     multi_hit_rate = round(_avg_hit_rate(multi_tasks) * 100, 1)
 
-    attempts_list = [t.get("attempts", 0) for t in instrumented if t.get("attempts", 0) > 0]
-    avg_attempts = sum(attempts_list) / len(attempts_list) if attempts_list else 0
+    # Avg attempts: for single = avg(total_steps), for multi = avg(total_steps/effective_count)
+    single_avg_attempts = (
+        round(sum(t["total_steps"] for t in single_tasks) / len(single_tasks), 1)
+        if single_tasks else 0
+    )
+    multi_avg_attempts = (
+        round(
+            sum(t["total_steps"] / t["effective_count"] for t in multi_tasks)
+            / len(multi_tasks),
+            1,
+        )
+        if multi_tasks else 0
+    )
+    multi_avg_effective = (
+        round(sum(t["effective_count"] for t in multi_tasks) / len(multi_tasks), 1)
+        if multi_tasks else 0
+    )
 
-    tokens_list = [t.get("total_tokens", 0) for t in instrumented if t.get("total_tokens", 0) > 0]
-    avg_tokens = sum(tokens_list) / len(tokens_list) if tokens_list else 0
-
-    error_counter: Counter[str] = Counter()
     tool_counter: Counter[str] = Counter()
     for t in instrumented:
         for s in t.get("steps", []):
-            ec = s.get("error_code", "")
-            if ec:
-                error_counter[ec] += 1
             tn = s.get("tool_name", "")
             if tn:
                 tool_counter[tn] += 1
 
-    top_errors = [
-        {"code": code, "count": cnt}
-        for code, cnt in error_counter.most_common(10)
-    ]
     top_tools = [
         {"tool": tool, "count": cnt}
         for tool, cnt in tool_counter.most_common(10)
     ]
+
+    # Global averages for trend charts
+    all_success = single_tasks + multi_tasks
+    avg_attempts = (
+        round(sum(t["total_steps"] for t in all_success) / len(all_success), 1)
+        if all_success else 0
+    )
 
     return {
         "date": date_str,
@@ -414,12 +430,13 @@ def aggregate(tasks: list[dict], date_str: str) -> dict:
         "single_tasks": len(single_tasks),
         "single_hits": len(single_tasks),
         "single_hit_rate": single_hit_rate,
+        "single_avg_attempts": single_avg_attempts,
         "multi_tasks": len(multi_tasks),
         "multi_hits": len(multi_tasks),
         "multi_hit_rate": multi_hit_rate,
-        "avg_attempts": round(avg_attempts, 2),
-        "avg_tokens": round(avg_tokens, 2),
-        "top_error_codes": top_errors,
+        "multi_avg_attempts": multi_avg_attempts,
+        "multi_avg_effective": multi_avg_effective,
+        "avg_attempts": avg_attempts,
         "top_tools": top_tools,
         "report_text": "",
     }
@@ -429,7 +446,7 @@ def aggregate(tasks: list[dict], date_str: str) -> dict:
 
 
 def generate_report(metrics: dict, tasks: list[dict] | None = None) -> str:
-    """Use LLM to generate a short healthcheck report.
+    """Use LLM to generate a short execution radar report.
 
     The LLM only interprets structured stats — it does NOT judge success/fail.
     Returns empty string if LLM is unavailable.
@@ -463,7 +480,6 @@ def generate_report(metrics: dict, tasks: list[dict] | None = None) -> str:
 单任务命中率: {single_rate}
 多任务命中率: {multi_rate}
 平均尝试次数: {metrics['avg_attempts']}
-Top 错误码: {json.dumps(metrics.get('top_error_codes', []), ensure_ascii=False)}
 Top 工具: {json.dumps(metrics.get('top_tools', []), ensure_ascii=False)}
 失败样本摘要: {json.dumps(fail_samples, ensure_ascii=False)}
 """
@@ -501,7 +517,7 @@ Top 工具: {json.dumps(metrics.get('top_tools', []), ensure_ascii=False)}
                     completion_tokens=getattr(usage, "completion_tokens", 0),
                 )
                 record_task_usage(
-                    "app_healthcheck",
+                    "app_execution_radar",
                     getattr(usage, "prompt_tokens", 0),
                     getattr(usage, "completion_tokens", 0),
                     0,
@@ -511,7 +527,7 @@ Top 工具: {json.dumps(metrics.get('top_tools', []), ensure_ascii=False)}
 
         return content.strip()
     except Exception:
-        log.warning("[healthcheck] LLM report generation failed", exc_info=True)
+        log.warning("[execution_radar] LLM report generation failed", exc_info=True)
         return ""
 
 

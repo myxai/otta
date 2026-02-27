@@ -1,4 +1,4 @@
-"""Data-access layer for healthcheck tables (hc_tasks, hc_steps, hc_daily_metrics).
+"""Data-access layer for execution radar tables (er_tasks, er_steps, er_daily_metrics).
 
 All three tables live in the shared ``myxai.db`` SQLite database.
 """
@@ -16,13 +16,44 @@ log = logging.getLogger("myxai")
 _TABLES_READY = False
 
 
-def init_healthcheck_tables() -> None:
+def _migrate_legacy_tables() -> None:
+    """Rename old hc_* tables to er_* if they exist (one-time migration)."""
+    renames = [
+        ("hc_tasks", "er_tasks"),
+        ("hc_steps", "er_steps"),
+        ("hc_daily_metrics", "er_daily_metrics"),
+    ]
+    for old, new in renames:
+        try:
+            rows = execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                (old,),
+                readonly=True,
+            )
+            if rows:
+                new_exists = execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (new,),
+                    readonly=True,
+                )
+                if not new_exists:
+                    from myxai_desk.core.storage.sqlite import connect
+                    with connect() as conn:
+                        conn.execute(f"ALTER TABLE {old} RENAME TO {new}")
+                    log.info("[execution_radar] migrated table %s → %s", old, new)
+        except Exception:
+            log.debug("[execution_radar] table migration %s → %s skipped", old, new, exc_info=True)
+
+
+def init_radar_tables() -> None:
     global _TABLES_READY
     if _TABLES_READY:
         return
 
+    _migrate_legacy_tables()
+
     ensure_table(
-        "hc_tasks",
+        "er_tasks",
         """
         task_id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
@@ -38,7 +69,7 @@ def init_healthcheck_tables() -> None:
     )
 
     ensure_table(
-        "hc_steps",
+        "er_steps",
         """
         step_id TEXT PRIMARY KEY,
         task_id TEXT NOT NULL,
@@ -55,7 +86,7 @@ def init_healthcheck_tables() -> None:
     )
 
     ensure_table(
-        "hc_daily_metrics",
+        "er_daily_metrics",
         """
         date TEXT PRIMARY KEY,
         total_tasks INTEGER DEFAULT 0,
@@ -64,59 +95,66 @@ def init_healthcheck_tables() -> None:
         single_tasks INTEGER DEFAULT 0,
         single_hits INTEGER DEFAULT 0,
         single_hit_rate REAL DEFAULT 0,
+        single_avg_attempts REAL DEFAULT 0,
         multi_tasks INTEGER DEFAULT 0,
         multi_hits INTEGER DEFAULT 0,
         multi_hit_rate REAL DEFAULT 0,
+        multi_avg_attempts REAL DEFAULT 0,
+        multi_avg_effective REAL DEFAULT 0,
         avg_attempts REAL DEFAULT 0,
-        avg_tokens REAL DEFAULT 0,
+        avg_tokens INTEGER DEFAULT 0,
         top_error_codes TEXT DEFAULT '[]',
         top_tools TEXT DEFAULT '[]',
         report_text TEXT DEFAULT ''
         """,
     )
 
-    # Backfill: add new columns if table existed before this schema version
     _backfill_columns = [
         ("instrumented_tasks", "INTEGER DEFAULT 0"),
         ("single_hit_rate", "REAL DEFAULT 0"),
+        ("single_avg_attempts", "REAL DEFAULT 0"),
         ("multi_hit_rate", "REAL DEFAULT 0"),
+        ("multi_avg_attempts", "REAL DEFAULT 0"),
+        ("multi_avg_effective", "REAL DEFAULT 0"),
+        ("avg_attempts", "REAL DEFAULT 0"),
+        ("avg_tokens", "INTEGER DEFAULT 0"),
     ]
     for col, typedef in _backfill_columns:
         try:
-            execute(f"SELECT {col} FROM hc_daily_metrics LIMIT 1", readonly=True)
+            execute(f"SELECT {col} FROM er_daily_metrics LIMIT 1", readonly=True)
         except Exception:
             try:
                 from myxai_desk.core.storage.sqlite import connect
                 with connect() as conn:
-                    conn.execute(f"ALTER TABLE hc_daily_metrics ADD COLUMN {col} {typedef}")
+                    conn.execute(f"ALTER TABLE er_daily_metrics ADD COLUMN {col} {typedef}")
             except Exception:
                 pass
 
     _TABLES_READY = True
 
 
-# ── hc_tasks CRUD ──────────────────────────────────────────────────
+# ── er_tasks CRUD ──────────────────────────────────────────────────
 
 
 def delete_date_data(date_str: str) -> None:
     """Remove all tasks and their steps for a given date before re-import."""
-    init_healthcheck_tables()
+    init_radar_tables()
     task_ids = execute(
-        "SELECT task_id FROM hc_tasks WHERE created_at LIKE ?",
+        "SELECT task_id FROM er_tasks WHERE created_at LIKE ?",
         (f"{date_str}%",),
         readonly=True,
     )
     if task_ids:
         ids = [r["task_id"] for r in task_ids]
         placeholders = ",".join("?" * len(ids))
-        execute(f"DELETE FROM hc_steps WHERE task_id IN ({placeholders})", ids)
-    execute("DELETE FROM hc_tasks WHERE created_at LIKE ?", (f"{date_str}%",))
+        execute(f"DELETE FROM er_steps WHERE task_id IN ({placeholders})", ids)
+    execute("DELETE FROM er_tasks WHERE created_at LIKE ?", (f"{date_str}%",))
 
 
 def upsert_task(task: dict) -> None:
-    init_healthcheck_tables()
+    init_radar_tables()
     execute(
-        """INSERT OR REPLACE INTO hc_tasks
+        """INSERT OR REPLACE INTO er_tasks
            (task_id, session_id, created_at, user_text, total_steps,
             success, hit_rate, attempts, total_tokens, final_error_code)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -136,9 +174,9 @@ def upsert_task(task: dict) -> None:
 
 
 def upsert_tasks(tasks: list[dict]) -> None:
-    init_healthcheck_tables()
+    init_radar_tables()
     execute_many(
-        """INSERT OR REPLACE INTO hc_tasks
+        """INSERT OR REPLACE INTO er_tasks
            (task_id, session_id, created_at, user_text, total_steps,
             success, hit_rate, attempts, total_tokens, final_error_code)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -161,9 +199,9 @@ def upsert_tasks(tasks: list[dict]) -> None:
 
 
 def upsert_steps(steps: list[dict]) -> None:
-    init_healthcheck_tables()
+    init_radar_tables()
     execute_many(
-        """INSERT OR REPLACE INTO hc_steps
+        """INSERT OR REPLACE INTO er_steps
            (step_id, task_id, step_index, tool_name, args_json,
             status, error_code, duration_ms, result_json, token_used, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
@@ -187,9 +225,9 @@ def upsert_steps(steps: list[dict]) -> None:
 
 
 def get_tasks_for_date(date_str: str) -> list[dict]:
-    init_healthcheck_tables()
+    init_radar_tables()
     return execute(
-        "SELECT * FROM hc_tasks WHERE created_at LIKE ?",
+        "SELECT * FROM er_tasks WHERE created_at LIKE ?",
         (f"{date_str}%",),
         readonly=True,
     )
@@ -197,9 +235,9 @@ def get_tasks_for_date(date_str: str) -> list[dict]:
 
 def get_tasks_with_steps(date_str: str) -> list[dict]:
     """Return tasks for a date, each enriched with its step list."""
-    init_healthcheck_tables()
+    init_radar_tables()
     tasks = execute(
-        "SELECT * FROM hc_tasks WHERE created_at LIKE ? ORDER BY created_at",
+        "SELECT * FROM er_tasks WHERE created_at LIKE ? ORDER BY created_at",
         (f"{date_str}%",),
         readonly=True,
     )
@@ -209,7 +247,7 @@ def get_tasks_with_steps(date_str: str) -> list[dict]:
     task_ids = [t["task_id"] for t in tasks]
     placeholders = ",".join("?" * len(task_ids))
     all_steps = execute(
-        f"SELECT * FROM hc_steps WHERE task_id IN ({placeholders}) ORDER BY step_index",
+        f"SELECT * FROM er_steps WHERE task_id IN ({placeholders}) ORDER BY step_index",
         task_ids,
         readonly=True,
     )
@@ -243,17 +281,19 @@ def get_tasks_with_steps(date_str: str) -> list[dict]:
     return tasks
 
 
-# ── hc_daily_metrics CRUD ──────────────────────────────────────────
+# ── er_daily_metrics CRUD ──────────────────────────────────────────
 
 
 def save_daily_metrics(m: dict) -> None:
-    init_healthcheck_tables()
+    init_radar_tables()
     execute(
-        """INSERT OR REPLACE INTO hc_daily_metrics
+        """INSERT OR REPLACE INTO er_daily_metrics
            (date, total_tasks, instrumented_tasks, success_tasks, single_tasks,
-            single_hits, single_hit_rate, multi_tasks, multi_hits, multi_hit_rate,
-            avg_attempts, avg_tokens, top_error_codes, top_tools, report_text)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            single_hits, single_hit_rate, single_avg_attempts,
+            multi_tasks, multi_hits, multi_hit_rate, multi_avg_attempts,
+            multi_avg_effective, avg_attempts, avg_tokens,
+            top_error_codes, top_tools, report_text)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             m["date"],
             m.get("total_tasks", 0),
@@ -262,10 +302,13 @@ def save_daily_metrics(m: dict) -> None:
             m.get("single_tasks", 0),
             m.get("single_hits", 0),
             m.get("single_hit_rate", 0.0),
+            m.get("single_avg_attempts", 0.0),
             m.get("multi_tasks", 0),
             m.get("multi_hits", 0),
             m.get("multi_hit_rate", 0.0),
-            m.get("avg_attempts", 0),
+            m.get("multi_avg_attempts", 0.0),
+            m.get("multi_avg_effective", 0.0),
+            m.get("avg_attempts", 0.0),
             m.get("avg_tokens", 0),
             json.dumps(m.get("top_error_codes", []), ensure_ascii=False),
             json.dumps(m.get("top_tools", []), ensure_ascii=False),
@@ -275,9 +318,9 @@ def save_daily_metrics(m: dict) -> None:
 
 
 def get_daily_metrics(date_str: str) -> dict | None:
-    init_healthcheck_tables()
+    init_radar_tables()
     rows = execute(
-        "SELECT * FROM hc_daily_metrics WHERE date = ?",
+        "SELECT * FROM er_daily_metrics WHERE date = ?",
         (date_str,),
         readonly=True,
     )
@@ -290,9 +333,9 @@ def get_daily_metrics(date_str: str) -> dict | None:
 
 
 def get_metrics_range(start_date: str, end_date: str) -> list[dict]:
-    init_healthcheck_tables()
+    init_radar_tables()
     rows = execute(
-        "SELECT * FROM hc_daily_metrics WHERE date >= ? AND date <= ? ORDER BY date",
+        "SELECT * FROM er_daily_metrics WHERE date >= ? AND date <= ? ORDER BY date",
         (start_date, end_date),
         readonly=True,
     )
@@ -328,26 +371,13 @@ def get_exec_steps_for_date(date_str: str) -> list[dict]:
             return []
 
 
-def get_top_errors(date_str: str, limit: int = 10) -> list[dict]:
-    """Aggregate top error codes for a date from hc_steps."""
-    init_healthcheck_tables()
-    return execute(
-        """SELECT error_code, COUNT(*) as cnt
-           FROM hc_steps
-           WHERE created_at LIKE ? AND error_code != ''
-           GROUP BY error_code ORDER BY cnt DESC LIMIT ?""",
-        (f"{date_str}%", limit),
-        readonly=True,
-    )
-
-
 def get_top_tools(date_str: str, limit: int = 10) -> list[dict]:
-    """Aggregate top tools by call count for a date from hc_steps."""
-    init_healthcheck_tables()
+    """Aggregate top tools by call count for a date from er_steps."""
+    init_radar_tables()
     return execute(
         """SELECT tool_name, COUNT(*) as cnt,
                   SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) as fail_cnt
-           FROM hc_steps
+           FROM er_steps
            WHERE created_at LIKE ?
            GROUP BY tool_name ORDER BY cnt DESC LIMIT ?""",
         (f"{date_str}%", limit),

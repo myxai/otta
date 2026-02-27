@@ -60,6 +60,8 @@ DESK_SETTINGS_FILE: Path = NANOBOT_HOME / "desk_settings.json"
 
 TOKEN_USAGE_FILE: Path = USAGE_DIR / "token_usage.json"
 SEARCH_USAGE_FILE: Path = USAGE_DIR / "search_usage.json"
+TOKEN_COST_CONFIG_FILE: Path = USAGE_DIR / "token_cost_config.json"
+SEARCH_QUOTA_CONFIG_FILE: Path = USAGE_DIR / "search_quota_config.json"
 
 
 def ensure_dir(path: Path) -> Path:

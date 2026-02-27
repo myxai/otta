@@ -61,7 +61,7 @@
       </nav>
       <div class="sidebar-footer">
         <div class="sidebar-stats" id="sidebar-stats">
-          <span class="sidebar-stat" id="stat-tokens" title="">今日 — token</span>
+          <span class="sidebar-stat" id="stat-tokens" title=""><span class="token-alert-indicator" id="token-alert-ind"></span>今日 — token</span>
           <span class="sidebar-stat-sep" id="stat-sep">·</span>
           <span class="sidebar-stat" id="stat-search" title=""></span>
         </div>
@@ -238,6 +238,27 @@
               </div>
             </div>
             <div class="settings-card">
+              <h2 data-i18n="settings.tokenCost">Token 成本与预警</h2>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label data-i18n="settings.inputPrice">输入单价 (元/百万token)</label>
+                  <input type="number" id="cfg-input-price" placeholder="1.0" step="0.01" min="0" />
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.outputPrice">输出单价 (元/百万token)</label>
+                  <input type="number" id="cfg-output-price" placeholder="3.0" step="0.01" min="0" />
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.dailyLimit">日使用量预警 (百万token)</label>
+                  <input type="number" id="cfg-daily-limit" placeholder="1" step="0.1" min="0" />
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.monthlyLimit">月使用量预警 (百万token)</label>
+                  <input type="number" id="cfg-monthly-limit" placeholder="10" step="1" min="0" />
+                </div>
+              </div>
+            </div>
+            <div class="settings-card">
               <h2 data-i18n="settings.apiKeys">API 密钥</h2>
               <div class="form-grid">
                 <div class="form-group"><label>OpenRouter</label><input type="password" id="cfg-openrouter-key" placeholder="sk-or-v1-xxx" /></div>
@@ -267,9 +288,17 @@
                   <div class="search-usage-bar" id="baidu-usage-bar"></div>
                 </div>
                 <div class="form-group">
+                  <label data-i18n="settings.baiduQuota">免费额度</label>
+                  <input type="number" id="cfg-baidu-quota" placeholder="100" min="0" step="1" />
+                </div>
+                <div class="form-group">
                   <label data-i18n="settings.braveKey">Brave Search API Key</label>
                   <input type="password" id="cfg-brave-key" placeholder="BSA..." />
                   <div class="search-usage-bar" id="brave-usage-bar"></div>
+                </div>
+                <div class="form-group">
+                  <label data-i18n="settings.braveQuota">免费额度</label>
+                  <input type="number" id="cfg-brave-quota" placeholder="1000" min="0" step="1" />
                 </div>
                 <div class="form-group form-group-checkbox">
                   <label>
@@ -277,6 +306,11 @@
                     <span data-i18n="settings.quotaOnly">仅使用免费额度</span>
                   </label>
                 </div>
+              </div>
+            </div>
+            <div class="settings-card">
+              <h2 data-i18n="settings.toolSettings">工具设置</h2>
+              <div class="form-grid">
                 <div class="form-group">
                   <label data-i18n="settings.shellTimeout">Shell 超时 (秒)</label>
                   <input type="number" id="cfg-exec-timeout" placeholder="60" />
@@ -508,6 +542,15 @@
               <span class="token-chart-total" id="search-chart-total"></span>
             </div>
             <div class="token-chart-container" id="search-chart-container"></div>
+          </div>
+          <div class="token-chart-section">
+            <div class="token-chart-header">
+              <h3 data-i18n="stats.costTitle">消费成本</h3>
+              <span class="token-chart-total" id="cost-chart-total"></span>
+            </div>
+            <div style="position:relative;height:200px;padding:10px 0">
+              <canvas id="cost-chart-canvas"></canvas>
+            </div>
           </div>
           <div class="token-chart-section">
             <div class="token-chart-header">

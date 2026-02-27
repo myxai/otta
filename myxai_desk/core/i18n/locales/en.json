@@ -46,8 +46,8 @@
   "app.daily_digest.desc": "Your personal curator — daily picks based on your interests, with deep-dive exploration",
   "app.email_summary.name": "Email Briefing",
   "app.email_summary.desc": "Connect your inbox, AI categorises and summarises into a daily briefing",
-  "app.healthcheck.name": "Execution Radar",
-  "app.healthcheck.desc": "Daily execution quality analytics — hit rates, error trends, tool diagnostics",
+  "app.execution_radar.name": "Execution Radar",
+  "app.execution_radar.desc": "Daily execution quality analytics — hit rates, error trends, tool diagnostics",
   
   "notification.daily_digest.updated": "🎯 Daily Briefing Updated",
   "notification.daily_digest.content": "Analyzed {filtered} browsing records, searched {results} recommended content.",

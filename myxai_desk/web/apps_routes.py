@@ -14,6 +14,7 @@ from myxai_desk.web.apps_helpers import (
     APP_CATALOG,
     DEFAULT_DIGEST_CONFIG,
     DEFAULT_EMAIL_CONFIG,
+    DEFAULT_EXECUTION_RADAR_CONFIG,
     _t,
     load_apps_prefs,
     load_apps_registry,
@@ -126,6 +127,7 @@ def install(app_id):
     default_configs = {
         "daily_digest": DEFAULT_DIGEST_CONFIG,
         "email_summary": DEFAULT_EMAIL_CONFIG,
+        "execution_radar": DEFAULT_EXECUTION_RADAR_CONFIG,
     }
     registry[app_id] = {
         "installed_at": datetime.now(timezone.utc).isoformat(),

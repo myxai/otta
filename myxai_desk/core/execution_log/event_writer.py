@@ -1,4 +1,4 @@
-"""Write tool-call step events to SQLite for healthcheck analytics.
+﻿"""Write tool-call step events to SQLite for execution radar analytics.
 
 Each call to ``record_step`` inserts one row into the ``exec_steps`` table.
 The table is auto-created on first use.

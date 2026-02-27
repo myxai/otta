@@ -87,12 +87,108 @@ def get_token_usage() -> dict:
         _ensure_loaded()
         today = date.today().isoformat()
         day = _token_data.get(today, {"input": 0, "output": 0})
+        inp = day.get("input", 0)
+        out = day.get("output", 0)
         return {
             "date": today,
-            "input_tokens": day.get("input", 0),
-            "output_tokens": day.get("output", 0),
-            "total_tokens": day.get("input", 0) + day.get("output", 0),
+            "input_tokens": inp,
+            "output_tokens": out,
+            "total_tokens": inp + out,
         }
+
+
+def calculate_cost(input_tokens: int, output_tokens: int, input_price: float, output_price: float) -> float:
+    """Calculate cost in yuan based on token usage and pricing.
+    
+    Args:
+        input_tokens: Number of input tokens
+        output_tokens: Number of output tokens
+        input_price: Price per million input tokens (in yuan)
+        output_price: Price per million output tokens (in yuan)
+    
+    Returns:
+        Total cost in yuan
+    """
+    input_cost = (input_tokens / 1_000_000) * input_price
+    output_cost = (output_tokens / 1_000_000) * output_price
+    return input_cost + output_cost
+
+
+def get_token_usage_with_cost(config: dict | None = None) -> dict:
+    """Get today's token usage with cost calculation.
+    
+    Args:
+        config: Configuration dict containing tokenCost settings
+    
+    Returns:
+        Dict with token usage, cost, and alert status
+    """
+    with _token_lock:
+        _ensure_loaded()
+        today = date.today().isoformat()
+        day = _token_data.get(today, {"input": 0, "output": 0})
+        inp = day.get("input", 0)
+        out = day.get("output", 0)
+        
+        result = {
+            "date": today,
+            "input_tokens": inp,
+            "output_tokens": out,
+            "total_tokens": inp + out,
+            "cost": 0.0,
+            "daily_limit": 0.0,
+            "monthly_limit": 0.0,
+            "daily_usage_pct": 0.0,
+            "monthly_usage_pct": 0.0,
+            "alert_level": "green",  # green, yellow, red
+        }
+        
+        if config and "tokenCost" in config:
+            cost_cfg = config["tokenCost"]
+            input_price = cost_cfg.get("inputPrice", 0)
+            output_price = cost_cfg.get("outputPrice", 0)
+            daily_limit = cost_cfg.get("dailyLimit", 0)  # in M tokens (百万)
+            monthly_limit = cost_cfg.get("monthlyLimit", 0)  # in M tokens (百万)
+            
+            # Calculate cost if prices are set
+            if input_price or output_price:
+                result["cost"] = calculate_cost(inp, out, input_price, output_price)
+            
+            result["daily_limit"] = daily_limit
+            result["monthly_limit"] = monthly_limit
+            
+            # Calculate daily percentage based on token count
+            if daily_limit > 0:
+                daily_limit_tokens = daily_limit * 1000000  # M tokens to tokens
+                result["daily_usage_pct"] = ((inp + out) / daily_limit_tokens) * 100
+            
+            # Calculate monthly percentage (sum of last 30 days)
+            monthly_tokens = 0
+            monthly_cost = 0.0
+            for i in range(30):
+                d = (date.today() - timedelta(days=i)).isoformat()
+                day_data = _token_data.get(d, {"input": 0, "output": 0})
+                day_inp = day_data.get("input", 0)
+                day_out = day_data.get("output", 0)
+                monthly_tokens += day_inp + day_out
+                if input_price or output_price:
+                    monthly_cost += calculate_cost(day_inp, day_out, input_price, output_price)
+            
+            if monthly_limit > 0:
+                monthly_limit_tokens = monthly_limit * 1000000  # M tokens to tokens
+                result["monthly_usage_pct"] = (monthly_tokens / monthly_limit_tokens) * 100
+            
+            if input_price or output_price:
+                result["monthly_cost"] = monthly_cost
+            
+            # Determine alert level based on token usage percentage
+            max_pct = max(result["daily_usage_pct"], result["monthly_usage_pct"])
+            if max_pct >= 100:
+                result["alert_level"] = "red"
+            elif max_pct >= 80:
+                result["alert_level"] = "yellow"
+        
+        return result
 
 
 def get_token_history(days: int = 30) -> list[dict]:
@@ -107,6 +203,44 @@ def get_token_history(days: int = 30) -> list[dict]:
             inp = day.get("input", 0) if isinstance(day, dict) else day
             out = day.get("output", 0) if isinstance(day, dict) else 0
             result.append({"date": d, "input": inp, "output": out, "tokens": inp + out})
+        return result
+
+
+def get_cost_history(days: int = 30, config: dict | None = None) -> list[dict]:
+    """Return daily token usage with cost for the last N days.
+    
+    Args:
+        days: Number of days to retrieve
+        config: Configuration dict containing tokenCost settings
+    
+    Returns:
+        List of dicts with date, tokens, and cost
+    """
+    with _token_lock:
+        _ensure_loaded()
+        result = []
+        today = date.today()
+        
+        input_price = 0
+        output_price = 0
+        if config and "tokenCost" in config:
+            cost_cfg = config["tokenCost"]
+            input_price = cost_cfg.get("inputPrice", 0)
+            output_price = cost_cfg.get("outputPrice", 0)
+        
+        for i in range(days):
+            d = (today - timedelta(days=days - 1 - i)).isoformat()
+            day = _token_data.get(d, {"input": 0, "output": 0})
+            inp = day.get("input", 0) if isinstance(day, dict) else day
+            out = day.get("output", 0) if isinstance(day, dict) else 0
+            cost = calculate_cost(inp, out, input_price, output_price)
+            result.append({
+                "date": d,
+                "input": inp,
+                "output": out,
+                "tokens": inp + out,
+                "cost": round(cost, 4)
+            })
         return result
 
 

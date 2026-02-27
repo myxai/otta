@@ -1,4 +1,4 @@
-"""Unified result envelope that wraps raw tool output for healthcheck analytics.
+﻿"""Unified result envelope that wraps raw tool output for execution radar analytics.
 
 The envelope is created *post-hoc* (after tools.execute returns) so it does not
 alter the nanobot tool interface.  Verifiers are looked up from the registry and

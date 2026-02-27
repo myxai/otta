@@ -139,7 +139,7 @@ from myxai_desk.web.apps_digest_routes import bp as apps_digest_bp
 from myxai_desk.web.apps_email_routes import bp as apps_email_bp
 from myxai_desk.web.apps_custom_routes import bp as apps_custom_bp
 from myxai_desk.web.reports_routes import bp as reports_bp
-from myxai_desk.apps.healthcheck.api import bp as healthcheck_bp
+from myxai_desk.apps.execution_radar.api import bp as execution_radar_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
@@ -153,7 +153,7 @@ flask_app.register_blueprint(apps_digest_bp)
 flask_app.register_blueprint(apps_email_bp)
 flask_app.register_blueprint(apps_custom_bp)
 flask_app.register_blueprint(reports_bp)
-flask_app.register_blueprint(healthcheck_bp)
+flask_app.register_blueprint(execution_radar_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -1896,6 +1896,29 @@ def api_undo_action(action_id):
     return jsonify(result), status
 
 
+@flask_app.route("/api/search/quota_config", methods=["GET", "POST"])
+def api_search_quota_config():
+    """搜索 API 额度配置 API（GET/POST）."""
+    from myxai_desk.core.search_quota_service import get_search_quota_config, save_search_quota_config
+    
+    if request.method == "GET":
+        return jsonify(get_search_quota_config())
+    
+    # POST
+    try:
+        config = request.get_json()
+        save_search_quota_config(config)
+        
+        # Update the quota manager limits
+        from apps.web_search import quota
+        quota.set_limits(config)
+        
+        return jsonify({"success": True})
+    except Exception as e:
+        log.exception("[api] Failed to save search quota config")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @flask_app.route("/api/search/usage")
 def api_search_usage():
     """Return today's search API usage stats, with key availability."""
@@ -1916,21 +1939,57 @@ def api_search_usage():
         return jsonify({"error": str(e)}), 500
 
 
+@flask_app.route("/api/token/cost_config", methods=["GET", "POST"])
+def api_token_cost_config():
+    """Token 成本配置 API（GET/POST）."""
+    from myxai_desk.core.token_cost_service import get_token_cost_config, save_token_cost_config
+    
+    if request.method == "GET":
+        return jsonify(get_token_cost_config())
+    
+    # POST
+    try:
+        config = request.get_json()
+        save_token_cost_config(config)
+        return jsonify({"success": True})
+    except Exception as e:
+        log.exception("[api] Failed to save token cost config")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @flask_app.route("/api/token/usage")
 def api_token_usage():
-    from apps.llm_utils import get_token_usage
+    from apps.llm_utils import get_token_usage_with_cost
+    from myxai_desk.core.token_cost_service import get_token_cost_config
 
-    return jsonify(get_token_usage())
+    cost_config = get_token_cost_config()
+    # Wrap in a dict structure compatible with get_token_usage_with_cost
+    config_wrapper = {"tokenCost": cost_config}
+    
+    return jsonify(get_token_usage_with_cost(config_wrapper))
 
 
 @flask_app.route("/api/token/history")
 def api_token_history():
     days = request.args.get("days", 30, type=int)
-    from apps.llm_utils import get_token_history
+    from apps.llm_utils import get_token_history, get_cost_history
+    from myxai_desk.core.token_cost_service import get_token_cost_config
 
+    cost_config = get_token_cost_config()
+    config_wrapper = {"tokenCost": cost_config}
+    
     history = get_token_history(min(days, 90))
+    cost_history = get_cost_history(min(days, 90), config_wrapper)
     total = sum(d["tokens"] for d in history)
-    return jsonify({"days": len(history), "total": total, "history": history})
+    total_cost = sum(d["cost"] for d in cost_history)
+    
+    return jsonify({
+        "days": len(history),
+        "total": total,
+        "total_cost": round(total_cost, 2),
+        "history": history,
+        "cost_history": cost_history
+    })
 
 
 @flask_app.route("/api/usage/categories")
@@ -2720,38 +2779,46 @@ def _exec_custom_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str
     )
 
 
-def _load_healthcheck_tasks() -> list["_TaskDescriptor"]:
-    """Build a single TaskDescriptor for the daily healthcheck pipeline."""
+def _load_execution_radar_tasks() -> list["_TaskDescriptor"]:
+    """Build a single TaskDescriptor for the daily execution radar pipeline."""
+    registry = load_apps_registry()
+    app = registry.get("execution_radar", {})
+    if not app.get("enabled"):
+        return []
+    config = app.get("config", {})
+    schedule_time = config.get("schedule_time", "02:00")
+    hh, mm = schedule_time.split(":")[:2]
+    cron_expr = f"{mm} {hh} * * *"
     return [
         _TaskDescriptor(
-            task_id="daily_healthcheck",
-            schedule={"enabled": True, "mode": "daily", "time": "02:00"},
-            cron_expr="0 2 * * *",
-            created_at="2025-01-01T00:00:00",
-            last_success_at=None,
+            task_id="daily_execution_radar",
+            schedule={"enabled": True, "mode": "daily", "time": schedule_time},
+            cron_expr=cron_expr,
+            created_at=app.get("installed_at", "2025-01-01T00:00:00"),
+            last_success_at=app.get("last_run"),
             catchup_policy="LATEST_ONLY",
             catchup_window_hours=48,
             max_catchup_runs=1,
-            extra={"kind": "healthcheck"},
+            extra={"kind": "execution_radar"},
         )
     ]
 
 
-def _exec_healthcheck(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
-    from apps.healthcheck_runner import run_healthcheck
-    run_healthcheck(task, slot, trigger)
+def _exec_execution_radar(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
+    from apps.execution_radar_runner import run_execution_radar
+    run_execution_radar(task, slot, trigger)
 
 
 def _init_scheduler_service():
     """Register task loaders and executors with the global SchedulerService."""
     _scheduler_svc.register_task_loader(_load_official_tasks)
     _scheduler_svc.register_task_loader(_load_custom_tasks)
-    _scheduler_svc.register_task_loader(_load_healthcheck_tasks)
+    _scheduler_svc.register_task_loader(_load_execution_radar_tasks)
     _scheduler_svc.register_executor("daily_digest", _exec_daily_digest)
     _scheduler_svc.register_executor("email_summary", _exec_email_summary)
     _scheduler_svc.register_executor("custom", _exec_custom_app)
     _scheduler_svc.register_executor("custom_summary", _exec_custom_summary)
-    _scheduler_svc.register_executor("healthcheck", _exec_healthcheck)
+    _scheduler_svc.register_executor("execution_radar", _exec_execution_radar)
 
 
 def _start_app_scheduler():
@@ -3003,6 +3070,13 @@ atexit.register(_shutdown)
 def main():
     global _desk_manager
 
+    # Migrate tokenCost from config.json to separate file (one-time migration)
+    try:
+        from myxai_desk.core.migrate_token_cost import migrate_token_cost_config
+        migrate_token_cost_config()
+    except Exception:
+        log.debug("[app] Token cost config migration skipped", exc_info=True)
+
     # --- Localhost API token guard ---------------------------------------- #
     _api_token = secrets.token_hex(32)
     flask_app.config["MYXAI_API_TOKEN"] = _api_token
@@ -3113,9 +3187,15 @@ def main():
     _desk_manager._get_unread_count = _unread_count
 
     try:
-        from apps.llm_utils import get_token_usage
+        from apps.llm_utils import get_token_usage_with_cost
+        from myxai_desk.core.token_cost_service import get_token_cost_config
 
-        _desk_manager._get_token_usage = get_token_usage
+        def _get_token_usage_wrapper():
+            cost_config = get_token_cost_config()
+            config_wrapper = {"tokenCost": cost_config}
+            return get_token_usage_with_cost(config_wrapper)
+        
+        _desk_manager._get_token_usage = _get_token_usage_wrapper
     except ImportError:
         pass
 

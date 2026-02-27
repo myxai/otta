@@ -46,8 +46,8 @@
   "app.daily_digest.desc": "你的私人资讯策展人——基于浏览和对话，每天精选最值得关注的内容，支持深入探索",
   "app.email_summary.name": "邮件简报",
   "app.email_summary.desc": "连接邮箱，AI 分类归纳生成每日邮件简报",
-  "app.healthcheck.name": "执行雷达",
-  "app.healthcheck.desc": "每日执行质量分析——命中率、错误趋势、工具诊断",
+  "app.execution_radar.name": "执行雷达",
+  "app.execution_radar.desc": "每日执行质量分析——命中率、错误趋势、工具诊断",
   
   "notification.daily_digest.updated": "🎯 每日私享已更新",
   "notification.daily_digest.content": "分析 {filtered} 条浏览记录，搜索 {results} 条推荐内容。",
