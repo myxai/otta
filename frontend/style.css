@@ -3756,3 +3756,153 @@ a:hover { text-decoration: underline; }
   color: var(--text);
   border: 1px solid var(--surface2, rgba(255,255,255,0.1));
 }
+
+/* ── Execution Radar App ──────────────────────────────────────── */
+.hc-card {
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-align: center;
+}
+.hc-card-label {
+  font-size: 11px;
+  color: var(--subtext0);
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.hc-card-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+.hc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.hc-table th {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 2px solid var(--bg-surface1);
+  font-weight: 600;
+  color: var(--subtext0);
+  font-size: 11px;
+  text-transform: uppercase;
+}
+.hc-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--bg-surface0);
+}
+.hc-table tr:hover td {
+  background: var(--bg-surface0);
+}
+.hc-table code {
+  background: var(--bg-mantle);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.hc-table-placeholder {
+  text-align: center;
+  padding: 24px;
+  color: var(--subtext0);
+  font-size: 13px;
+}
+.btn-xs {
+  padding: 3px 10px;
+  font-size: 11px;
+  border-radius: 5px;
+  cursor: pointer;
+  background: var(--bg-surface0);
+  color: var(--text);
+  border: 1px solid var(--bg-surface1);
+}
+.btn-xs.active {
+  background: var(--blue);
+  color: #fff;
+  border-color: var(--blue);
+}
+.btn-xs:hover:not(.active) {
+  background: var(--bg-surface1);
+}
+.btn-loading {
+  opacity: 0.7;
+  pointer-events: none;
+  position: relative;
+}
+.btn-loading::after {
+  content: "";
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid transparent;
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: hc-spin 0.6s linear infinite;
+  vertical-align: middle;
+}
+@keyframes hc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Task detail table */
+.hc-task-row { transition: background 0.15s; }
+.hc-task-row:hover td { background: var(--bg-surface0); }
+.hc-arrow {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--subtext0);
+  transition: transform 0.2s;
+  width: 14px;
+  text-align: center;
+}
+.hc-steps-container {
+  padding: 6px 8px 6px 28px;
+  background: var(--bg-mantle);
+  border-radius: 6px;
+  margin: 4px 0;
+}
+.hc-steps-inner { font-size: 12px; }
+.hc-steps-inner th {
+  font-size: 10px;
+  color: var(--subtext0);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--bg-surface0);
+}
+.hc-steps-inner td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--bg-surface0);
+}
+.hc-args-cell {
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--subtext0);
+}
+.hc-badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.hc-badge-ok {
+  background: rgba(166,227,161,0.15);
+  color: var(--green, #a6e3a1);
+}
+.hc-badge-fail {
+  background: rgba(243,139,168,0.15);
+  color: var(--red, #f38ba8);
+}
+.hc-badge-dim {
+  background: var(--bg-surface0);
+  color: var(--subtext0);
+}

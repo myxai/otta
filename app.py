@@ -139,6 +139,7 @@ from myxai_desk.web.apps_digest_routes import bp as apps_digest_bp
 from myxai_desk.web.apps_email_routes import bp as apps_email_bp
 from myxai_desk.web.apps_custom_routes import bp as apps_custom_bp
 from myxai_desk.web.reports_routes import bp as reports_bp
+from myxai_desk.apps.healthcheck.api import bp as healthcheck_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
@@ -152,6 +153,7 @@ flask_app.register_blueprint(apps_digest_bp)
 flask_app.register_blueprint(apps_email_bp)
 flask_app.register_blueprint(apps_custom_bp)
 flask_app.register_blueprint(reports_bp)
+flask_app.register_blueprint(healthcheck_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -487,6 +489,15 @@ def _try_execute_pending() -> str | None:
 
         post_execution_audit(pa.capability, pa.op, pa.tool_args, result, None)
         post_execution_undo(pa.capability, pa.op, pa.tool_args, result)
+        try:
+            from myxai_desk.core.execution_log.event_writer import record_step
+            record_step(
+                session_id="pending_confirm", tool_name=pa.tool_name,
+                args_json=pa.tool_args, status="ok", action="EXEC_CONFIRMED",
+                result_preview=str(result)[:500],
+            )
+        except Exception:
+            pass
         print(f"[policy] Confirmed via chat → executed {pa.tool_name}")
         return _t("policy.tool_executed", 
                   tool_name=pa.tool_name,
@@ -494,6 +505,16 @@ def _try_execute_pending() -> str | None:
                   result=str(result)[:2000])
     except Exception as exc:
         log.exception("[policy] Pending execution error")
+        try:
+            from myxai_desk.core.execution_log.event_writer import record_step
+            from myxai_desk.core.execution_log.error_codes import classify_error as _cls_err
+            record_step(
+                session_id="pending_confirm", tool_name="__pending__",
+                status="hard_fail", error_code=_cls_err(exc=exc),
+                action="HARD_FAIL", result_preview=str(exc)[:500],
+            )
+        except Exception:
+            pass
         return _t("policy.exec_failed", error=str(exc))
 
 
@@ -774,6 +795,8 @@ def _patch_agent_tool_history(agent):
                         if "search" in tc.name.lower():
                             _turn_search += 1
                         print(f"[agent] tool: {tc.name}({str(tc.arguments)[:100]})")
+                        import time as _time_mod
+                        _step_start_ts = _time_mod.time()
 
                         # ── CapabilityGuard: environment/network/policy check ──
                         if _cap_guard:
@@ -791,6 +814,15 @@ def _patch_agent_tool_history(agent):
                                         "arguments": tc.arguments,
                                     }, ensure_ascii=False))
                                 print(f"[agent] result(cap): {str(result)[:100]}")
+                                try:
+                                    from myxai_desk.core.execution_log.event_writer import record_step_from_event
+                                    record_step_from_event(
+                                        session_id=key, tool_name=tc.name, args=tc.arguments,
+                                        result=str(result)[:500], turn_event=_turn_events[-1],
+                                        started_at=_step_start_ts,
+                                    )
+                                except Exception:
+                                    pass
                                 messages = self.context.add_tool_result(
                                     messages, tc.id, tc.name, result,
                                 )
@@ -811,6 +843,15 @@ def _patch_agent_tool_history(agent):
                                     "arguments": tc.arguments,
                                 }, ensure_ascii=False))
                             print(f"[agent] result(guard): {str(result)[:100]}")
+                            try:
+                                from myxai_desk.core.execution_log.event_writer import record_step_from_event
+                                record_step_from_event(
+                                    session_id=key, tool_name=tc.name, args=tc.arguments,
+                                    result=str(result)[:500], turn_event=_turn_events[-1],
+                                    started_at=_step_start_ts,
+                                )
+                            except Exception:
+                                pass
                             messages = self.context.add_tool_result(
                                 messages, tc.id, tc.name, result,
                             )
@@ -990,6 +1031,19 @@ def _patch_agent_tool_history(agent):
                                 "arguments": tc.arguments,
                             }, ensure_ascii=False))
                         print(f"[agent] result: {str(result)[:100]}")
+
+                        # ── Step event logging (unified point for EXEC/DENY/CONFIRM/SANDBOX branches) ──
+                        try:
+                            from myxai_desk.core.execution_log.event_writer import record_step_from_event
+                            record_step_from_event(
+                                session_id=key, tool_name=tc.name, args=tc.arguments,
+                                result=str(result)[:500] if result else "",
+                                turn_event=_turn_events[-1] if _turn_events else {"action": "UNKNOWN"},
+                                started_at=_step_start_ts,
+                            )
+                        except Exception:
+                            pass
+
                         messages = self.context.add_tool_result(
                             messages,
                             tc.id,
@@ -1008,6 +1062,18 @@ def _patch_agent_tool_history(agent):
                     break
         except Exception as _loop_err:
             log.exception("[agent] error during message processing loop")
+            try:
+                from myxai_desk.core.execution_log.event_writer import record_step
+                from myxai_desk.core.execution_log.error_codes import classify_error as _cls_err
+                record_step(
+                    session_id=key, tool_name="__loop__",
+                    status="hard_fail",
+                    error_code=_cls_err(exc=_loop_err),
+                    action="HARD_FAIL",
+                    result_preview=str(_loop_err)[:500],
+                )
+            except Exception:
+                pass
             if final_content is None:
                 final_content = f"Error during processing: {_loop_err}"
 
@@ -1732,9 +1798,29 @@ def api_plan_confirm(action_id):
 
         post_execution_audit(pa.capability, pa.op, pa.tool_args, result, None)
         post_execution_undo(pa.capability, pa.op, pa.tool_args, result)
+        try:
+            from myxai_desk.core.execution_log.event_writer import record_step
+            record_step(
+                session_id="plan_confirm", tool_name=pa.tool_name,
+                args_json=pa.tool_args, status="ok", action="EXEC_CONFIRMED",
+                result_preview=str(result)[:500],
+            )
+        except Exception:
+            pass
         return jsonify({"success": True, "result": str(result)[:500]})
     except Exception as e:
         log.exception("[api] plan approve/execute failed")
+        try:
+            from myxai_desk.core.execution_log.event_writer import record_step
+            from myxai_desk.core.execution_log.error_codes import classify_error as _cls_err
+            record_step(
+                session_id="plan_confirm", tool_name=pa.tool_name if pa else "__plan__",
+                args_json=pa.tool_args if pa else {}, status="hard_fail",
+                error_code=_cls_err(exc=e), action="HARD_FAIL",
+                result_preview=str(e)[:500],
+            )
+        except Exception:
+            pass
         return jsonify({"error": str(e)}), 500
 
 
@@ -2634,14 +2720,38 @@ def _exec_custom_summary(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str
     )
 
 
+def _load_healthcheck_tasks() -> list["_TaskDescriptor"]:
+    """Build a single TaskDescriptor for the daily healthcheck pipeline."""
+    return [
+        _TaskDescriptor(
+            task_id="daily_healthcheck",
+            schedule={"enabled": True, "mode": "daily", "time": "02:00"},
+            cron_expr="0 2 * * *",
+            created_at="2025-01-01T00:00:00",
+            last_success_at=None,
+            catchup_policy="LATEST_ONLY",
+            catchup_window_hours=48,
+            max_catchup_runs=1,
+            extra={"kind": "healthcheck"},
+        )
+    ]
+
+
+def _exec_healthcheck(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
+    from apps.healthcheck_runner import run_healthcheck
+    run_healthcheck(task, slot, trigger)
+
+
 def _init_scheduler_service():
     """Register task loaders and executors with the global SchedulerService."""
     _scheduler_svc.register_task_loader(_load_official_tasks)
     _scheduler_svc.register_task_loader(_load_custom_tasks)
+    _scheduler_svc.register_task_loader(_load_healthcheck_tasks)
     _scheduler_svc.register_executor("daily_digest", _exec_daily_digest)
     _scheduler_svc.register_executor("email_summary", _exec_email_summary)
     _scheduler_svc.register_executor("custom", _exec_custom_app)
     _scheduler_svc.register_executor("custom_summary", _exec_custom_summary)
+    _scheduler_svc.register_executor("healthcheck", _exec_healthcheck)
 
 
 def _start_app_scheduler():

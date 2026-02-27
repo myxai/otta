@@ -97,6 +97,18 @@ APP_CATALOG = {
         "category": "productivity",
         "min_mode": "Assistant",
     },
+    "healthcheck": {
+        "id": "healthcheck",
+        "name": _t("app.healthcheck.name"),
+        "name_en": "Execution Radar",
+        "icon": "📡",
+        "description": _t("app.healthcheck.desc"),
+        "description_en": "Daily execution quality analytics — hit rates, error trends, tool diagnostics",
+        "version": "1.0.0",
+        "author": "nanobot",
+        "category": "analytics",
+        "min_mode": "Observer",
+    },
 }
 
 DEFAULT_DIGEST_CONFIG = {

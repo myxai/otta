@@ -264,6 +264,24 @@ const FALLBACK_I18N = {
     "custom.step1":"类型与任务","custom.step2":"定时与总结","custom.step3":"基本信息",
     "custom.next":"下一步","custom.prev":"上一步","custom.cancel":"取消",
     "custom.badge":"自定义",
+    "healthcheck.title":"执行雷达","healthcheck.summary":"今日雷达","healthcheck.runNow":"立即运行",
+    "healthcheck.totalTasks":"任务数","healthcheck.successRate":"成功率",
+    "healthcheck.singleHitRate":"单任务命中率","healthcheck.multiHitRate":"多任务命中率",
+    "healthcheck.avgAttempts":"平均尝试次数","healthcheck.avgTokens":"平均 Token",
+    "healthcheck.trends":"趋势","healthcheck.hitRateTrend":"命中率趋势","healthcheck.attemptsTrend":"试错与成本趋势",
+    "healthcheck.topErrors":"Top 错误码","healthcheck.topTools":"Top 工具",
+    "healthcheck.errorCode":"错误码","healthcheck.count":"次数","healthcheck.pct":"占比",
+    "healthcheck.toolName":"工具名称","healthcheck.failCount":"失败次数",
+    "healthcheck.loading":"加载中…","healthcheck.noData":"暂无数据",
+    "healthcheck.running":"正在扫描…","healthcheck.runStarted":"雷达扫描已启动，数据将在几秒后更新",
+    "healthcheck.runFailed":"扫描失败","healthcheck.runDone":"扫描完成，数据已更新","healthcheck.runTimeout":"扫描仍在进行中，请稍后手动刷新",
+    "healthcheck.taskDetail":"评价详情","healthcheck.taskContent":"任务内容",
+    "healthcheck.totalSteps":"步数","healthcheck.effectiveSteps":"有效数",
+    "healthcheck.hitRateCol":"命中率","healthcheck.successCol":"是否成功",
+    "healthcheck.yes":"成功","healthcheck.no":"失败",
+    "healthcheck.stepIndex":"步骤","healthcheck.stepArgs":"参数",
+    "healthcheck.stepStatus":"状态","healthcheck.stepEffective":"判定",
+    "healthcheck.effective":"有效","healthcheck.ineffective":"无效",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
@@ -468,6 +486,24 @@ const FALLBACK_I18N = {
     "custom.step1":"Type & Task","custom.step2":"Schedule & Summary","custom.step3":"App Info",
     "custom.next":"Next","custom.prev":"Back","custom.cancel":"Cancel",
     "custom.badge":"Custom",
+    "healthcheck.title":"Execution Radar","healthcheck.summary":"Today's Radar","healthcheck.runNow":"Run Now",
+    "healthcheck.totalTasks":"Tasks","healthcheck.successRate":"Success Rate",
+    "healthcheck.singleHitRate":"Single Hit Rate","healthcheck.multiHitRate":"Multi Hit Rate",
+    "healthcheck.avgAttempts":"Avg Attempts","healthcheck.avgTokens":"Avg Tokens",
+    "healthcheck.trends":"Trends","healthcheck.hitRateTrend":"Hit Rate Trend","healthcheck.attemptsTrend":"Attempts & Cost Trend",
+    "healthcheck.topErrors":"Top Errors","healthcheck.topTools":"Top Tools",
+    "healthcheck.errorCode":"Error Code","healthcheck.count":"Count","healthcheck.pct":"Pct",
+    "healthcheck.toolName":"Tool Name","healthcheck.failCount":"Fail Count",
+    "healthcheck.loading":"Loading…","healthcheck.noData":"No data yet",
+    "healthcheck.running":"Scanning…","healthcheck.runStarted":"Radar scan started, data will update shortly",
+    "healthcheck.runFailed":"Scan failed","healthcheck.runDone":"Scan complete, data updated","healthcheck.runTimeout":"Scan still running, refresh later",
+    "healthcheck.taskDetail":"Task Detail","healthcheck.taskContent":"Task",
+    "healthcheck.totalSteps":"Steps","healthcheck.effectiveSteps":"Effective",
+    "healthcheck.hitRateCol":"Hit Rate","healthcheck.successCol":"Success",
+    "healthcheck.yes":"Yes","healthcheck.no":"No",
+    "healthcheck.stepIndex":"#","healthcheck.stepArgs":"Args",
+    "healthcheck.stepStatus":"Status","healthcheck.stepEffective":"Verdict",
+    "healthcheck.effective":"Effective","healthcheck.ineffective":"Ineffective",
   },
 };
 
@@ -2670,6 +2706,7 @@ async function uninstallApp(appId) {
 async function openAppDetail(appId) {
   if (appId === "daily_digest") { await openDigestDetail(); return; }
   if (appId === "email_summary") { await openEmailDetail(); return; }
+  if (appId === "healthcheck") { await openHealthcheckDetail(); return; }
   if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
 }
@@ -2684,6 +2721,352 @@ async function openAppReports(appId) {
       if (el) { el.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     }
   }, 200);
+}
+
+// ── Execution Radar Detail ────────────────────────────────────────────
+let _hcChart1 = null, _hcChart2 = null;
+
+async function openHealthcheckDetail() {
+  document.getElementById("app-detail-title").textContent = `📡 ${t("healthcheck.title")}`;
+  switchPage("app-detail");
+  const container = document.getElementById("app-detail-content");
+
+  container.innerHTML = `
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <div class="digest-status-bar" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span style="font-weight:600">${t("healthcheck.summary")}</span>
+        <input type="date" id="hc-date-picker" value="${new Date().toISOString().slice(0,10)}" style="padding:4px 8px;border-radius:6px;border:1px solid var(--bg-surface1);background:var(--bg-surface0);color:var(--text);font-size:12px" onchange="switchHcDate(this.value)">
+        <button class="btn btn-sm" id="hc-run-btn" onclick="runHealthcheck()">${t("healthcheck.runNow")}</button>
+        <span id="hc-run-indicator" style="font-size:12px;color:var(--subtext0);display:none"></span>
+      </div>
+    </div>
+
+    <div class="digest-config-grid" id="hc-summary-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:22px">
+      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.totalTasks")}</div><div class="hc-card-value" id="hc-total-tasks">--</div></div>
+      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.successRate")}</div><div class="hc-card-value" id="hc-success-rate">--</div></div>
+      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.singleHitRate")}</div><div class="hc-card-value" id="hc-single-hit">--</div></div>
+      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.multiHitRate")}</div><div class="hc-card-value" id="hc-multi-hit">--</div></div>
+      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.avgAttempts")}</div><div class="hc-card-value" id="hc-avg-attempts">--</div></div>
+      <div class="hc-card"><div class="hc-card-label">${t("healthcheck.avgTokens")}</div><div class="hc-card-value" id="hc-avg-tokens">--</div></div>
+    </div>
+
+    <div id="hc-report-text" style="display:none;margin-bottom:18px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary);font-size:13px;line-height:1.6"></div>
+
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <span style="font-weight:600">${t("healthcheck.trends")}</span>
+        <button class="btn btn-xs hc-window-btn active" data-w="7" onclick="switchHcWindow(7)">7d</button>
+        <button class="btn btn-xs hc-window-btn" data-w="30" onclick="switchHcWindow(30)">30d</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div style="position:relative;height:260px"><canvas id="hc-chart-hitrate"></canvas></div>
+        <div style="position:relative;height:260px"><canvas id="hc-chart-attempts"></canvas></div>
+      </div>
+    </div>
+
+    <div class="app-detail-section">
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <button class="btn btn-xs hc-tab-btn active" data-tab="errors" onclick="switchHcTab('errors')">${t("healthcheck.topErrors")}</button>
+        <button class="btn btn-xs hc-tab-btn" data-tab="tools" onclick="switchHcTab('tools')">${t("healthcheck.topTools")}</button>
+      </div>
+      <div id="hc-tab-errors" class="hc-tab-panel"><div class="hc-table-placeholder">${t("healthcheck.loading")}</div></div>
+      <div id="hc-tab-tools" class="hc-tab-panel" style="display:none"><div class="hc-table-placeholder">${t("healthcheck.loading")}</div></div>
+    </div>
+
+    <div class="app-detail-section" style="margin-top:18px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+        <span style="font-weight:600">${t("healthcheck.taskDetail")}</span>
+      </div>
+      <div id="hc-task-detail"><div class="hc-table-placeholder">${t("healthcheck.loading")}</div></div>
+    </div>
+  `;
+
+  await _refreshAllHcPanels();
+}
+
+function _getHcDate() {
+  const picker = document.getElementById("hc-date-picker");
+  return picker ? picker.value : new Date().toISOString().slice(0,10);
+}
+
+async function _refreshAllHcPanels() {
+  const d = _getHcDate();
+  await loadHcSummary(d);
+  const activeW = document.querySelector(".hc-window-btn.active");
+  await loadHcTrends(activeW ? parseInt(activeW.dataset.w) : 7);
+  await loadHcTopErrors(d);
+  await loadHcTopTools(d);
+  await loadHcTaskDetail(d);
+}
+
+function switchHcDate(dateStr) {
+  _refreshAllHcPanels();
+}
+
+async function loadHcSummary(dateStr) {
+  try {
+    const dt = dateStr || _getHcDate();
+    const d = await api(`/api/apps/healthcheck/summary?date=${dt}`);
+    const inst = d.instrumented_tasks || 0;
+    const total = d.total_tasks || 0;
+    document.getElementById("hc-total-tasks").textContent = inst > 0 ? (inst < total ? `${inst} / ${total}` : `${inst}`) : (total > 0 ? `0 / ${total}` : "0");
+    document.getElementById("hc-success-rate").textContent = (d.success_rate || 0) + "%";
+    document.getElementById("hc-single-hit").textContent = (d.single_hit_rate || 0) + "%";
+    document.getElementById("hc-multi-hit").textContent = (d.multi_hit_rate || 0) + "%";
+    document.getElementById("hc-avg-attempts").textContent = d.avg_attempts || 0;
+    document.getElementById("hc-avg-tokens").textContent = d.avg_tokens || 0;
+    const reportEl = document.getElementById("hc-report-text");
+    if (d.report_text) {
+      reportEl.style.display = "block";
+      reportEl.textContent = d.report_text;
+    } else {
+      reportEl.style.display = "none";
+    }
+  } catch (e) { console.warn("hc summary", e); }
+}
+
+async function loadHcTrends(window) {
+  try {
+    const d = await api(`/api/apps/healthcheck/trends?window=${window}`);
+    _renderHcHitRateChart(d);
+    _renderHcAttemptsChart(d);
+  } catch (e) { console.warn("hc trends", e); }
+}
+
+function _renderHcHitRateChart(d) {
+  const canvas = document.getElementById("hc-chart-hitrate");
+  if (!canvas) return;
+  if (_hcChart1) { _hcChart1.destroy(); _hcChart1 = null; }
+  const labels = (d.dates || []).map(x => x.slice(5));
+  _hcChart1 = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: t("healthcheck.singleHitRate"), data: d.single_hit_rates || [], borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
+        { label: t("healthcheck.multiHitRate"), data: d.multi_hit_rates || [], borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 10, font: { size: 11 } } },
+                 title: { display: true, text: t("healthcheck.hitRateTrend"), font: { size: 13 } } },
+      scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + "%" } } },
+    },
+  });
+}
+
+function _renderHcAttemptsChart(d) {
+  const canvas = document.getElementById("hc-chart-attempts");
+  if (!canvas) return;
+  if (_hcChart2) { _hcChart2.destroy(); _hcChart2 = null; }
+  const labels = (d.dates || []).map(x => x.slice(5));
+  _hcChart2 = new Chart(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: t("healthcheck.avgAttempts"), data: d.avg_attempts || [], borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)", tension: 0.3, fill: true, pointRadius: 3 },
+        { label: t("healthcheck.avgTokens"), data: d.avg_tokens || [], borderColor: "#8b5cf6", backgroundColor: "rgba(139,92,246,0.08)", tension: 0.3, fill: true, pointRadius: 3, hidden: true },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 10, font: { size: 11 } } },
+                 title: { display: true, text: t("healthcheck.attemptsTrend"), font: { size: 13 } } },
+      scales: { y: { beginAtZero: true } },
+    },
+  });
+}
+
+async function loadHcTopErrors(dateStr) {
+  try {
+    const dt = dateStr || _getHcDate();
+    const d = await api(`/api/apps/healthcheck/top_errors?date=${dt}`);
+    const el = document.getElementById("hc-tab-errors");
+    if (!d.errors || d.errors.length === 0) {
+      el.innerHTML = `<div class="hc-table-placeholder">${t("healthcheck.noData")}</div>`;
+      return;
+    }
+    let html = `<table class="hc-table"><thead><tr><th>#</th><th>${t("healthcheck.errorCode")}</th><th>${t("healthcheck.count")}</th><th>${t("healthcheck.pct")}</th></tr></thead><tbody>`;
+    d.errors.forEach((e, i) => {
+      html += `<tr><td>${i+1}</td><td><code>${e.error_code || e.code}</code></td><td>${e.cnt}</td><td>${e.pct || 0}%</td></tr>`;
+    });
+    html += "</tbody></table>";
+    el.innerHTML = html;
+  } catch (e) { console.warn("hc errors", e); }
+}
+
+async function loadHcTopTools(dateStr) {
+  try {
+    const dt = dateStr || _getHcDate();
+    const d = await api(`/api/apps/healthcheck/top_tools?date=${dt}`);
+    const el = document.getElementById("hc-tab-tools");
+    if (!d.tools || d.tools.length === 0) {
+      el.innerHTML = `<div class="hc-table-placeholder">${t("healthcheck.noData")}</div>`;
+      return;
+    }
+    let html = `<table class="hc-table"><thead><tr><th>#</th><th>${t("healthcheck.toolName")}</th><th>${t("healthcheck.count")}</th><th>${t("healthcheck.failCount")}</th></tr></thead><tbody>`;
+    d.tools.forEach((e, i) => {
+      html += `<tr><td>${i+1}</td><td><code>${e.tool_name}</code></td><td>${e.cnt}</td><td>${e.fail_cnt || 0}</td></tr>`;
+    });
+    html += "</tbody></table>";
+    el.innerHTML = html;
+  } catch (e) { console.warn("hc tools", e); }
+}
+
+function switchHcWindow(w) {
+  document.querySelectorAll(".hc-window-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.w) === w));
+  loadHcTrends(w);
+}
+
+function switchHcTab(tab) {
+  document.querySelectorAll(".hc-tab-btn").forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".hc-tab-panel").forEach(p => p.style.display = "none");
+  const panel = document.getElementById(`hc-tab-${tab}`);
+  if (panel) panel.style.display = "block";
+}
+
+async function loadHcTaskDetail(dateStr) {
+  try {
+    const dt = dateStr || _getHcDate();
+    const d = await api(`/api/apps/healthcheck/tasks?date=${dt}`);
+    const el = document.getElementById("hc-task-detail");
+    if (!d.tasks || d.tasks.length === 0) {
+      el.innerHTML = `<div class="hc-table-placeholder">${t("healthcheck.noData")}</div>`;
+      return;
+    }
+    let html = `<table class="hc-table hc-task-table"><thead><tr>
+      <th style="width:30px"></th>
+      <th>#</th>
+      <th>${t("healthcheck.taskContent")}</th>
+      <th>${t("healthcheck.totalSteps")}</th>
+      <th>${t("healthcheck.effectiveSteps")}</th>
+      <th>${t("healthcheck.hitRateCol")}</th>
+      <th>${t("healthcheck.successCol")}</th>
+    </tr></thead><tbody>`;
+    d.tasks.forEach((task, i) => {
+      const hasSteps = task.steps && task.steps.length > 0;
+      const toggleAttr = hasSteps ? `onclick="toggleHcSteps(this)" style="cursor:pointer"` : "";
+      const arrow = hasSteps ? `<span class="hc-arrow">▶</span>` : `<span class="hc-arrow" style="visibility:hidden">▶</span>`;
+      const successIcon = task.success ? `<span class="hc-badge hc-badge-ok">${t("healthcheck.yes")}</span>` : `<span class="hc-badge hc-badge-fail">${t("healthcheck.no")}</span>`;
+      const hitStr = task.total_steps > 0 ? task.hit_rate + "%" : "-";
+      const userText = _escHtml((task.user_text || "").slice(0, 60));
+      html += `<tr class="hc-task-row" ${toggleAttr}>
+        <td>${arrow}</td>
+        <td>${i + 1}</td>
+        <td title="${_escHtml(task.user_text || "")}">${userText}</td>
+        <td>${task.total_steps}</td>
+        <td>${task.effective_count}</td>
+        <td>${hitStr}</td>
+        <td>${successIcon}</td>
+      </tr>`;
+      if (hasSteps) {
+        html += `<tr class="hc-steps-row" style="display:none"><td colspan="7"><div class="hc-steps-container">`;
+        html += `<table class="hc-table hc-steps-inner"><thead><tr>
+          <th>${t("healthcheck.stepIndex")}</th>
+          <th>${t("healthcheck.toolName")}</th>
+          <th>${t("healthcheck.stepArgs")}</th>
+          <th>${t("healthcheck.stepStatus")}</th>
+          <th>${t("healthcheck.stepEffective")}</th>
+        </tr></thead><tbody>`;
+        task.steps.forEach(s => {
+          const statusBadge = s.status === "ok"
+            ? `<span class="hc-badge hc-badge-ok">OK</span>`
+            : `<span class="hc-badge hc-badge-fail">${s.error_code || s.status}</span>`;
+          const effBadge = s.effective
+            ? `<span class="hc-badge hc-badge-ok">${t("healthcheck.effective")}</span>`
+            : `<span class="hc-badge hc-badge-dim">${t("healthcheck.ineffective")}</span>`;
+          let argsPreview = "";
+          try {
+            const parsed = JSON.parse(s.args || "{}");
+            const keys = Object.keys(parsed);
+            if (keys.length > 0) {
+              const val = String(parsed[keys[0]] || "").slice(0, 60);
+              argsPreview = val + (String(parsed[keys[0]] || "").length > 60 ? "…" : "");
+            }
+          } catch (_) { argsPreview = (s.args || "").slice(0, 60); }
+          html += `<tr>
+            <td>${s.index + 1}</td>
+            <td><code>${s.tool || "-"}</code></td>
+            <td class="hc-args-cell" title="${_escHtml(s.args || "")}">${_escHtml(argsPreview)}</td>
+            <td>${statusBadge}</td>
+            <td>${effBadge}</td>
+          </tr>`;
+        });
+        html += `</tbody></table></div></td></tr>`;
+      }
+    });
+    html += "</tbody></table>";
+    el.innerHTML = html;
+  } catch (e) { console.warn("hc task detail", e); }
+}
+
+function toggleHcSteps(rowEl) {
+  const stepsRow = rowEl.nextElementSibling;
+  if (!stepsRow || !stepsRow.classList.contains("hc-steps-row")) return;
+  const isHidden = stepsRow.style.display === "none";
+  stepsRow.style.display = isHidden ? "table-row" : "none";
+  const arrow = rowEl.querySelector(".hc-arrow");
+  if (arrow) arrow.textContent = isHidden ? "▼" : "▶";
+}
+
+function _escHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+async function runHealthcheck() {
+  const btn = document.getElementById("hc-run-btn");
+  const indicator = document.getElementById("hc-run-indicator");
+  if (!btn) return;
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("healthcheck.running");
+  btn.classList.add("btn-loading");
+  if (indicator) { indicator.style.display = "inline"; indicator.textContent = ""; }
+
+  try {
+    const dateStr = _getHcDate();
+    await api("/api/apps/healthcheck/run", "POST", { date: dateStr });
+
+    let done = false;
+    for (let i = 0; i < 15; i++) {
+      await new Promise(r => setTimeout(r, 2000));
+      const elapsed = (i + 1) * 2;
+      if (indicator) indicator.textContent = `${elapsed}s`;
+      try {
+        const st = await api("/api/apps/healthcheck/status");
+        if (!st.running) {
+          done = true;
+          if (st.error) {
+            toast(t("healthcheck.runFailed") + ": " + st.error, "error");
+          }
+          break;
+        }
+      } catch (_) {}
+    }
+
+    btn.textContent = origText;
+    btn.classList.remove("btn-loading");
+    btn.disabled = false;
+    if (indicator) { indicator.style.display = "none"; }
+
+    await _refreshAllHcPanels();
+
+    if (done) {
+      toast(t("healthcheck.runDone"), "success");
+    } else {
+      toast(t("healthcheck.runTimeout"), "warning");
+    }
+  } catch (e) {
+    toast(t("healthcheck.runFailed") + ": " + e.message, "error");
+    btn.textContent = origText;
+    btn.classList.remove("btn-loading");
+    btn.disabled = false;
+    if (indicator) { indicator.style.display = "none"; }
+  }
 }
 
 async function openDigestDetail() {
