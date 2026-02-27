@@ -48,7 +48,7 @@ def evaluate(op: str, args: dict, policy: ModePolicy) -> tuple[str, int, str]:
         if _SENSITIVE_DATA_RE.search(body) and not policy.net_exfiltration_allowed:
             return "DENY", 90, "NET_SENSITIVE_EXFILTRATION"
 
-        if policy.confirm_level == "strong":
+        if policy.confirm_level == "strong" and op != "http_get":
             return "REQUIRE_CONFIRM", 40, "NET_STRONG_CONFIRM"
 
         return "ALLOW", 15, "NET_ALLOWED"

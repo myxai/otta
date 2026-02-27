@@ -498,13 +498,17 @@ def _try_execute_pending() -> str | None:
 
 
 _TOOLS_FS = {"exec", "read_file", "list_dir", "write_file", "edit_file"}
-_TOOLS_SEARCH = {"web_search", "web_fetch"}
+_TOOLS_SEARCH = {"web_search", "web_fetch", "smart_fetch"}
 _TOOLS_SCHEDULE = {"cron"}
 _TOOLS_COMM = {"message", "spawn"}
 
 _TRIGGER_SEARCH = _re.compile(
     r"搜索|查找|查询|搜一下|谷歌|百度|google|search|bing|"
     r"新闻|资讯|最新|天气|汇率|股价",
+    _re.IGNORECASE,
+)
+_TRIGGER_FETCH = _re.compile(
+    r"https?://\S|www\.\S|抓取|获取.*(?:网页|页面|内容)|打开.*链接|简报|摘要|fetch\b",
     _re.IGNORECASE,
 )
 _TRIGGER_SCHEDULE = _re.compile(
@@ -532,6 +536,8 @@ def _filter_tool_defs_for_message(
     needed = set(_TOOLS_FS)
 
     if _TRIGGER_SEARCH.search(user_msg):
+        needed |= _TOOLS_SEARCH
+    if _TRIGGER_FETCH.search(user_msg):
         needed |= _TOOLS_SEARCH
     if _TRIGGER_SCHEDULE.search(user_msg):
         needed |= _TOOLS_SCHEDULE
@@ -600,7 +606,22 @@ def _patch_agent_tool_history(agent):
         except Exception:
             log.warning("Failed to load persona/profile for system prompt", exc_info=True)
 
-        return base + mode_hint + persona_block
+        fetch_rules = (
+            "\n\nURL FETCH RULES (MANDATORY):\n"
+            "A) To fetch content from any URL, ALWAYS use smart_fetch(url) first.\n"
+            "B) NEVER use exec with curl/wget/Invoke-WebRequest to fetch web pages.\n"
+            "C) If smart_fetch returns blocked=true or ok=false, STOP and tell the user. "
+            "Do NOT fabricate content or try alternative shell commands.\n"
+            "D) NEVER write a report/digest/summary if you have no valid source text. "
+            "If all fetches failed, inform the user and suggest alternatives.\n"
+            "E) For each URL, attempt smart_fetch at most 2 times. If still failing, stop."
+        )
+
+        cap_summary = ""
+        if hasattr(agent, "_cap_manager"):
+            cap_summary = "\n[CAPABILITIES] " + agent._cap_manager.get_prompt_summary()
+
+        return base + mode_hint + persona_block + fetch_rules + cap_summary
 
     agent.context.build_system_prompt = _enhanced_system_prompt
 
@@ -698,6 +719,15 @@ def _patch_agent_tool_history(agent):
         _turn_output = 0
         _turn_search = 0
 
+        from apps.smart_fetch import FetchGuard
+
+        _fetch_guard = FetchGuard()
+        _cap_guard = None
+        if hasattr(self, "_cap_manager"):
+            from apps.capabilities import CapabilityGuard
+
+            _cap_guard = CapabilityGuard(self._cap_manager)
+
         try:
             while iteration < self.max_iterations:
                 iteration += 1
@@ -744,6 +774,47 @@ def _patch_agent_tool_history(agent):
                         if "search" in tc.name.lower():
                             _turn_search += 1
                         print(f"[agent] tool: {tc.name}({str(tc.arguments)[:100]})")
+
+                        # ── CapabilityGuard: environment/network/policy check ──
+                        if _cap_guard:
+                            _cap_block = await _cap_guard.check(tc.name, tc.arguments)
+                            if _cap_block:
+                                result = _cap_block
+                                _turn_events.append(
+                                    {"tool": tc.name, "cap": "capability", "action": "CAP_BLOCK"}
+                                )
+                                print(f"[cap] {tc.name}: {_cap_block[:80]}")
+                                if progress:
+                                    await progress(_json.dumps({
+                                        "__tool_call__": True,
+                                        "name": tc.name,
+                                        "arguments": tc.arguments,
+                                    }, ensure_ascii=False))
+                                print(f"[agent] result(cap): {str(result)[:100]}")
+                                messages = self.context.add_tool_result(
+                                    messages, tc.id, tc.name, result,
+                                )
+                                continue
+
+                        # ── FetchGuard: attempt limiter + no-source-no-write ──
+                        _guard_block = _fetch_guard.pre_execute(tc.name, tc.arguments)
+                        if _guard_block:
+                            result = _guard_block
+                            _turn_events.append(
+                                {"tool": tc.name, "cap": "guard", "action": "GUARD_BLOCK"}
+                            )
+                            print(f"[guard] {tc.name}: {_guard_block[:80]}")
+                            if progress:
+                                await progress(_json.dumps({
+                                    "__tool_call__": True,
+                                    "name": tc.name,
+                                    "arguments": tc.arguments,
+                                }, ensure_ascii=False))
+                            print(f"[agent] result(guard): {str(result)[:100]}")
+                            messages = self.context.add_tool_result(
+                                messages, tc.id, tc.name, result,
+                            )
+                            continue
 
                         # ── Phase 1: Policy gate (pre-execution) ──
                         from myxai_desk.core.policy.engine import decide as _policy_decide
@@ -897,6 +968,20 @@ def _patch_agent_tool_history(agent):
                             _turn_events.append(
                                 {"tool": tc.name, "cap": _cap, "action": "EXEC", "ok": True}
                             )
+
+                        # ── FetchGuard: update state after execution ──
+                        _fetch_guard.post_execute(
+                            tc.name, tc.arguments, str(result) if result else ""
+                        )
+
+                        # ── CapabilityManager: implicit network confirmation ──
+                        if (
+                            _cap_guard
+                            and tc.name in {"smart_fetch", "web_fetch", "web_search"}
+                            and result
+                            and "error" not in str(result)[:200].lower()
+                        ):
+                            self._cap_manager.mark_network_ok()
 
                         if progress:
                             await progress(_json.dumps({
@@ -1085,6 +1170,14 @@ def _get_or_create_agent():
         except Exception as _ws_err:
             log.exception("[agent] failed to replace web_search")
 
+        try:
+            from apps.smart_fetch import SmartFetchTool
+
+            _agent.tools.register(SmartFetchTool())
+            print("[agent] smart_fetch tool registered")
+        except Exception as _sf_err:
+            log.exception("[agent] failed to register smart_fetch")
+
         # Wrap exec tool: intercept deletion commands → safe_remove (recoverable)
         _exec_tool = _agent.tools._tools.get("exec")
         if _exec_tool and hasattr(_exec_tool, "execute"):
@@ -1098,6 +1191,10 @@ def _get_or_create_agent():
             )
             _PATH_QUOTED = _wrap_re.compile(r"""['"]([^'"]{3,})['"]\s*""")
             _PATH_DRIVE = _wrap_re.compile(r'([A-Z]:\\[^\s"\'<>|*?]+)', _wrap_re.IGNORECASE)
+            _NET_FETCH = _wrap_re.compile(
+                r"\b(?:curl|wget|Invoke-WebRequest|Invoke-RestMethod|iwr|irm)\b",
+                _wrap_re.IGNORECASE,
+            )
 
             def _extract_paths(cmd: str) -> list[str]:
                 paths = _PATH_QUOTED.findall(cmd)
@@ -1113,6 +1210,12 @@ def _get_or_create_agent():
 
             async def _safe_exec_wrapper(**kwargs):
                 command = kwargs.get("command", "")
+                if _NET_FETCH.search(command):
+                    return (
+                        "[REDIRECT] 请使用 smart_fetch(url) 工具抓取网页内容，"
+                        "它能自动处理反爬检测和内容提取。"
+                        "禁止通过 exec 执行 curl/wget/Invoke-WebRequest 等网络抓取命令。"
+                    )
                 if _DEL_INTENT.search(command):
                     paths = _extract_paths(command)
                     if paths:
@@ -1130,6 +1233,19 @@ def _get_or_create_agent():
 
             _exec_tool.execute = _safe_exec_wrapper
             print("[agent] exec tool wrapped: deletion commands → safe_remove (trash)")
+
+        # ── CapabilityManager: probe environment + network + tools ──
+        try:
+            from apps.capabilities import CapabilityManager
+
+            _cap_mgr = CapabilityManager(workspace=str(config.workspace_path))
+            _cap_mgr.probe_static()
+            _cap_mgr.probe_tools(set(_agent.tools._tools.keys()))
+            _cap_mgr.probe_network_sync()
+            _agent._cap_manager = _cap_mgr
+            print(f"[agent] capabilities: {_cap_mgr.get_prompt_summary()}")
+        except Exception as _cap_err:
+            log.exception("[agent] CapabilityManager init failed")
 
         async def _on_cron_job(job):
             """Cron callback: directly push notification without LLM processing.
@@ -1306,6 +1422,7 @@ _TOOL_CAP_MAP = {
     "bing_search": ("search", "web"),
     "duckduckgo_search": ("search", "web"),
     "web_fetch": ("net", "http_get"),
+    "smart_fetch": ("net", "http_get"),
     "read_file": ("fs", "read"),
     "write_file": ("fs", "write_text"),
     "edit_file": ("fs", "write_text"),
