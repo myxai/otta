@@ -230,6 +230,18 @@ def _ensure_loop():
 # ---------------------------------------------------------------------------
 
 
+def _resolve_api_key(raw_key: str | None, provider_name: str | None) -> str | None:
+    """Resolve <<KEYRING>> placeholder to the real key from secret storage."""
+    if not raw_key or raw_key == "<<KEYRING>>":
+        if provider_name:
+            from myxai_desk.core.storage.secrets import retrieve_provider_key
+            real = retrieve_provider_key(provider_name)
+            if real:
+                return real
+        return None if raw_key == "<<KEYRING>>" else raw_key
+    return raw_key
+
+
 def _make_provider(config):
     from nanobot.providers.custom_provider import CustomProvider
     from nanobot.providers.litellm_provider import LiteLLMProvider
@@ -238,19 +250,20 @@ def _make_provider(config):
     model = config.agents.defaults.model
     provider_name = config.get_provider_name(model)
     p = config.get_provider(model)
+    api_key = _resolve_api_key(p.api_key if p else None, provider_name)
 
     if provider_name == "openai_codex" or model.startswith("openai-codex/"):
         return OpenAICodexProvider(default_model=model)
 
     if provider_name == "custom":
         return CustomProvider(
-            api_key=p.api_key if p else "no-key",
+            api_key=api_key or "no-key",
             api_base=config.get_api_base(model) or "http://localhost:8000/v1",
             default_model=model,
         )
 
     return LiteLLMProvider(
-        api_key=p.api_key if p else None,
+        api_key=api_key,
         api_base=config.get_api_base(model),
         default_model=model,
         extra_headers=p.extra_headers if p else None,
@@ -782,7 +795,7 @@ def _patch_agent_tool_history(agent):
 
             _cap_guard = CapabilityGuard(self._cap_manager)
 
-        # ── PR-2: Golden / Candidate replay (deterministic, no LLM) ──
+        # ── Golden 2.0 + PR-2: deterministic replay (no LLM) ──
         _skip_llm_loop = False
         _plan_source: str | None = None
         _case_key: str | None = None
@@ -792,7 +805,90 @@ def _patch_agent_tool_history(agent):
         _llm_attempts = 0
         _golden_version: int | None = None
 
+        # ── Priority 1 & 2: Golden 2.0 (Instance / Template) ──
         if _ie_result:
+            try:
+                from myxai_desk.core.intent_engine.config import golden_v2_enabled as _gv2_on
+                if _gv2_on():
+                    from myxai_desk.core.golden.slot_extractor import extract_slots as _extract_slots
+                    from myxai_desk.core.golden.store import GoldenV2Store as _GV2Store, compute_instance_key as _compute_ikey
+                    from myxai_desk.core.golden.template_matcher import match as _template_match
+                    from myxai_desk.core.golden.replay_validator import validate as _replay_validate
+                    from myxai_desk.core.golden.models import GoldenInstance as _GI
+                    from myxai_desk.core.intent_engine.plan_runner import run_plan as _run_plan
+                    from myxai_desk.core.golden_store import parse_candidate_plan as _parse_candidate_plan
+
+                    _slot_result = _extract_slots(msg.content)
+                    _gv2_store = _GV2Store()
+
+                    if _slot_result.intent_label and _slot_result.confidence >= 0.3:
+                        _instance_key = _compute_ikey(
+                            _slot_result.intent_label,
+                            _slot_result.slots,
+                        )
+
+                        # Priority 1: Instance hit (exact match, fastest)
+                        _inst = _gv2_store.get_instance(_instance_key)
+                        if _inst and _inst.resolved_plan:
+                            _v = _replay_validate(_inst.resolved_plan, _slot_result.slots)
+                            if _v.ok:
+                                _inst_steps = _parse_candidate_plan(
+                                    _inst.resolved_plan_json
+                                    if isinstance(_inst.resolved_plan_json, str)
+                                    else json.dumps(_inst.resolved_plan)
+                                )
+                                if _inst_steps:
+                                    _inst_result = await _run_plan(_inst_steps, self.tools, key, progress)
+                                    _attempts_count += _inst_result.steps_executed
+                                    if _inst_result.success:
+                                        _gv2_store.record_instance_use(
+                                            _instance_key, ok=True,
+                                            duration_ms=_inst_result.total_duration_ms,
+                                            run_id=getattr(_ie_result, "run_id", None),
+                                        )
+                                        tools_used = [s["tool_name"] for s in _inst_result.results if s.get("tool_name")]
+                                        final_content = _inst_result.final_summary
+                                        _plan_source = "golden_v2_instance"
+                                        _case_key = _instance_key
+                                        _skip_llm_loop = True
+                                        print(f"[agent] golden_v2 instance hit: key={_instance_key[:12]}, steps={_inst_result.steps_executed}")
+                                    else:
+                                        _gv2_store.record_instance_use(_instance_key, ok=False)
+                                        print(f"[agent] golden_v2 instance FAILED at step {_inst_result.failed_at}, falling through")
+
+                        # Priority 2: Template hit (slot filling)
+                        if not _skip_llm_loop:
+                            _tmatch = _template_match(_slot_result.intent_label, _slot_result.slots)
+                            if _tmatch and _tmatch.filled_plan:
+                                _v = _replay_validate(_tmatch.filled_plan, _slot_result.slots, _tmatch.constraints)
+                                if _v.ok:
+                                    _tpl_steps = _parse_candidate_plan(json.dumps(_tmatch.filled_plan, ensure_ascii=False))
+                                    if _tpl_steps:
+                                        _tpl_result = await _run_plan(_tpl_steps, self.tools, key, progress)
+                                        _attempts_count += _tpl_result.steps_executed
+                                        if _tpl_result.success:
+                                            _gv2_store.save_instance(
+                                                case_key=_instance_key,
+                                                template_id=_tmatch.template_id,
+                                                intent_label=_slot_result.intent_label,
+                                                slot_values=_slot_result.slots,
+                                                resolved_plan=_tmatch.filled_plan,
+                                            )
+                                            _gv2_store.record_template_use(_tmatch.template_id, ok=True)
+                                            tools_used = [s["tool_name"] for s in _tpl_result.results if s.get("tool_name")]
+                                            final_content = _tpl_result.final_summary
+                                            _plan_source = "golden_v2_template"
+                                            _case_key = _instance_key
+                                            _skip_llm_loop = True
+                                            print(f"[agent] golden_v2 template hit: tpl={_tmatch.template_id[:16]}, steps={_tpl_result.steps_executed}")
+                                        else:
+                                            _gv2_store.record_template_use(_tmatch.template_id, ok=False)
+                                            print(f"[agent] golden_v2 template FAILED, falling through")
+            except Exception:
+                log.warning("[agent] golden_v2 replay skipped", exc_info=True)
+
+        # ── Priority 3: PR-2 Candidate replay (legacy golden_plans + candidates) ──
+        if not _skip_llm_loop and _ie_result:
             try:
                 from myxai_desk.core.intent_engine.config import golden_replay_enabled as _golden_on
                 if not _golden_on():
@@ -822,7 +918,7 @@ def _patch_agent_tool_history(agent):
 
                 _store = _GoldenStore()
 
-                # 1) Verified golden plan — highest priority
+                # 3a) Verified golden plan
                 _gp = _store.get_golden_plan(_case_key)
                 if _gp:
                     _gp_steps = _parse_candidate_plan(_gp.golden_plan_json)
@@ -850,7 +946,7 @@ def _patch_agent_tool_history(agent):
                             )
                             print(f"[agent] golden_replay FAILED at step {_gp_result.failed_at}, falling through")
 
-                # 2) Candidate replay — verify then promote
+                # 3b) Candidate replay — verify then promote
                 if not _skip_llm_loop:
                     _cand = _store.get_best_candidate(_case_key)
                     if _cand:
@@ -1268,7 +1364,16 @@ def _patch_agent_tool_history(agent):
                 if _ie_result.run_id:
                     try:
                         from myxai_desk.core.intent_engine.dao import update_ie_run as _update_ie_run
-                        _final_source = _plan_source or ("llm_free" if tools_used else None)
+                        # Determine plan_source: only mark as llm_free if NO LLM was called
+                        if _plan_source:
+                            _final_source = _plan_source
+                        elif tools_used and _llm_attempts == 0:
+                            _final_source = "llm_free"
+                        elif tools_used:
+                            _final_source = None  # Will not be recorded, means standard LLM flow
+                        else:
+                            _final_source = None
+                        
                         _run_fields: dict = {}
                         if _final_source:
                             _run_fields["plan_source"] = _final_source
@@ -1278,8 +1383,25 @@ def _patch_agent_tool_history(agent):
                             _run_fields["llm_attempts"] = _llm_attempts
                         if _golden_version is not None:
                             _run_fields["golden_version"] = _golden_version
-                        if _run_fields:
-                            _update_ie_run(_ie_result.run_id, **_run_fields)
+                        _run_fields["golden_hit"] = 1 if _plan_source in (
+                            "golden_v2_instance", "golden_v2_template",
+                            "golden_replay", "golden_candidate",
+                        ) else 0
+                        
+                        # Calculate effective_steps (last occurrence of each tool in successful runs)
+                        if _ie_outcome == "success" and tools_used:
+                            last_idx_by_tool: dict[str, int] = {}
+                            for i, tool in enumerate(tools_used):
+                                if tool:
+                                    last_idx_by_tool[tool] = i
+                            _run_fields["effective_steps"] = len(set(last_idx_by_tool.values()))
+                        else:
+                            _run_fields["effective_steps"] = 0
+                        
+                        # Calculate total_tokens
+                        _run_fields["total_tokens"] = _turn_input + _turn_output
+                        
+                        _update_ie_run(_ie_result.run_id, **_run_fields)
                     except Exception:
                         log.debug("[agent] ie_run field writeback failed", exc_info=True)
 
@@ -1298,6 +1420,31 @@ def _patch_agent_tool_history(agent):
                         pitfalls="" if _ie_outcome == "success" else str(final_content)[:200],
                         fail_reason="" if _ie_outcome == "success" else str(locals().get("_loop_err", ""))[:200],
                     )
+
+                # Golden 2.0: save successful LLM runs as instances
+                if _ie_outcome == "success" and tools_used and _plan_source is None:
+                    try:
+                        from myxai_desk.core.intent_engine.config import golden_v2_enabled as _gv2_chk
+                        if _gv2_chk():
+                            from myxai_desk.core.golden.slot_extractor import extract_slots as _ext2
+                            from myxai_desk.core.golden.store import GoldenV2Store as _GV2S2, compute_instance_key as _cik2
+                            _sr2 = _ext2(msg.content)
+                            if _sr2.intent_label and _sr2.confidence >= 0.3:
+                                _ik2 = _cik2(_sr2.intent_label, _sr2.slots)
+                                _plan2 = [
+                                    {"tool_name": e.get("tool", ""), "args": e.get("args", {})}
+                                    for e in _turn_events if e.get("tool")
+                                ]
+                                if _plan2:
+                                    _GV2S2().save_instance(
+                                        case_key=_ik2,
+                                        template_id=None,
+                                        intent_label=_sr2.intent_label,
+                                        slot_values=_sr2.slots,
+                                        resolved_plan=_plan2,
+                                    )
+                    except Exception:
+                        log.debug("[agent] golden_v2 instance save failed", exc_info=True)
             except Exception:
                 pass
 
@@ -2580,6 +2727,8 @@ def api_ie_golden_config():
             updates = {}
             if "golden_replay_enabled" in body:
                 updates["golden_replay_enabled"] = bool(body["golden_replay_enabled"])
+            if "golden_v2_enabled" in body:
+                updates["golden_v2_enabled"] = bool(body["golden_v2_enabled"])
             if updates:
                 ie_config.set_values(updates)
             return jsonify({"ok": True, **ie_config.get()})
@@ -2773,15 +2922,13 @@ def _get_model_config() -> dict:
                 p_cfg = merged.get("providers", {}).get(provider_name, {})
                 api_key = p_cfg.get("apiKey") or None
                 if api_key == "<<KEYRING>>":
-                    api_key = None
+                    api_key = _resolve_api_key(api_key, provider_name)
             baidu_key = (
                 merged.get("tools", {}).get("web", {}).get("search", {}).get("baiduApiKey") or None
             )
         except Exception:
             p = config.get_provider(model)
-            api_key = p.api_key if p else None
-            if api_key == "<<KEYRING>>":
-                api_key = None
+            api_key = _resolve_api_key(p.api_key if p else None, provider_name)
             log.debug("config_service unavailable, fell back to nanobot loader", exc_info=True)
 
         return {

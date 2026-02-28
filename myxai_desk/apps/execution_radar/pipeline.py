@@ -69,11 +69,27 @@ def run_daily_radar(run_date: str | None = None, *, skip_report: bool = False) -
     if candidates:
         upsert_candidates(candidates)
 
+    # Golden 2.0: attempt auto template generation after new data
+    _templates_created = 0
+    try:
+        from myxai_desk.core.intent_engine.config import golden_v2_enabled as _gv2_check
+        if _gv2_check():
+            from myxai_desk.core.golden.store import GoldenV2Store
+            from myxai_desk.core.golden.template_generator import maybe_generate_templates
+            _gv2_store = GoldenV2Store()
+            _new_templates = maybe_generate_templates(_gv2_store)
+            _templates_created = len(_new_templates)
+            if _templates_created:
+                log.info("[execution_radar] golden_v2: %d templates auto-generated", _templates_created)
+    except Exception:
+        log.debug("[execution_radar] golden_v2 template generation skipped", exc_info=True)
+
     log.info(
-        "[execution_radar] pipeline done for %s — %d tasks, %d with steps, %d candidates",
+        "[execution_radar] pipeline done for %s — %d tasks, %d with steps, %d candidates, %d templates",
         date_str, len(tasks),
         sum(1 for t in tasks if t.get("total_steps", 0) > 0),
         len(candidates),
+        _templates_created,
     )
     return metrics
 

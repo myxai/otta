@@ -43,6 +43,36 @@ def get_stats():
     return jsonify(get_runs_stats(days=days))
 
 
+# ── Visualization APIs ─────────────────────────────────────────────
+
+@bp.route("/metrics", methods=["GET"])
+def get_metrics():
+    days = request.args.get("days", 7, type=int)
+    from myxai_desk.core.intent_engine.dao import get_ie_metrics
+    return jsonify(get_ie_metrics(days=days))
+
+
+@bp.route("/trends", methods=["GET"])
+def get_trends():
+    days = request.args.get("days", 7, type=int)
+    from myxai_desk.core.intent_engine.dao import get_ie_trends
+    return jsonify(get_ie_trends(days=days))
+
+
+@bp.route("/distribution", methods=["GET"])
+def get_distribution():
+    days = request.args.get("days", 7, type=int)
+    from myxai_desk.core.intent_engine.dao import get_ie_distribution
+    return jsonify(get_ie_distribution(days=days))
+
+
+@bp.route("/misroutes", methods=["GET"])
+def get_misroutes():
+    days = request.args.get("days", 7, type=int)
+    from myxai_desk.core.intent_engine.dao import get_ie_misroutes
+    return jsonify(get_ie_misroutes(days=days))
+
+
 # ── Runs ───────────────────────────────────────────────────────────
 
 @bp.route("/runs", methods=["GET"])
@@ -148,3 +178,40 @@ def rollback_model():
 @bp.route("/status", methods=["GET"])
 def run_status():
     return jsonify(_run_status)
+
+
+# ── Data Repair ────────────────────────────────────────────────────
+
+@bp.route("/repair/llm_free", methods=["POST"])
+def repair_llm_free_misclassification():
+    """Fix historical llm_free rows where llm_attempts > 0."""
+    try:
+        from myxai_desk.core.storage.sqlite import execute
+        rows = execute(
+            """UPDATE ie_runs
+               SET plan_source = NULL
+               WHERE plan_source = 'llm_free'
+                 AND llm_attempts > 0""",
+        )
+        affected = rows if isinstance(rows, int) else 0
+        return jsonify({"status": "ok", "affected": affected})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/repair/llm_free/check", methods=["GET"])
+def check_llm_free_misclassification():
+    """Check how many llm_free rows have llm_attempts > 0."""
+    try:
+        from myxai_desk.core.storage.sqlite import query_all
+        rows = query_all(
+            """SELECT id, user_text, plan_source, llm_attempts, outcome, created_at
+               FROM ie_runs
+               WHERE plan_source = 'llm_free'
+                 AND llm_attempts > 0
+               ORDER BY created_at DESC
+               LIMIT 20""",
+        )
+        return jsonify({"count": len(rows), "samples": rows})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500

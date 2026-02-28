@@ -302,6 +302,22 @@ const FALLBACK_I18N = {
     "ie.noModel":"暂无训练模型","ie.currentVersion":"当前版本","ie.allVersions":"所有版本",
     "ie.noRuns":"暂无路由记录","ie.time":"时间","ie.text":"用户输入",
     "ie.route":"路由","ie.mode":"模式","ie.toolsTrim":"工具裁剪","ie.outcome":"结果",
+    "ie.healthOverview":"全局健康概览","ie.routingHealth":"路由健康度",
+    "ie.avgToolReduction":"平均裁剪率","ie.goldenHitRate":"Golden 命中率",
+    "ie.avgLlmCalls":"平均 LLM 调用","ie.avgLatency":"路由耗时",
+    "ie.misrouteRate":"疑似误裁剪","ie.routeEffect":"路由效果分析",
+    "ie.toolReductionTrend":"工具裁剪率趋势","ie.goldenHitTrend":"Golden 命中率趋势",
+    "ie.llmCallTrend":"LLM 调用趋势","ie.patternDist":"模式分布与工具分析",
+    "ie.routeLabelDist":"路由标签分布","ie.toolPruneMap":"工具裁剪热力图",
+    "ie.tool":"工具","ie.keptCount":"保留次数","ie.prunedCount":"裁剪次数",
+    "ie.keptRate":"保留率","ie.execDetail":"单次执行明细","ie.caseKey":"Case Key",
+    "ie.goldenHit":"Golden","ie.llmCalls":"LLM次数","ie.latency":"耗时",
+    "ie.routeLabels":"路由标签","ie.allowedTools":"保留工具","ie.reductionRate":"裁剪率",
+    "ie.planSource":"决策来源","ie.decisionModes":"决策模式分布",
+    "ie.good":"良好","ie.fair":"一般","ie.poor":"较差",
+    "ie.last7d":"近7天","ie.last14d":"近14天","ie.last30d":"近30天",
+    "ie.configAndModels":"配置与模型",
+    "ie.intentConfidence":"意图置信度","ie.effectiveSteps":"有效步数","ie.costScore":"Token数",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
@@ -544,6 +560,22 @@ const FALLBACK_I18N = {
     "ie.noModel":"No trained model yet","ie.currentVersion":"Current Version","ie.allVersions":"All Versions",
     "ie.noRuns":"No routing logs yet","ie.time":"Time","ie.text":"User Input",
     "ie.route":"Route","ie.mode":"Mode","ie.toolsTrim":"Tool Trim","ie.outcome":"Outcome",
+    "ie.healthOverview":"Health Overview","ie.routingHealth":"Routing Health",
+    "ie.avgToolReduction":"Avg Tool Reduction","ie.goldenHitRate":"Golden Hit Rate",
+    "ie.avgLlmCalls":"Avg LLM Calls","ie.avgLatency":"Routing Latency",
+    "ie.misrouteRate":"Suspected Misroute","ie.routeEffect":"Route Effectiveness",
+    "ie.toolReductionTrend":"Tool Reduction Trend","ie.goldenHitTrend":"Golden Hit Rate Trend",
+    "ie.llmCallTrend":"LLM Call Trend","ie.patternDist":"Pattern & Tool Analysis",
+    "ie.routeLabelDist":"Route Label Distribution","ie.toolPruneMap":"Tool Pruning Heatmap",
+    "ie.tool":"Tool","ie.keptCount":"Kept","ie.prunedCount":"Pruned",
+    "ie.keptRate":"Kept Rate","ie.execDetail":"Execution Detail","ie.caseKey":"Case Key",
+    "ie.goldenHit":"Golden","ie.llmCalls":"LLM Calls","ie.latency":"Latency",
+    "ie.routeLabels":"Route Labels","ie.allowedTools":"Allowed Tools","ie.reductionRate":"Reduction",
+    "ie.planSource":"Decision Source","ie.decisionModes":"Decision Modes",
+    "ie.good":"Good","ie.fair":"Fair","ie.poor":"Poor",
+    "ie.last7d":"7 Days","ie.last14d":"14 Days","ie.last30d":"30 Days",
+    "ie.configAndModels":"Config & Models",
+    "ie.intentConfidence":"Intent Confidence","ie.effectiveSteps":"Effective Steps","ie.costScore":"Tokens",
   },
 };
 
@@ -3492,24 +3524,93 @@ async function runExecutionRadar() {
 
 // ── Intent Engine Console ─────────────────────────────────────────────
 
-let _ieChartHit = null;
-let _ieChartReuse = null;
+// ── Intent Engine Visualization Dashboard ─────────────────────────
+let _ieChartReduction = null;
+let _ieChartGolden = null;
+let _ieChartLlm = null;
+let _ieChartLabelPie = null;
+let _ieChartModePie = null;
+let _ieTimeRange = 7;
 
 async function openIntentEngineDetail() {
-  document.getElementById("app-detail-title").textContent = `🧠 ${t("ie.title") || "意图引擎"}`;
+  document.getElementById("app-detail-title").textContent = `🧠 ${t("ie.title")}`;
   switchPage("app-detail");
   const container = document.getElementById("app-detail-content");
-  container.innerHTML = `<div class="app-detail-loading">${t("status.loading") || "加载中..."}</div>`;
+  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
 
   let cfg = {};
   try { cfg = await api("/api/apps/intent_engine/config"); } catch(_) {}
 
   container.innerHTML = `
+    <!-- Repair Button -->
+    <div style="margin-bottom:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end;">
+      <button id="ie-check-btn" class="btn-secondary" style="font-size:11px;padding:4px 10px;">🔍 检查数据问题</button>
+      <button id="ie-repair-btn" class="btn-secondary" style="font-size:11px;padding:4px 10px;">🔧 修复 llm_free 误判</button>
+    </div>
+
+    <!-- 1. Health Overview -->
+    <div class="app-detail-section ie-health-section">
+      <div class="ie-section-header">
+        <h3>${t("ie.healthOverview")}</h3>
+        <div class="ie-time-range">
+          <button class="btn btn-sm ${_ieTimeRange===7?'btn-primary':''}" onclick="ieSetRange(7)">${t("ie.last7d")}</button>
+          <button class="btn btn-sm ${_ieTimeRange===14?'btn-primary':''}" onclick="ieSetRange(14)">${t("ie.last14d")}</button>
+          <button class="btn btn-sm ${_ieTimeRange===30?'btn-primary':''}" onclick="ieSetRange(30)">${t("ie.last30d")}</button>
+        </div>
+      </div>
+      <div id="ie-health-score" class="ie-health-score-box"></div>
+      <div id="ie-metrics-cards" class="ie-metrics-grid"></div>
+    </div>
+
+    <!-- 2. Route Effectiveness -->
     <div class="app-detail-section">
-      <h3>⚙️ ${t("ie.switches") || "开关配置"}</h3>
+      <h3>${t("ie.routeEffect")}</h3>
+      <div class="ie-charts-row">
+        <div class="ie-chart-box">
+          <canvas id="ie-chart-reduction"></canvas>
+        </div>
+        <div class="ie-chart-box">
+          <canvas id="ie-chart-golden"></canvas>
+        </div>
+        <div class="ie-chart-box">
+          <canvas id="ie-chart-llm"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Pattern Distribution & Tool Analysis -->
+    <div class="app-detail-section">
+      <h3>${t("ie.patternDist")}</h3>
+      <div class="ie-dist-row">
+        <div class="ie-dist-chart-col">
+          <h4>${t("ie.routeLabelDist")}</h4>
+          <div class="ie-pie-wrap"><canvas id="ie-chart-labels"></canvas></div>
+        </div>
+        <div class="ie-dist-chart-col">
+          <h4>${t("ie.decisionModes")}</h4>
+          <div class="ie-pie-wrap"><canvas id="ie-chart-modes"></canvas></div>
+        </div>
+      </div>
+      <div style="margin-top:16px;">
+        <h4>${t("ie.toolPruneMap")}</h4>
+        <div id="ie-tool-heatmap"></div>
+      </div>
+    </div>
+
+    <!-- 4. Execution Detail -->
+    <div class="app-detail-section">
+      <details id="ie-detail-panel">
+        <summary style="cursor:pointer;font-weight:600;font-size:15px;">${t("ie.execDetail")}</summary>
+        <div id="ie-runs-table" style="margin-top:12px;"></div>
+      </details>
+    </div>
+
+    <!-- 5. Core Switches -->
+    <div class="app-detail-section">
+      <h3>⚙️ ${t("ie.switches")}</h3>
       <div class="digest-config-grid">
         <div class="form-group">
-          <label>${t("ie.routingEnabled") || "意图路由"}</label>
+          <label>${t("ie.routingEnabled")}</label>
           <label class="toggle">
             <input type="checkbox" id="ie-routing-enabled" ${cfg.routing_enabled ? "checked" : ""}
                    onchange="updateIeConfig('routing_enabled', this.checked)">
@@ -3517,80 +3618,133 @@ async function openIntentEngineDetail() {
           </label>
         </div>
         <div class="form-group">
-          <label>${t("ie.caseRetrieval") || "Case 检索"}</label>
+          <label>Golden Replay</label>
           <label class="toggle">
-            <input type="checkbox" id="ie-case-enabled" ${cfg.case_retrieval_enabled ? "checked" : ""}
-                   onchange="updateIeConfig('case_retrieval_enabled', this.checked)">
+            <input type="checkbox" id="ie-golden-enabled" ${cfg.golden_replay_enabled ? "checked" : ""}
+                   onchange="updateIeConfig('golden_replay_enabled', this.checked)">
             <span class="toggle-slider"></span>
           </label>
         </div>
         <div class="form-group">
-          <label>${t("ie.planReuse") || "计划复用"}</label>
+          <label>Golden v2</label>
           <label class="toggle">
-            <input type="checkbox" id="ie-plan-enabled" ${cfg.plan_reuse_enabled ? "checked" : ""}
-                   onchange="updateIeConfig('plan_reuse_enabled', this.checked)">
+            <input type="checkbox" id="ie-golden-v2-enabled" ${cfg.golden_v2_enabled ? "checked" : ""}
+                   onchange="updateIeConfig('golden_v2_enabled', this.checked)">
             <span class="toggle-slider"></span>
           </label>
         </div>
       </div>
     </div>
 
+    <!-- 6. Advanced Config & Models (collapsed by default) -->
     <div class="app-detail-section">
-      <h3>🎚️ ${t("ie.thresholds") || "阈值调节"}</h3>
-      <div class="digest-config-grid">
-        <div class="form-group">
-          <label>${t("ie.routeConfLow") || "路由置信阈值"}</label>
-          <input type="number" id="ie-conf-low" value="${cfg.route_conf_low || 0.4}" step="0.05" min="0" max="1"
-                 onchange="updateIeConfig('route_conf_low', parseFloat(this.value))" class="form-input">
+      <details id="ie-config-panel">
+        <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--subtext0)">Advanced</summary>
+        <div style="margin-top:12px;">
+          <div class="digest-config-grid" style="margin-bottom:16px;">
+            <div class="form-group">
+              <label>${t("ie.caseRetrieval")}</label>
+              <label class="toggle">
+                <input type="checkbox" id="ie-case-enabled" ${cfg.case_retrieval_enabled ? "checked" : ""}
+                       onchange="updateIeConfig('case_retrieval_enabled', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label>${t("ie.planReuse")}</label>
+              <label class="toggle">
+                <input type="checkbox" id="ie-plan-enabled" ${cfg.plan_reuse_enabled ? "checked" : ""}
+                       onchange="updateIeConfig('plan_reuse_enabled', this.checked)">
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
+            <div class="form-group">
+              <label>${t("ie.routeConfLow")}</label>
+              <input type="number" id="ie-conf-low" value="${cfg.route_conf_low || 0.4}" step="0.05" min="0" max="1"
+                     onchange="updateIeConfig('route_conf_low', parseFloat(this.value))" class="form-input">
+            </div>
+            <div class="form-group">
+              <label>${t("ie.caseReuseSim")}</label>
+              <input type="number" id="ie-reuse-sim" value="${cfg.case_reuse_sim_threshold || 0.92}" step="0.01" min="0" max="1"
+                     onchange="updateIeConfig('case_reuse_sim_threshold', parseFloat(this.value))" class="form-input">
+            </div>
+          </div>
+          <h4>🤖 ${t("ie.models")}</h4>
+          <div id="ie-model-info" style="margin-bottom:12px;"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn btn-primary" id="ie-train-btn" onclick="ieRunTrain()">🏋️ ${t("ie.train")}</button>
+            <button class="btn" id="ie-eval-btn" onclick="ieRunEval()">📝 ${t("ie.eval")}</button>
+          </div>
+          <div id="ie-train-status" style="margin-top:8px;"></div>
+          <div id="ie-eval-results" style="margin-top:12px;"></div>
         </div>
-        <div class="form-group">
-          <label>${t("ie.caseReuseSim") || "复用相似度阈值"}</label>
-          <input type="number" id="ie-reuse-sim" value="${cfg.case_reuse_sim_threshold || 0.92}" step="0.01" min="0" max="1"
-                 onchange="updateIeConfig('case_reuse_sim_threshold', parseFloat(this.value))" class="form-input">
-        </div>
-        <div class="form-group">
-          <label>${t("ie.hintsMaxLen") || "Hints 最大长度"}</label>
-          <input type="number" id="ie-hints-len" value="${cfg.hints_max_length || 600}" step="50" min="100" max="2000"
-                 onchange="updateIeConfig('hints_max_length', parseInt(this.value))" class="form-input">
-        </div>
-      </div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>📊 ${t("ie.trends") || "最近 7 天趋势"}</h3>
-      <div id="ie-stats-cards" class="er-card-grid" style="grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:10px; margin-bottom:16px;"></div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:300px;position:relative;height:260px;">
-          <canvas id="ie-chart-hit"></canvas>
-        </div>
-        <div style="flex:1;min-width:300px;position:relative;height:260px;">
-          <canvas id="ie-chart-reuse"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>🤖 ${t("ie.models") || "模型管理"}</h3>
-      <div id="ie-model-info" style="margin-bottom:12px;"></div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-primary" id="ie-train-btn" onclick="ieRunTrain()">🏋️ ${t("ie.train") || "训练模型"}</button>
-        <button class="btn" id="ie-eval-btn" onclick="ieRunEval()">📝 ${t("ie.eval") || "评测模型"}</button>
-      </div>
-      <div id="ie-train-status" style="margin-top:8px;"></div>
-      <div id="ie-eval-results" style="margin-top:12px;"></div>
-    </div>
-
-    <div class="app-detail-section">
-      <h3>📋 ${t("ie.recentRuns") || "最近路由记录"}</h3>
-      <div id="ie-runs-table"></div>
+      </details>
     </div>
   `;
 
-  await _refreshIePanels();
+  await _ieRefreshAll();
 }
 
-async function _refreshIePanels() {
-  await Promise.all([_loadIeStats(), _loadIeModels(), _loadIeRuns()]);
+function ieSetRange(days) {
+  _ieTimeRange = days;
+  document.querySelectorAll(".ie-time-range .btn").forEach(b => b.classList.remove("btn-primary"));
+  event.target.classList.add("btn-primary");
+  _ieRefreshAll();
+}
+
+async function _ieRefreshAll() {
+  await Promise.all([
+    _ieLoadMetrics(),
+    _ieLoadTrends(),
+    _ieLoadDistribution(),
+    _ieLoadRuns(),
+    _ieLoadModels(),
+  ]);
+  
+  // Attach check button handler
+  const checkBtn = document.getElementById("ie-check-btn");
+  if (checkBtn) {
+    checkBtn.addEventListener("click", async () => {
+      checkBtn.disabled = true;
+      checkBtn.textContent = "检查中...";
+      try {
+        const res = await api("/api/apps/intent_engine/repair/llm_free/check");
+        if (res.count > 0) {
+          const msg = `发现 ${res.count} 条矛盾数据（plan_source=llm_free 但 llm_attempts>0）\n\n示例：\n${res.samples.slice(0,3).map(r => 
+            `- ${r.user_text?.substring(0,30) || r.id}: llm_attempts=${r.llm_attempts}`
+          ).join('\n')}`;
+          alert(msg);
+        } else {
+          toast("数据正常，没有发现矛盾", "success");
+        }
+      } catch(e) {
+        toast("检查失败: " + e.message, "error");
+      } finally {
+        checkBtn.disabled = false;
+        checkBtn.textContent = "🔍 检查数据问题";
+      }
+    });
+  }
+  
+  // Attach repair button handler
+  const repairBtn = document.getElementById("ie-repair-btn");
+  if (repairBtn) {
+    repairBtn.addEventListener("click", async () => {
+      if (!confirm("这将修正历史数据中的 llm_free 误判（llm_attempts>0 的行），确认？")) return;
+      repairBtn.disabled = true;
+      repairBtn.textContent = "修复中...";
+      try {
+        const res = await api("/api/apps/intent_engine/repair/llm_free", "POST");
+        toast(`已修复 ${res.affected} 条记录`, "success");
+        openIntentEngineDetail(); // 重新加载
+      } catch(e) {
+        toast("修复失败: " + e.message, "error");
+      } finally {
+        repairBtn.disabled = false;
+        repairBtn.textContent = "🔧 修复 llm_free 误判";
+      }
+    });
+  }
 }
 
 async function updateIeConfig(key, value) {
@@ -3600,91 +3754,334 @@ async function updateIeConfig(key, value) {
   } catch(e) { toast("Config update failed: " + e.message, "error"); }
 }
 
-async function _loadIeStats() {
+// ── 1. Health Metrics ────────────────────────────────────────────
+
+async function _ieLoadMetrics() {
   try {
-    const d = await api("/api/apps/intent_engine/stats?days=7");
-    const daily = d.daily || [];
-    const cardsEl = document.getElementById("ie-stats-cards");
-    if (!cardsEl) return;
+    const [m, mis] = await Promise.all([
+      api(`/api/apps/intent_engine/metrics?days=${_ieTimeRange}`),
+      api(`/api/apps/intent_engine/misroutes?days=${_ieTimeRange}`),
+    ]);
 
-    const totalRuns = daily.reduce((s, r) => s + (r.total || 0), 0);
-    const totalSuccess = daily.reduce((s, r) => s + (r.success || 0), 0);
-    const totalReuse = daily.reduce((s, r) => s + (r.reuse_count || 0), 0);
-    const avgConf = daily.length ? (daily.reduce((s, r) => s + (r.avg_conf || 0), 0) / daily.length).toFixed(2) : "N/A";
-    const avgToolsBefore = daily.length ? (daily.reduce((s, r) => s + (r.avg_before || 0), 0) / daily.length).toFixed(1) : "N/A";
-    const avgToolsAfter = daily.length ? (daily.reduce((s, r) => s + (r.avg_after || 0), 0) / daily.length).toFixed(1) : "N/A";
-    const successRate = totalRuns > 0 ? ((totalSuccess / totalRuns) * 100).toFixed(1) + "%" : "N/A";
-
-    cardsEl.innerHTML = `
-      <div class="er-card"><div class="er-card-label">${t("ie.totalRuns") || "总路由次数"}</div><div class="er-card-value">${totalRuns}</div></div>
-      <div class="er-card"><div class="er-card-label">${t("ie.successRate") || "成功率"}</div><div class="er-card-value">${successRate}</div></div>
-      <div class="er-card"><div class="er-card-label">${t("ie.reuseCount") || "复用次数"}</div><div class="er-card-value">${totalReuse}</div></div>
-      <div class="er-card"><div class="er-card-label">${t("ie.avgConf") || "平均置信度"}</div><div class="er-card-value">${avgConf}</div></div>
-      <div class="er-card"><div class="er-card-label">${t("ie.toolsBefore") || "裁剪前工具数"}</div><div class="er-card-value">${avgToolsBefore}</div></div>
-      <div class="er-card"><div class="er-card-label">${t("ie.toolsAfter") || "裁剪后工具数"}</div><div class="er-card-value">${avgToolsAfter}</div></div>
-    `;
-
-    // Charts
-    const labels = daily.map(r => r.local_date || "");
-    const successData = daily.map(r => r.total > 0 ? ((r.success / r.total) * 100).toFixed(1) : 0);
-    const reuseData = daily.map(r => r.total > 0 ? ((r.reuse_count / r.total) * 100).toFixed(1) : 0);
-
-    const hitCanvas = document.getElementById("ie-chart-hit");
-    if (hitCanvas) {
-      if (_ieChartHit) _ieChartHit.destroy();
-      _ieChartHit = new Chart(hitCanvas, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            label: t("ie.successRate") || "成功率 (%)",
-            data: successData,
-            borderColor: "#4caf50",
-            backgroundColor: "rgba(76,175,80,0.1)",
-            fill: true, tension: 0.3,
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } },
-          scales: { y: { beginAtZero: true, max: 100 } } }
-      });
+    const scoreEl = document.getElementById("ie-health-score");
+    if (scoreEl) {
+      const score = m.routing_health_score || 0;
+      let level, color;
+      if (score >= 70) { level = t("ie.good"); color = "#10b981"; }
+      else if (score >= 40) { level = t("ie.fair"); color = "#f59e0b"; }
+      else { level = t("ie.poor"); color = "#ef4444"; }
+      scoreEl.innerHTML = `
+        <div class="ie-score-ring" style="--score-color:${color}">
+          <svg viewBox="0 0 100 100">
+            <circle cx="50" cy="50" r="42" fill="none" stroke="var(--bg-surface0)" stroke-width="8"/>
+            <circle cx="50" cy="50" r="42" fill="none" stroke="${color}" stroke-width="8"
+                    stroke-dasharray="${score * 2.64} 264" stroke-dashoffset="0"
+                    stroke-linecap="round" transform="rotate(-90 50 50)"/>
+          </svg>
+          <div class="ie-score-text">
+            <span class="ie-score-num" style="color:${color}">${score}</span>
+            <span class="ie-score-label">${level}</span>
+          </div>
+        </div>
+        <div class="ie-score-title">${t("ie.routingHealth")}</div>
+      `;
     }
 
-    const reuseCanvas = document.getElementById("ie-chart-reuse");
-    if (reuseCanvas) {
-      if (_ieChartReuse) _ieChartReuse.destroy();
-      _ieChartReuse = new Chart(reuseCanvas, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            label: t("ie.reuseRate") || "复用率 (%)",
-            data: reuseData,
-            borderColor: "#2196f3",
-            backgroundColor: "rgba(33,150,243,0.1)",
-            fill: true, tension: 0.3,
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } },
-          scales: { y: { beginAtZero: true, max: 100 } } }
-      });
+    const cardsEl = document.getElementById("ie-metrics-cards");
+    if (cardsEl) {
+      const misRate = mis.suspected_rate || 0;
+      cardsEl.innerHTML = `
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.total_runs || 0}</div>
+          <div class="ie-metric-label">${t("ie.totalRuns")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.avg_tool_reduction || 0}%</div>
+          <div class="ie-metric-label">${t("ie.avgToolReduction")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.golden_hit_rate || 0}%</div>
+          <div class="ie-metric-label">${t("ie.goldenHitRate")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.avg_llm_calls || 0}</div>
+          <div class="ie-metric-label">${t("ie.avgLlmCalls")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.avg_latency_ms || 0}ms</div>
+          <div class="ie-metric-label">${t("ie.avgLatency")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.success_rate || 0}%</div>
+          <div class="ie-metric-label">${t("ie.successRate")}</div>
+        </div>
+        <div class="ie-metric-card ${misRate > 10 ? 'ie-metric-warn' : ''}">
+          <div class="ie-metric-value">${misRate}%</div>
+          <div class="ie-metric-label">${t("ie.misrouteRate")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.reuse_count || 0}</div>
+          <div class="ie-metric-label">${t("ie.reuseCount")}</div>
+        </div>
+      `;
     }
-  } catch(e) { console.warn("ie stats", e); }
+  } catch(e) { console.warn("ie metrics", e); }
 }
 
-async function _loadIeModels() {
+// ── 2. Trend Charts ──────────────────────────────────────────────
+
+async function _ieLoadTrends() {
+  try {
+    const d = await api(`/api/apps/intent_engine/trends?days=${_ieTimeRange}`);
+    const labels = (d.dates || []).map(s => s.slice(5));
+    const chartOpts = (title, maxY, suffix) => ({
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: title, font: { size: 12, weight: "500" }, color: "var(--text-secondary)" },
+      },
+      scales: {
+        y: { beginAtZero: true, max: maxY || undefined, ticks: { callback: v => v + (suffix||""), font: { size: 10 } } },
+        x: { ticks: { font: { size: 10 } } },
+      },
+    });
+
+    const c1 = document.getElementById("ie-chart-reduction");
+    if (c1) {
+      if (_ieChartReduction) _ieChartReduction.destroy();
+      _ieChartReduction = new Chart(c1, {
+        type: "line",
+        data: { labels, datasets: [{
+          label: t("ie.avgToolReduction"),
+          data: d.tool_reduction_rates || [],
+          borderColor: "#6366f1", backgroundColor: "rgba(99,102,241,0.08)",
+          fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2,
+        }] },
+        options: chartOpts(t("ie.toolReductionTrend"), 100, "%"),
+      });
+    }
+
+    const c2 = document.getElementById("ie-chart-golden");
+    if (c2) {
+      if (_ieChartGolden) _ieChartGolden.destroy();
+      _ieChartGolden = new Chart(c2, {
+        type: "line",
+        data: { labels, datasets: [{
+          label: t("ie.goldenHitRate"),
+          data: d.golden_hit_rates || [],
+          borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.08)",
+          fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2,
+        }] },
+        options: chartOpts(t("ie.goldenHitTrend"), 100, "%"),
+      });
+    }
+
+    const c3 = document.getElementById("ie-chart-llm");
+    if (c3) {
+      if (_ieChartLlm) _ieChartLlm.destroy();
+      _ieChartLlm = new Chart(c3, {
+        type: "line",
+        data: { labels, datasets: [{
+          label: t("ie.avgLlmCalls"),
+          data: d.llm_calls || [],
+          borderColor: "#f59e0b", backgroundColor: "rgba(245,158,11,0.08)",
+          fill: true, tension: 0.3, pointRadius: 2, borderWidth: 2,
+        }] },
+        options: chartOpts(t("ie.llmCallTrend"), null, ""),
+      });
+    }
+  } catch(e) { console.warn("ie trends", e); }
+}
+
+// ── 3. Distribution & Tool Heatmap ───────────────────────────────
+
+async function _ieLoadDistribution() {
+  try {
+    const d = await api(`/api/apps/intent_engine/distribution?days=${_ieTimeRange}`);
+
+    const PIE_COLORS = ["#6366f1","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#14b8a6","#64748b"];
+
+    const labelData = d.route_labels || {};
+    const labelNames = Object.keys(labelData);
+    const labelCounts = Object.values(labelData);
+    const c1 = document.getElementById("ie-chart-labels");
+    if (c1) {
+      if (_ieChartLabelPie) _ieChartLabelPie.destroy();
+      _ieChartLabelPie = new Chart(c1, {
+        type: "doughnut",
+        data: {
+          labels: labelNames,
+          datasets: [{ data: labelCounts, backgroundColor: PIE_COLORS.slice(0, labelNames.length), borderWidth: 0 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "right", labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } },
+          cutout: "55%",
+        },
+      });
+    }
+
+    const modeData = d.decision_modes || {};
+    const modeNames = Object.keys(modeData);
+    const modeCounts = Object.values(modeData);
+    const c2 = document.getElementById("ie-chart-modes");
+    if (c2) {
+      if (_ieChartModePie) _ieChartModePie.destroy();
+      _ieChartModePie = new Chart(c2, {
+        type: "doughnut",
+        data: {
+          labels: modeNames,
+          datasets: [{ data: modeCounts, backgroundColor: PIE_COLORS.slice(0, modeNames.length), borderWidth: 0 }],
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: "right", labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } },
+          cutout: "55%",
+        },
+      });
+    }
+
+    const heatEl = document.getElementById("ie-tool-heatmap");
+    if (heatEl) {
+      const tools = d.tool_analysis || [];
+      if (!tools.length) {
+        heatEl.innerHTML = `<p style="color:var(--text-secondary)">暂无数据</p>`;
+      } else {
+        const maxKept = Math.max(...tools.map(t => t.kept_count), 1);
+        heatEl.innerHTML = `
+          <div class="ie-heatmap-table">
+            <div class="ie-heatmap-header">
+              <span>${t("ie.tool")}</span>
+              <span>${t("ie.keptCount")}</span>
+              <span>${t("ie.prunedCount")}</span>
+              <span>${t("ie.keptRate")}</span>
+              <span></span>
+            </div>
+            ${tools.slice(0, 20).map(tool => {
+              const barW = Math.round(tool.kept_count / maxKept * 100);
+              const hue = Math.round(tool.kept_rate * 1.2);
+              return `<div class="ie-heatmap-row">
+                <span class="ie-heatmap-tool" title="${tool.tool}">${tool.tool}</span>
+                <span>${tool.kept_count}</span>
+                <span>${tool.pruned_count}</span>
+                <span>${tool.kept_rate}%</span>
+                <span class="ie-heatmap-bar-cell">
+                  <div class="ie-heatmap-bar" style="width:${barW}%;background:hsl(${hue},70%,50%)"></div>
+                </span>
+              </div>`;
+            }).join("")}
+          </div>
+        `;
+      }
+    }
+  } catch(e) { console.warn("ie dist", e); }
+}
+
+// ── 4. Execution Detail ──────────────────────────────────────────
+
+async function _ieLoadRuns() {
+  const el = document.getElementById("ie-runs-table");
+  if (!el) return;
+  try {
+    const runs = await api(`/api/apps/intent_engine/runs?limit=50`);
+    if (!runs || !runs.length) {
+      el.innerHTML = `<p style="color:var(--text-secondary)">${t("ie.noRuns")}</p>`;
+      return;
+    }
+    el.innerHTML = `
+      <table class="er-task-table ie-detail-table">
+        <thead><tr>
+          <th></th>
+          <th>${t("ie.time")}</th>
+          <th>${t("ie.text")}</th>
+          <th>${t("ie.routeLabels")}</th>
+          <th>${t("ie.intentConfidence")}</th>
+          <th>${t("ie.reductionRate")}</th>
+          <th>${t("ie.goldenHit")}</th>
+          <th>${t("ie.planSource")}</th>
+          <th>${t("ie.effectiveSteps")}</th>
+          <th>${t("ie.llmCalls")}</th>
+          <th>${t("ie.costScore")}</th>
+          <th>${t("ie.outcome")}</th>
+        </tr></thead>
+        <tbody>${runs.map((r, i) => {
+          const reduction = r.tools_before > 0
+            ? Math.round((r.tools_before - r.tools_after) / r.tools_before * 100) : 0;
+          const golden = r.golden_hit || (r.plan_source && (r.plan_source === "golden_v2" || r.plan_source === "golden_replay"));
+          const toolGroup = (() => { try { return JSON.parse(r.tool_group || "[]"); } catch(_) { return []; } })();
+          const confidence = r.route_conf != null ? (r.route_conf * 100).toFixed(0) + '%' : '-';
+          const effectiveSteps = r.effective_steps ?? '-';
+          const totalTokens = r.total_tokens || 0;
+          const planSource = r.plan_source || (r.llm_attempts > 0 ? 'llm' : (r.decision_mode || '-'));
+          return `
+            <tr class="ie-run-row" onclick="ieToggleDetail(${i})">
+              <td><span class="ie-expand-icon" id="ie-expand-${i}">▶</span></td>
+              <td style="white-space:nowrap">${(r.created_at || "").slice(5,16).replace("T"," ")}</td>
+              <td class="ie-text-cell" title="${(r.user_text||"").replace(/"/g,"&quot;")}">${(r.user_text||"").slice(0,35)}</td>
+              <td><code class="ie-label-tag">${r.route_label || "default"}</code></td>
+              <td>${confidence}</td>
+              <td>${r.tools_before}→${r.tools_after} <span class="ie-pct">(${reduction}%)</span></td>
+              <td>${golden ? '<span class="ie-golden-yes">●</span>' : '<span class="ie-golden-no">○</span>'}</td>
+              <td>${planSource}</td>
+              <td>${effectiveSteps}</td>
+              <td>${r.llm_attempts ?? "-"}</td>
+              <td>${totalTokens}</td>
+              <td>${_ieOutcomeBadge(r.outcome)}</td>
+            </tr>
+            <tr class="ie-detail-row" id="ie-detail-${i}" style="display:none">
+              <td colspan="12">
+                <div class="ie-detail-content">
+                  <div class="ie-detail-row-main">
+                    <div><strong>${t("ie.caseKey")}:</strong> ${r.case_key || "-"}</div>
+                    <div><strong>${t("ie.latency")}:</strong> ${r.latency_ms ? r.latency_ms.toFixed(1) + 'ms' : '-'} | <strong>Attempts:</strong> ${r.attempts_count || 0} | <strong>Mode:</strong> ${r.decision_mode || "rule"}</div>
+                    <div><strong>${t("ie.allowedTools")}:</strong>
+                      <span class="ie-tool-chips">${toolGroup.length ? toolGroup.map(t => `<code class="ie-tool-chip">${t}</code>`).join("") : "-"}</span>
+                    </div>
+                  </div>
+                  <details class="ie-raw-data" style="margin-top:8px;">
+                    <summary style="cursor:pointer;font-size:10px;color:var(--subtext0)">🔍 原始数据</summary>
+                    <pre style="margin-top:4px;padding:8px;background:var(--bg-base);border-radius:4px;font-size:10px;overflow-x:auto;">${JSON.stringify(r, null, 2)}</pre>
+                  </details>
+                </div>
+              </td>
+            </tr>`;
+        }).join("")}</tbody>
+      </table>
+    `;
+  } catch(e) { el.innerHTML = `<p style="color:var(--text-secondary)">加载失败</p>`; }
+}
+
+function ieToggleDetail(idx) {
+  const row = document.getElementById(`ie-detail-${idx}`);
+  const icon = document.getElementById(`ie-expand-${idx}`);
+  if (!row) return;
+  const show = row.style.display === "none";
+  row.style.display = show ? "table-row" : "none";
+  if (icon) icon.textContent = show ? "▼" : "▶";
+}
+
+function _ieOutcomeBadge(outcome) {
+  if (outcome === "success") return '<span class="ie-badge-ok">✓</span>';
+  if (outcome === "fail") return '<span class="ie-badge-fail">✗</span>';
+  return '<span class="ie-badge-none">-</span>';
+}
+
+// ── 5. Models ────────────────────────────────────────────────────
+
+async function _ieLoadModels() {
   const el = document.getElementById("ie-model-info");
   if (!el) return;
   try {
     const d = await api("/api/apps/intent_engine/models");
     const versions = d.versions || [];
     if (!versions.length) {
-      el.innerHTML = `<p style="color:var(--text-secondary)">${t("ie.noModel") || "暂无训练模型"}</p>`;
+      el.innerHTML = `<p style="color:var(--text-secondary)">${t("ie.noModel")}</p>`;
       return;
     }
     const current = versions[versions.length - 1];
     el.innerHTML = `
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
-        <span><strong>${t("ie.currentVersion") || "当前版本"}:</strong> v${current.version}</span>
+        <span><strong>${t("ie.currentVersion")}:</strong> v${current.version}</span>
         <span><strong>Precision:</strong> ${(current.train_precision * 100).toFixed(1)}%</span>
         <span><strong>Recall:</strong> ${(current.train_recall * 100).toFixed(1)}%</span>
         <span><strong>Labels:</strong> ${current.n_labels}</span>
@@ -3692,7 +4089,7 @@ async function _loadIeModels() {
       </div>
       ${versions.length > 1 ? `
         <details style="margin-top:8px;">
-          <summary style="cursor:pointer;color:var(--text-secondary)">${t("ie.allVersions") || "所有版本"} (${versions.length})</summary>
+          <summary style="cursor:pointer;color:var(--text-secondary)">${t("ie.allVersions")} (${versions.length})</summary>
           <table class="er-task-table" style="margin-top:6px;">
             <thead><tr><th>Version</th><th>Precision</th><th>Recall</th><th>Date</th><th></th></tr></thead>
             <tbody>${versions.map(v => `<tr>
@@ -3707,44 +4104,6 @@ async function _loadIeModels() {
       ` : ""}
     `;
   } catch(e) { el.innerHTML = `<p style="color:var(--text-secondary)">模型信息加载失败</p>`; }
-}
-
-async function _loadIeRuns() {
-  const el = document.getElementById("ie-runs-table");
-  if (!el) return;
-  try {
-    const runs = await api("/api/apps/intent_engine/runs?limit=20");
-    if (!runs || !runs.length) {
-      el.innerHTML = `<p style="color:var(--text-secondary)">${t("ie.noRuns") || "暂无路由记录"}</p>`;
-      return;
-    }
-    el.innerHTML = `
-      <table class="er-task-table">
-        <thead><tr>
-          <th>${t("ie.time") || "时间"}</th>
-          <th>${t("ie.text") || "用户输入"}</th>
-          <th>${t("ie.route") || "路由"}</th>
-          <th>${t("ie.mode") || "模式"}</th>
-          <th>${t("ie.toolsTrim") || "工具裁剪"}</th>
-          <th>${t("ie.outcome") || "结果"}</th>
-        </tr></thead>
-        <tbody>${runs.map(r => `<tr>
-          <td style="white-space:nowrap">${(r.created_at || "").slice(11,19)}</td>
-          <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(r.user_text||"").replace(/"/g,"&quot;")}">${(r.user_text||"").slice(0,40)}</td>
-          <td><code>${r.route_label || "-"}</code></td>
-          <td>${r.decision_mode || "rule"}</td>
-          <td>${r.tools_before} → ${r.tools_after}</td>
-          <td>${_ieOutcomeBadge(r.outcome)}</td>
-        </tr>`).join("")}</tbody>
-      </table>
-    `;
-  } catch(e) { el.innerHTML = `<p style="color:var(--text-secondary)">加载失败</p>`; }
-}
-
-function _ieOutcomeBadge(outcome) {
-  if (outcome === "success") return '<span style="color:#4caf50">✓</span>';
-  if (outcome === "fail") return '<span style="color:#f44336">✗</span>';
-  return '<span style="color:var(--text-secondary)">-</span>';
 }
 
 async function ieRunTrain() {
@@ -3762,17 +4121,17 @@ async function ieRunTrain() {
       if (!st.running) {
         const res = st.last_result || {};
         statusEl.innerHTML = res.status === "ok"
-          ? `<span style="color:#4caf50">✅ 训练完成 (v${(res.result||{}).version || "?"})</span>`
-          : `<span style="color:#ff9800">⚠ ${res.reason || res.error || "完成"}</span>`;
-        await _loadIeModels();
+          ? `<span style="color:#10b981">✅ 训练完成 (v${(res.result||{}).version || "?"})</span>`
+          : `<span style="color:#f59e0b">⚠ ${res.reason || res.error || "完成"}</span>`;
+        await _ieLoadModels();
         break;
       }
     }
   } catch(e) {
-    statusEl.innerHTML = `<span style="color:#f44336">❌ ${e.message}</span>`;
+    statusEl.innerHTML = `<span style="color:#ef4444">❌ ${e.message}</span>`;
   }
   btn.disabled = false;
-  btn.textContent = "🏋️ 训练模型";
+  btn.textContent = `🏋️ ${t("ie.train")}`;
 }
 
 async function ieRunEval() {
@@ -3786,18 +4145,18 @@ async function ieRunEval() {
     if (res.status === "ok") {
       el.innerHTML = `
         <div style="background:var(--bg-surface0);border-radius:8px;padding:12px;margin-top:8px;">
-          <strong>评测结果</strong> — Accuracy: ${((res.accuracy||0)*100).toFixed(1)}%, 
-          Mismatch: ${((res.route_mismatch_rate||0)*100).toFixed(1)}%, 
+          <strong>评测结果</strong> — Accuracy: ${((res.accuracy||0)*100).toFixed(1)}%,
+          Mismatch: ${((res.route_mismatch_rate||0)*100).toFixed(1)}%,
           Total: ${res.total || 0}
         </div>`;
     } else {
-      el.innerHTML = `<span style="color:#ff9800">${res.note || res.error || "评测跳过"}</span>`;
+      el.innerHTML = `<span style="color:#f59e0b">${res.note || res.error || "评测跳过"}</span>`;
     }
   } catch(e) {
-    el.innerHTML = `<span style="color:#f44336">评测失败: ${e.message}</span>`;
+    el.innerHTML = `<span style="color:#ef4444">评测失败: ${e.message}</span>`;
   }
   btn.disabled = false;
-  btn.textContent = "📝 评测模型";
+  btn.textContent = `📝 ${t("ie.eval")}`;
 }
 
 async function ieRollback(version) {
@@ -3805,11 +4164,11 @@ async function ieRollback(version) {
   try {
     await api("/api/apps/intent_engine/models/rollback", "POST", { version });
     toast(`已回滚到 v${version}`, "success");
-    await _loadIeModels();
+    await _ieLoadModels();
   } catch(e) { toast("回滚失败: " + e.message, "error"); }
 }
 
-// ── End Intent Engine Console ─────────────────────────────────────
+// ── End Intent Engine Visualization Dashboard ─────────────────────
 
 async function openDigestDetail() {
   document.getElementById("app-detail-title").textContent = `🎯 ${t("digest.title")}`;

@@ -8,6 +8,7 @@ PR-3+: augmented with plan reuse via arbiter.
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -33,6 +34,7 @@ class PredictResult:
     # PR-3 plan reuse fields
     decision: str = "llm"  # llm | reuse_plan
     plan_steps: list[dict] | None = None
+    latency_ms: float = 0.0
 
     # ── helper methods ─────────────────────────────────────────────
 
@@ -45,8 +47,8 @@ class PredictResult:
             if d.get("function", {}).get("name", "") in self.allowed_tools
         ]
 
-    def save(self, session_id: str = "", user_text: str = "", context: dict | None = None) -> None:
-        """Persist this prediction as an ie_runs row."""
+    def save(self, session_id: str = "", user_text: str = "", context: dict | None = None) -> str | None:
+        """Persist this prediction as an ie_runs row. Returns run_id."""
         self.run_id = insert_run(
             session_id=session_id,
             user_text=user_text,
@@ -58,6 +60,10 @@ class PredictResult:
             tools_before=self.tools_before,
             tools_after=self.tools_after,
         )
+        if self.run_id and self.latency_ms > 0:
+            from myxai_desk.core.intent_engine.dao import update_ie_run
+            update_ie_run(self.run_id, latency_ms=self.latency_ms)
+        return self.run_id
 
     def write_outcome(self, outcome: str) -> None:
         if self.run_id:
@@ -78,6 +84,7 @@ def predict(
     """
     ctx = context or {}
     result = PredictResult()
+    t0 = time.perf_counter()
 
     cfg = ie_config.get()
     always_include = set(cfg.get("base_tools_always_included", []))
@@ -124,4 +131,5 @@ def predict(
         except Exception:
             log.debug("[ie] plan reuse skipped", exc_info=True)
 
+    result.latency_ms = round((time.perf_counter() - t0) * 1000, 2)
     return result
