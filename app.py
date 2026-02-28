@@ -141,6 +141,7 @@ from myxai_desk.web.apps_custom_routes import bp as apps_custom_bp
 from myxai_desk.web.reports_routes import bp as reports_bp
 from myxai_desk.apps.execution_radar.api import bp as execution_radar_bp
 from myxai_desk.apps.intent_engine.api import bp as intent_engine_bp
+from myxai_desk.apps.strategy_hub.api import bp as strategy_hub_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
@@ -156,6 +157,7 @@ flask_app.register_blueprint(apps_custom_bp)
 flask_app.register_blueprint(reports_bp)
 flask_app.register_blueprint(execution_radar_bp)
 flask_app.register_blueprint(intent_engine_bp)
+flask_app.register_blueprint(strategy_hub_bp)
 
 # ---------------------------------------------------------------------------
 # Global state

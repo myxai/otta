@@ -1,16 +1,15 @@
 """Candidate Golden Path extraction algorithm.
 
 Given a sequence of execution steps from a successful task, extract the
-minimal effective path (the "candidate golden path") by:
+replayable path (the "candidate golden path"):
 
-1. Removing failed steps that have a later successful replacement
-2. De-duplicating successful targets (same normalised tool+args)
-3. Keeping only OK steps
-4. Re-inserting minimal probe/read context before write/action steps
+1. Remove failed/retry steps
+2. De-duplicate identical steps (same normalised tool+args)
+3. Keep the ordered sequence of effective tool calls
 
-The normalisation layer handles volatile tokens (URLs, paths, GUIDs,
-dates, numbers) so that semantically identical calls match even when
-surface strings differ.
+The goal is NOT step-count reduction but LLM bypass: any successful tool
+execution sequence — even a single step — can be replayed next time
+WITHOUT calling LLM, saving both latency and tokens.
 """
 
 from __future__ import annotations
@@ -201,92 +200,48 @@ def make_candidate(
 ) -> list[Step]:
     """Build candidate plan from a successful task's steps.
 
-    1. Failed step with later identical success → drop
-    2. Duplicate success (same normalised key) → drop
-    3. Only keep OK steps
-    4. ``ensure_preconditions``: re-insert preceding probe context
+    Keep all OK steps (de-duplicated), preserving execution order.
+    Even a single effective step is a valid candidate — because replaying
+    it directly saves ≥2 LLM calls next time.
     """
     kept: list[Step] = []
     seen: set[str] = set()
 
-    for i, step in enumerate(steps):
+    for step in steps:
+        if step.status != "OK":
+            continue
         key = normalize_key(step)
-
-        if step.status in ("E_RETRY", "FAIL"):
+        if key in seen:
             continue
+        kept.append(step)
+        seen.add(key)
 
-        if step.status == "OK":
-            if key in seen:
-                continue
-            kept.append(step)
-            seen.add(key)
-
-    return _ensure_preconditions(steps, kept, keep_probe_before_ok)
-
-
-def _ensure_preconditions(
-    original_steps: list[Step],
-    plan: list[Step],
-    context_window: int = 2,
-) -> list[Step]:
-    """For each non-probe kept step, re-insert up to *context_window*
-    preceding OK probe steps from the original stream."""
-    if not plan:
-        return plan
-
-    idx_to_step = {s.idx: s for s in original_steps}
-    plan_idx_set = {s.idx for s in plan}
-    idx_pos = {s.idx: pos for pos, s in enumerate(original_steps)}
-
-    extra_probe_idxs: set[int] = set()
-
-    for s in plan:
-        if is_write_step(s) or (s.status == "OK" and not is_probe_step(s)):
-            pos = idx_pos.get(s.idx)
-            if pos is None:
-                continue
-            found = 0
-            p = pos - 1
-            while p >= 0 and found < context_window:
-                cand = original_steps[p]
-                if cand.status == "OK" and is_probe_step(cand) \
-                        and cand.idx not in plan_idx_set:
-                    extra_probe_idxs.add(cand.idx)
-                    found += 1
-                p -= 1
-
-    merged_idxs = sorted(
-        plan_idx_set | extra_probe_idxs,
-        key=lambda x: idx_pos.get(x, 10**12),
-    )
-    merged = [idx_to_step[i] for i in merged_idxs if i in idx_to_step]
-    return _dedup_consecutive(merged)
-
-
-def _dedup_consecutive(steps: list[Step]) -> list[Step]:
-    """Remove consecutive probe steps with identical normalised key."""
-    out: list[Step] = []
-    last_key: str | None = None
-    for s in steps:
-        k = normalize_key(s)
-        if k == last_key and is_probe_step(s):
-            continue
-        out.append(s)
-        last_key = k
-    return out
+    return kept
 
 
 # ── Metrics ────────────────────────────────────────────────────────
 
 
 def candidate_metrics(original: list[Step], candidate: list[Step]) -> dict[str, Any]:
+    """Compute metrics for a candidate golden path.
+
+    The primary value metric is ``llm_calls_saved``: a standard agent loop
+    needs N+1 LLM calls for N tool-call iterations (each iteration may have
+    multiple tool calls but still counts as 1 LLM round).  A golden replay
+    needs 0 LLM calls.  So the saving is at least 2 (one decision + one
+    summary) for any task with tool calls.
+    """
     cand_ids = {s.idx for s in candidate}
+    candidate_steps = len(candidate)
+    original_steps = len(original)
+    removed = original_steps - candidate_steps
     return {
-        "original_steps": len(original),
-        "candidate_steps": len(candidate),
-        "removed_steps": len(original) - len(candidate),
+        "original_steps": original_steps,
+        "candidate_steps": candidate_steps,
+        "removed_steps": removed,
+        "llm_calls_saved": 2 if candidate_steps > 0 else 0,
         "ok_original": sum(1 for s in original if s.status == "OK"),
-        "ok_candidate": sum(1 for s in candidate if s.status == "OK"),
+        "ok_candidate": candidate_steps,
         "failed_removed": sum(
             1 for s in original
             if s.status in ("E_RETRY", "FAIL") and s.idx not in cand_ids

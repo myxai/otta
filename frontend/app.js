@@ -290,8 +290,8 @@ const FALLBACK_I18N = {
     "er.stepStatus":"状态","er.stepEffective":"判定",
     "er.effective":"有效","er.ineffective":"无效",
     "er.config":"设置","er.scheduleTime":"每日扫描时间","er.saveConfig":"保存设置","er.configSaved":"设置已保存","er.configFail":"保存失败",
-    "er.avgRemovedSteps":"平均剪枝步数","er.candidatesUnit":"条候选",
-    "er.goldenCandidates":"候选黄金路径","er.qualityScore":"质量分","er.removedSteps":"剪枝步数","er.candidateLen":"候选长度","er.candidateStatus":"状态",
+    "er.avgRemovedSteps":"可省LLM调用","er.candidatesUnit":"条候选",
+    "er.goldenCandidates":"候选黄金路径","er.qualityScore":"质量分","er.removedSteps":"可省LLM","er.candidateLen":"候选步数","er.candidateStatus":"状态",
     "ie.title":"意图引擎","ie.switches":"开关配置","ie.thresholds":"阈值调节",
     "ie.routingEnabled":"意图路由","ie.caseRetrieval":"Case 检索","ie.planReuse":"计划复用",
     "ie.routeConfLow":"路由置信阈值","ie.caseReuseSim":"复用相似度阈值","ie.hintsMaxLen":"Hints 最大长度",
@@ -548,8 +548,8 @@ const FALLBACK_I18N = {
     "er.stepStatus":"Status","er.stepEffective":"Verdict",
     "er.effective":"Effective","er.ineffective":"Ineffective",
     "er.config":"Settings","er.scheduleTime":"Daily Scan Time","er.saveConfig":"Save Settings","er.configSaved":"Settings saved","er.configFail":"Save failed",
-    "er.avgRemovedSteps":"Avg Pruned Steps","er.candidatesUnit":"candidates",
-    "er.goldenCandidates":"Golden Path Candidates","er.qualityScore":"Quality","er.removedSteps":"Pruned","er.candidateLen":"Length","er.candidateStatus":"Status",
+    "er.avgRemovedSteps":"LLM Calls Saveable","er.candidatesUnit":"candidates",
+    "er.goldenCandidates":"Golden Path Candidates","er.qualityScore":"Quality","er.removedSteps":"LLM Saved","er.candidateLen":"Plan Steps","er.candidateStatus":"Status",
     "ie.title":"Intent Engine","ie.switches":"Switches","ie.thresholds":"Thresholds",
     "ie.routingEnabled":"Intent Routing","ie.caseRetrieval":"Case Retrieval","ie.planReuse":"Plan Reuse",
     "ie.routeConfLow":"Route Confidence Threshold","ie.caseReuseSim":"Reuse Similarity Threshold","ie.hintsMaxLen":"Hints Max Length",
@@ -592,10 +592,11 @@ function detectLang() {
 // Use t() function provided by i18n.js (loaded in index.html)
 // This is a fallback wrapper in case i18n.js not loaded
 function t(key) { 
-  // If global t() from i18n.js exists, use it
-  if (typeof window.t === 'function' && window.t !== t) {
-    return window.t(key);
-  }
+  // Try i18n module (loaded from backend JSON) first
+  try {
+    const msg = getI18n().t(key);
+    if (msg !== key) return msg;
+  } catch(_) {}
   // Fallback to embedded messages
   return (FALLBACK_I18N[_lang] && FALLBACK_I18N[_lang][key]) || (FALLBACK_I18N.zh && FALLBACK_I18N.zh[key]) || key; 
 }
@@ -603,11 +604,13 @@ function t(key) {
 function setLanguage(val) {
   localStorage.setItem("nanobot_lang", val);
   _lang = (val === "auto") ? detectLang() : val;
+  localStorage.setItem("myxai_locale", _lang);
   const sel = document.getElementById("lang-select");
   if (sel) sel.value = val;
   const radio = document.querySelector(`input[name="lang-radio"][value="${val}"]`);
   if (radio) radio.checked = true;
   applyLanguage();
+  try { getI18n().setLocale(_lang).then(() => applyLanguage()); } catch(_) {}
   fetch("/api/desk/lang", {method:"POST", headers:authHeaders({"Content-Type":"application/json"}), body: JSON.stringify({lang: _lang})}).catch(()=>{});
 }
 
@@ -2041,6 +2044,7 @@ function _catLabel(key) {
     const appNameMap = {
       'execution_radar': '执行雷达',
       'healthcheck': '执行雷达',  // legacy
+      'strategy_hub': '策略中枢',
     };
     return appNameMap[appKey] || appKey;
   }
@@ -3026,6 +3030,7 @@ async function openAppDetail(appId) {
   if (appId === "email_summary") { await openEmailDetail(); return; }
   if (appId === "execution_radar") { await openExecutionRadarDetail(); return; }
   if (appId === "intent_engine") { await openIntentEngineDetail(); return; }
+  if (appId === "strategy_hub") { await openStrategyHubDetail(); return; }
   if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
 }
@@ -3077,7 +3082,7 @@ async function openExecutionRadarDetail() {
       <div class="er-golden-card"><div class="er-card-label">候选回放占比</div><div class="er-card-value" id="er-golden-candidate-rate">--</div></div>
       <div class="er-golden-card"><div class="er-card-label">平均 LLM 次数</div><div class="er-card-value" id="er-avg-llm">--</div></div>
       <div class="er-golden-card"><div class="er-card-label">平均尝试次数</div><div class="er-card-value" id="er-avg-attempts-count">--</div></div>
-      <div class="er-golden-card"><div class="er-card-label">平均剪枝步数</div><div class="er-card-value" id="er-avg-removed-golden">--</div></div>
+      <div class="er-golden-card"><div class="er-card-label">可省 LLM 调用</div><div class="er-card-value" id="er-avg-removed-golden">--</div></div>
     </div>
 
     <div id="er-report-text" style="display:none;margin-bottom:18px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary);font-size:13px;line-height:1.6"></div>
@@ -3200,7 +3205,8 @@ async function loadErSummary(dateStr) {
     const avgRemoved = d.avg_removed_steps || 0;
     document.getElementById("er-avg-removed").textContent = avgRemoved > 0 ? avgRemoved.toFixed(1) : "0";
     const cg = d.candidates_generated || 0;
-    document.getElementById("er-candidates-count").textContent = cg > 0 ? `${cg} ${t("er.candidatesUnit")}` : "-";
+    const llmSave = d.total_llm_saveable || 0;
+    document.getElementById("er-candidates-count").textContent = cg > 0 ? `${cg} ${t("er.candidatesUnit")}${llmSave > 0 ? ` · 可省${llmSave}次LLM` : ""}` : "-";
     const reportEl = document.getElementById("er-report-text");
     if (d.report_text) {
       reportEl.style.display = "block";
@@ -3343,7 +3349,7 @@ async function loadErCandidates(dateStr) {
         <td>${c.quality_score}</td>
         <td>${c.original_steps || "-"}</td>
         <td>${c.candidate_len}</td>
-        <td>${c.removed_steps}</td>
+        <td>${c.llm_calls_saved || c.removed_steps || 0}</td>
         <td>${statusBadge}</td>
       </tr>`;
       const planSteps = c.candidate_plan || [];
@@ -4169,6 +4175,367 @@ async function ieRollback(version) {
 }
 
 // ── End Intent Engine Visualization Dashboard ─────────────────────
+
+// ── Strategy Hub Detail Page ──────────────────────────────────────────
+
+async function openStrategyHubDetail() {
+  document.getElementById("app-detail-title").textContent = `🎛️ ${t("sh.title")}`;
+  switchPage("app-detail");
+
+  const container = document.getElementById("app-detail-content");
+  container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
+
+  container.innerHTML = `
+    <div class="er-section">
+      <h2>${t("sh.healthOverview")}</h2>
+      <div class="er-health-bar" id="sh-health-bar" style="margin-bottom:16px;">
+        <span class="er-health-label">${t("sh.healthLabel")}</span>
+        <span class="er-health-score" id="sh-health-score">--</span>
+      </div>
+      <div class="er-kpi-grid" style="grid-template-columns:repeat(3,1fr);">
+        <div class="er-kpi-card">
+          <div class="er-kpi-value" id="sh-template-count">--</div>
+          <div class="er-kpi-label">${t("sh.templates")}</div>
+        </div>
+        <div class="er-kpi-card">
+          <div class="er-kpi-value" id="sh-instance-count">--</div>
+          <div class="er-kpi-label">${t("sh.instances")}</div>
+        </div>
+        <div class="er-kpi-card">
+          <div class="er-kpi-value" id="sh-candidate-count">--</div>
+          <div class="er-kpi-label">${t("sh.candidates")}</div>
+        </div>
+        <div class="er-kpi-card">
+          <div class="er-kpi-value" id="sh-hit-rate">--</div>
+          <div class="er-kpi-label">${t("sh.hitRate")}</div>
+        </div>
+        <div class="er-kpi-card">
+          <div class="er-kpi-value" id="sh-fail-rate">--</div>
+          <div class="er-kpi-label">${t("sh.failRate")}</div>
+        </div>
+        <div class="er-kpi-card">
+          <div class="er-kpi-value" id="sh-avg-replay">--</div>
+          <div class="er-kpi-label">${t("sh.avgReplayTime")}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="er-section" id="sh-suggestions-section" style="display:none;">
+      <h2>${t("sh.suggestions")}</h2>
+      <div id="sh-suggestions-list" class="er-table-placeholder"></div>
+    </div>
+
+    <div class="er-section">
+      <div class="er-tabs">
+        <button class="er-tab active" data-shtab="templates" onclick="_shSwitchTab('templates')">${t("sh.templates")}</button>
+        <button class="er-tab" data-shtab="instances" onclick="_shSwitchTab('instances')">${t("sh.instances")}</button>
+        <button class="er-tab" data-shtab="candidates" onclick="_shSwitchTab('candidates')">${t("sh.candidates")}</button>
+      </div>
+
+      <div class="er-tab-pane" id="sh-tab-templates" style="display:block;">
+        <div id="sh-templates-list" class="er-table-placeholder">${t("sh.loading")}</div>
+      </div>
+      <div class="er-tab-pane" id="sh-tab-instances" style="display:none;">
+        <div id="sh-instances-list" class="er-table-placeholder">${t("sh.loading")}</div>
+      </div>
+      <div class="er-tab-pane" id="sh-tab-candidates" style="display:none;">
+        <div id="sh-candidates-list" class="er-table-placeholder">${t("sh.loading")}</div>
+      </div>
+    </div>
+
+    <div class="er-section" id="sh-detail-panel" style="display:none;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <button class="btn btn-sm" onclick="_shCloseDetail()">${t("sh.back")}</button>
+        <h2 id="sh-detail-title" style="margin:0;"></h2>
+      </div>
+      <div id="sh-detail-content"></div>
+    </div>
+  `;
+
+  await _shLoadMetrics();
+  await _shLoadSuggestions();
+  _shLoadTemplates();
+  _shLoadInstances();
+  _shLoadCandidates();
+}
+
+function _shSwitchTab(tab) {
+  document.querySelectorAll("[data-shtab]").forEach(btn => btn.classList.toggle("active", btn.dataset.shtab === tab));
+  ["templates", "instances", "candidates"].forEach(t => {
+    const pane = document.getElementById(`sh-tab-${t}`);
+    if (pane) pane.style.display = t === tab ? "block" : "none";
+  });
+}
+
+async function _shLoadMetrics() {
+  try {
+    const d = await api("/api/apps/strategy_hub/metrics");
+    const _v = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    _v("sh-template-count", d.template_count || 0);
+    _v("sh-instance-count", d.instance_count || 0);
+    _v("sh-candidate-count", d.candidate_count || 0);
+    _v("sh-hit-rate", (d.hit_rate || 0) + "%");
+    _v("sh-fail-rate", (d.fail_rate || 0) + "%");
+    _v("sh-avg-replay", d.avg_replay_ms != null ? d.avg_replay_ms + "ms" : "--");
+
+    const score = d.health_score || 0;
+    const labelMap = { Healthy: t("sh.healthHealthy"), Stable: t("sh.healthStable"), Degraded: t("sh.healthDegraded"), Critical: t("sh.healthCritical") };
+    const label = labelMap[d.health_label] || d.health_label || "—";
+    const scoreEl = document.getElementById("sh-health-score");
+    if (scoreEl) {
+      scoreEl.textContent = `${score}/100 (${label})`;
+      scoreEl.style.color = score >= 80 ? "var(--success)" : score >= 60 ? "var(--warning, #f59e0b)" : "var(--danger, #ef4444)";
+    }
+  } catch (e) { console.warn("sh metrics", e); }
+}
+
+async function _shLoadSuggestions() {
+  try {
+    const d = await api("/api/apps/strategy_hub/suggestions");
+    const section = document.getElementById("sh-suggestions-section");
+    const list = document.getElementById("sh-suggestions-list");
+    if (!d.suggestions || !d.suggestions.length) {
+      section.style.display = "none";
+      return;
+    }
+    section.style.display = "";
+    list.innerHTML = d.suggestions.map(s =>
+      `<div class="er-candidate-card" style="margin-bottom:8px;padding:10px 14px;">
+        <span style="font-weight:600;">${_escHtml(s.intent_label)}</span>
+        <span style="color:var(--text-secondary);margin-left:8px;">${s.instance_count} ${t("sh.suggestAbstract")}</span>
+      </div>`
+    ).join("");
+  } catch(e) { console.warn("sh suggestions", e); }
+}
+
+async function _shLoadTemplates() {
+  const el = document.getElementById("sh-templates-list");
+  try {
+    const d = await api("/api/apps/strategy_hub/templates?limit=50");
+    if (!d.templates || !d.templates.length) {
+      el.innerHTML = `<div class="er-table-placeholder">${t("sh.noTemplates")}</div>`;
+      return;
+    }
+    el.innerHTML = `<table class="er-table"><thead><tr>
+      <th>${t("sh.colTemplateId")}</th><th>${t("sh.colIntent")}</th><th>${t("sh.colVersion")}</th><th>${t("sh.colUseCount")}</th><th>${t("sh.colSuccessRate")}</th><th>${t("sh.colLastUsed")}</th><th>${t("sh.colStatus")}</th><th>${t("sh.colActions")}</th>
+    </tr></thead><tbody>${d.templates.map(r => `<tr class="${r.status === 'stale' ? 'er-row-warn' : ''}">
+      <td><a href="#" onclick="_shShowTemplateDetail('${_escHtml(r.template_id)}');return false;" class="er-link">${_escHtml(r.template_id.substring(0, 12))}…</a></td>
+      <td>${_escHtml(r.intent_label)}</td>
+      <td>v${r.version}</td>
+      <td>${r.use_count}</td>
+      <td>${r.success_rate}%</td>
+      <td>${r.last_used_at ? r.last_used_at.substring(0, 10) : '--'}</td>
+      <td><span class="er-badge ${r.status === 'stale' ? 'er-badge-warn' : 'er-badge-ok'}">${r.status}</span></td>
+      <td><button class="btn btn-sm btn-danger" onclick="_shDeleteTemplate('${_escHtml(r.template_id)}')">${t("sh.delete")}</button></td>
+    </tr>`).join("")}</tbody></table>`;
+  } catch(e) { el.innerHTML = `<div class="er-table-placeholder">${t("sh.loadFailed")}</div>`; }
+}
+
+async function _shLoadInstances() {
+  const el = document.getElementById("sh-instances-list");
+  try {
+    const d = await api("/api/apps/strategy_hub/instances?limit=50");
+    if (!d.instances || !d.instances.length) {
+      el.innerHTML = `<div class="er-table-placeholder">${t("sh.noInstances")}</div>`;
+      return;
+    }
+    el.innerHTML = `<table class="er-table"><thead><tr>
+      <th>${t("sh.colCaseKey")}</th><th>${t("sh.colTemplate")}</th><th>${t("sh.colIntent")}</th><th>${t("sh.colUseCount")}</th><th>${t("sh.colSuccessRate")}</th><th>${t("sh.colLastUsed")}</th><th>${t("sh.colStatus")}</th><th>${t("sh.colActions")}</th>
+    </tr></thead><tbody>${d.instances.map(i => `<tr class="${i.status === 'stale' ? 'er-row-warn' : ''}">
+      <td><a href="#" onclick="_shShowInstanceDetail('${_escHtml(i.case_key)}');return false;" class="er-link">${_escHtml(i.case_key.substring(0, 12))}…</a></td>
+      <td>${i.template_id ? _escHtml(i.template_id.substring(0, 8)) + '…' : '--'}</td>
+      <td>${_escHtml(i.intent_label || '--')}</td>
+      <td>${i.use_count}</td>
+      <td>${i.success_rate}%</td>
+      <td>${i.last_used_at ? i.last_used_at.substring(0, 10) : '--'}</td>
+      <td><span class="er-badge ${i.status === 'stale' ? 'er-badge-warn' : 'er-badge-ok'}">${i.status}</span></td>
+      <td>
+        <button class="btn btn-sm" onclick="_shInvalidateInstance('${_escHtml(i.case_key)}')">${t("sh.invalidate")}</button>
+        <button class="btn btn-sm btn-danger" onclick="_shDeleteInstance('${_escHtml(i.case_key)}')">${t("sh.delete")}</button>
+      </td>
+    </tr>`).join("")}</tbody></table>`;
+  } catch(e) { el.innerHTML = `<div class="er-table-placeholder">${t("sh.loadFailed")}</div>`; }
+}
+
+async function _shLoadCandidates() {
+  const el = document.getElementById("sh-candidates-list");
+  try {
+    const d = await api("/api/apps/strategy_hub/candidates?limit=50");
+    if (!d.candidates || !d.candidates.length) {
+      el.innerHTML = `<div class="er-table-placeholder">${t("sh.noCandidates")}</div>`;
+      return;
+    }
+    el.innerHTML = `<table class="er-table"><thead><tr>
+      <th>${t("sh.colCandidateId")}</th><th>${t("sh.colSourceTask")}</th><th>${t("sh.colEffectiveSteps")}</th><th>${t("sh.colUseCount")}</th><th>${t("sh.colQualityScore")}</th><th>${t("sh.colStatus")}</th><th>${t("sh.colActions")}</th>
+    </tr></thead><tbody>${d.candidates.map(c => `<tr>
+      <td title="${_escHtml(c.candidate_id)}">${_escHtml(c.candidate_id.substring(0, 12))}…</td>
+      <td title="${_escHtml(c.user_text)}">${_escHtml((c.user_text || '').substring(0, 30))}${(c.user_text||'').length > 30 ? '…' : ''}</td>
+      <td>${c.effective_steps}</td>
+      <td>${c.used_count}</td>
+      <td>${c.quality_score}</td>
+      <td><span class="er-badge ${c.status === 'invalid' ? 'er-badge-warn' : c.status === 'promoted' ? 'er-badge-ok' : ''}">${c.status}</span></td>
+      <td>
+        ${c.status !== 'promoted' && c.status !== 'invalid' ? `<button class="btn btn-sm btn-primary" onclick="_shPromoteCandidate('${_escHtml(c.candidate_id)}')">${t("sh.promote")}</button>` : ''}
+        <button class="btn btn-sm btn-danger" onclick="_shDeleteCandidate('${_escHtml(c.candidate_id)}')">${t("sh.delete")}</button>
+      </td>
+    </tr>`).join("")}</tbody></table>`;
+  } catch(e) { el.innerHTML = `<div class="er-table-placeholder">${t("sh.loadFailed")}</div>`; }
+}
+
+async function _shShowTemplateDetail(templateId) {
+  const panel = document.getElementById("sh-detail-panel");
+  const title = document.getElementById("sh-detail-title");
+  const content = document.getElementById("sh-detail-content");
+  panel.style.display = "";
+  title.textContent = `${t("sh.templates")}: ${templateId.substring(0, 16)}…`;
+  content.innerHTML = `<div class="er-table-placeholder">${t("sh.loading")}</div>`;
+
+  try {
+    const d = await api(`/api/apps/strategy_hub/templates/${templateId}`);
+    const s = d.stats || {};
+    content.innerHTML = `
+      <div class="er-kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;">
+        <div class="er-kpi-card"><div class="er-kpi-value">${s.use_count || 0}</div><div class="er-kpi-label">${t("sh.colUseCount")}</div></div>
+        <div class="er-kpi-card"><div class="er-kpi-value">${s.success_rate || 0}%</div><div class="er-kpi-label">${t("sh.colSuccessRate")}</div></div>
+        <div class="er-kpi-card"><div class="er-kpi-value">${s.avg_duration_ms != null ? s.avg_duration_ms + 'ms' : '--'}</div><div class="er-kpi-label">${t("sh.avgDuration")}</div></div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <strong>${t("sh.colIntent")}:</strong> ${_escHtml(d.intent_label)} &nbsp;
+        <strong>${t("sh.colVersion")}:</strong> v${d.version} &nbsp;
+        <strong>${t("sh.colStatus")}:</strong> <span class="er-badge ${d.status === 'stale' ? 'er-badge-warn' : 'er-badge-ok'}">${d.status}</span>
+      </div>
+      <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:600;">${t("sh.planTemplate")} (${(d.plan_template || []).length} steps)</summary>
+        <pre style="background:var(--bg-surface0);padding:10px;border-radius:8px;font-size:0.82rem;overflow-x:auto;max-height:300px;">${_escHtml(JSON.stringify(d.plan_template, null, 2))}</pre>
+      </details>
+      <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:600;">${t("sh.slotSchema")}</summary>
+        <pre style="background:var(--bg-surface0);padding:10px;border-radius:8px;font-size:0.82rem;overflow-x:auto;max-height:200px;">${_escHtml(JSON.stringify(d.slot_schema, null, 2))}</pre>
+      </details>
+      <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:600;">${t("sh.constraints")}</summary>
+        <pre style="background:var(--bg-surface0);padding:10px;border-radius:8px;font-size:0.82rem;overflow-x:auto;max-height:200px;">${_escHtml(JSON.stringify(d.constraints, null, 2))}</pre>
+      </details>
+      ${d.instances && d.instances.length ? `
+      <h3 style="margin-top:16px;">${t("sh.relatedInstances")} (${d.instances.length})</h3>
+      <table class="er-table"><thead><tr>
+        <th>${t("sh.colCaseKey")}</th><th>${t("sh.colIntent")}</th><th>${t("sh.colUseCount")}</th><th>${t("sh.colSuccessRate")}</th><th>${t("sh.colLastUsed")}</th>
+      </tr></thead><tbody>${d.instances.map(i => `<tr>
+        <td>${_escHtml(i.case_key.substring(0, 12))}…</td>
+        <td>${_escHtml(i.intent_label || '--')}</td>
+        <td>${i.use_count}</td>
+        <td>${i.success_rate}%</td>
+        <td>${i.last_used_at ? i.last_used_at.substring(0, 10) : '--'}</td>
+      </tr>`).join("")}</tbody></table>` : ''}
+    `;
+  } catch(e) {
+    content.innerHTML = `<div class="er-table-placeholder">${t("sh.loadFailed")}: ${_escHtml(e.message)}</div>`;
+  }
+}
+
+async function _shShowInstanceDetail(caseKey) {
+  const panel = document.getElementById("sh-detail-panel");
+  const title = document.getElementById("sh-detail-title");
+  const content = document.getElementById("sh-detail-content");
+  panel.style.display = "";
+  title.textContent = `${t("sh.instances")}: ${caseKey.substring(0, 16)}…`;
+  content.innerHTML = `<div class="er-table-placeholder">${t("sh.loading")}</div>`;
+
+  try {
+    const d = await api(`/api/apps/strategy_hub/instances/${caseKey}`);
+    const s = d.stats || {};
+    content.innerHTML = `
+      <div class="er-kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:16px;">
+        <div class="er-kpi-card"><div class="er-kpi-value">${s.use_count || 0}</div><div class="er-kpi-label">${t("sh.colUseCount")}</div></div>
+        <div class="er-kpi-card"><div class="er-kpi-value">${s.success_rate || 0}%</div><div class="er-kpi-label">${t("sh.colSuccessRate")}</div></div>
+        <div class="er-kpi-card"><div class="er-kpi-value">${s.avg_duration_ms != null ? s.avg_duration_ms + 'ms' : '--'}</div><div class="er-kpi-label">${t("sh.avgDuration")}</div></div>
+      </div>
+      <div style="margin-bottom:12px;">
+        <strong>${t("sh.colIntent")}:</strong> ${_escHtml(d.intent_label || '--')} &nbsp;
+        <strong>${t("sh.colTemplate")}:</strong> ${d.template_id ? _escHtml(d.template_id.substring(0, 12)) + '…' : 'N/A'} &nbsp;
+        <strong>${t("sh.colStatus")}:</strong> <span class="er-badge ${d.status === 'stale' ? 'er-badge-warn' : 'er-badge-ok'}">${d.status}</span>
+      </div>
+      <details style="margin-bottom:12px;" ${Object.keys(d.slot_values || {}).length ? '' : 'hidden'}>
+        <summary style="cursor:pointer;font-weight:600;">${t("sh.slotValues")}</summary>
+        <pre style="background:var(--bg-surface0);padding:10px;border-radius:8px;font-size:0.82rem;overflow-x:auto;max-height:200px;">${_escHtml(JSON.stringify(d.slot_values, null, 2))}</pre>
+      </details>
+      <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer;font-weight:600;">${t("sh.resolvedPlan")} (${(d.resolved_plan || []).length} steps)</summary>
+        <pre style="background:var(--bg-surface0);padding:10px;border-radius:8px;font-size:0.82rem;overflow-x:auto;max-height:300px;">${_escHtml(JSON.stringify(d.resolved_plan, null, 2))}</pre>
+      </details>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button class="btn btn-sm" onclick="_shInvalidateInstance('${_escHtml(d.case_key)}')">${t("sh.markInvalid")}</button>
+        <button class="btn btn-sm btn-danger" onclick="_shDeleteInstance('${_escHtml(d.case_key)}')">${t("sh.delete")}</button>
+      </div>
+    `;
+  } catch(e) {
+    content.innerHTML = `<div class="er-table-placeholder">${t("sh.loadFailed")}: ${_escHtml(e.message)}</div>`;
+  }
+}
+
+function _shCloseDetail() {
+  const panel = document.getElementById("sh-detail-panel");
+  if (panel) panel.style.display = "none";
+}
+
+async function _shDeleteTemplate(templateId) {
+  if (!confirm(t("sh.confirmDeleteTemplate"))) return;
+  try {
+    await api(`/api/apps/strategy_hub/templates/${templateId}/delete`, "POST");
+    toast(t("sh.templateDeleted"), "success");
+    await _shLoadTemplates();
+    await _shLoadMetrics();
+    _shCloseDetail();
+  } catch(e) { toast(t("sh.deleteFailed") + ": " + e.message, "error"); }
+}
+
+async function _shInvalidateInstance(caseKey) {
+  if (!confirm(t("sh.confirmInvalidate"))) return;
+  try {
+    await api(`/api/apps/strategy_hub/instances/${caseKey}/invalidate`, "POST");
+    toast(t("sh.instanceInvalidated"), "success");
+    await _shLoadInstances();
+    await _shLoadMetrics();
+  } catch(e) { toast(t("sh.operationFailed") + ": " + e.message, "error"); }
+}
+
+async function _shDeleteInstance(caseKey) {
+  if (!confirm(t("sh.confirmDeleteInstance"))) return;
+  try {
+    await api(`/api/apps/strategy_hub/instances/${caseKey}/delete`, "POST");
+    toast(t("sh.instanceDeleted"), "success");
+    await _shLoadInstances();
+    await _shLoadMetrics();
+    _shCloseDetail();
+  } catch(e) { toast(t("sh.deleteFailed") + ": " + e.message, "error"); }
+}
+
+async function _shPromoteCandidate(candidateId) {
+  if (!confirm(t("sh.confirmPromote"))) return;
+  try {
+    const res = await api(`/api/apps/strategy_hub/candidates/${candidateId}/promote`, "POST");
+    if (res.ok) {
+      toast(t("sh.candidatePromoted"), "success");
+      await _shLoadCandidates();
+      await _shLoadInstances();
+      await _shLoadMetrics();
+    } else {
+      toast(t("sh.promoteFailed") + ": " + (res.error || "unknown"), "error");
+    }
+  } catch(e) { toast(t("sh.promoteFailed") + ": " + e.message, "error"); }
+}
+
+async function _shDeleteCandidate(candidateId) {
+  if (!confirm(t("sh.confirmDeleteCandidate"))) return;
+  try {
+    await api(`/api/apps/strategy_hub/candidates/${candidateId}/delete`, "POST");
+    toast(t("sh.candidateDeleted"), "success");
+    await _shLoadCandidates();
+    await _shLoadMetrics();
+  } catch(e) { toast(t("sh.deleteFailed") + ": " + e.message, "error"); }
+}
+
+// ── End Strategy Hub ──────────────────────────────────────────────────
 
 async function openDigestDetail() {
   document.getElementById("app-detail-title").textContent = `🎯 ${t("digest.title")}`;

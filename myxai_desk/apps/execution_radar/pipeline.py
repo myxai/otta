@@ -458,6 +458,7 @@ def aggregate(tasks: list[dict], date_str: str, candidates: list[dict] | None = 
         round(sum(c.get("removed_steps", 0) for c in cands) / len(cands), 1)
         if cands else 0.0
     )
+    total_llm_saveable = sum(c.get("llm_calls_saved", 0) for c in cands)
 
     return {
         "date": date_str,
@@ -478,6 +479,7 @@ def aggregate(tasks: list[dict], date_str: str, candidates: list[dict] | None = 
         "report_text": "",
         "avg_removed_steps": avg_removed_steps,
         "candidates_generated": candidates_generated,
+        "total_llm_saveable": total_llm_saveable,
     }
 
 
@@ -487,8 +489,11 @@ def aggregate(tasks: list[dict], date_str: str, candidates: list[dict] | None = 
 def generate_candidates(tasks: list[dict], date_str: str) -> list[dict]:
     """Generate candidate golden paths from successful tasks.
 
-    Delegates to ``candidate.make_candidate`` for the per-task extraction,
-    then deduplicates by ``case_key`` (keep best quality_score).
+    Any successful task with at least one tool call is a valid candidate.
+    The value of a candidate is LLM bypass — replaying the stored plan
+    next time saves ≥2 LLM calls and thousands of tokens.
+
+    Deduplicates by ``case_key`` (keep best quality_score).
     """
     from myxai_desk.apps.execution_radar.candidate import (
         candidate_metrics,
@@ -503,8 +508,7 @@ def generate_candidates(tasks: list[dict], date_str: str) -> list[dict]:
         if not task.get("success"):
             continue
         step_dicts = task.get("steps", [])
-        total = len(step_dicts)
-        if total < 2:
+        if not step_dicts:
             continue
 
         steps = steps_from_dicts(step_dicts)
@@ -513,12 +517,17 @@ def generate_candidates(tasks: list[dict], date_str: str) -> list[dict]:
             continue
 
         metrics = candidate_metrics(steps, plan)
+        llm_saved = metrics["llm_calls_saved"]
         removed = metrics["removed_steps"]
-        if removed == 0:
-            continue
 
         case_key = _generate_case_key(task, step_dicts)
-        quality = round(1.0 + 2.0 * removed - 0.1 * len(plan), 2)
+        quality = round(
+            2.0 * llm_saved
+            + 1.0 * removed
+            + 0.5 * len(plan)
+            + (1.0 if task.get("hit_rate", 0) >= 1.0 else 0),
+            2,
+        )
 
         raw.append({
             "candidate_id": uuid4().hex[:16],
@@ -527,7 +536,8 @@ def generate_candidates(tasks: list[dict], date_str: str) -> list[dict]:
             "candidate_plan_json": json.dumps(plan_to_json(plan), ensure_ascii=False),
             "quality_score": quality,
             "removed_steps": removed,
-            "original_steps": total,
+            "llm_calls_saved": llm_saved,
+            "original_steps": len(step_dicts),
             "user_text": (task.get("user_text", "") or "")[:200],
             "created_at": f"{date_str}T00:00:00",
             "status": "new",

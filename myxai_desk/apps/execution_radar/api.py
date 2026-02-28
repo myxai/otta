@@ -197,6 +197,7 @@ def radar_golden_candidates():
             "source_run_id": c["source_run_id"],
             "quality_score": c.get("quality_score", 0),
             "removed_steps": c.get("removed_steps", 0),
+            "llm_calls_saved": c.get("llm_calls_saved", 0),
             "original_steps": c.get("original_steps", 0),
             "candidate_len": candidate_len,
             "user_text": c.get("user_text", ""),

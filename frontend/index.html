@@ -734,8 +734,17 @@
   <script src="/static/i18n.js"></script>
   <script src="/static/app.js"></script>
   <script>
-    // Sync lang radio buttons on load
+    // Initialize i18n module and sync lang radio buttons on load
     document.addEventListener("DOMContentLoaded", function(){
+      // Sync i18n locale with app language before initializing
+      if (typeof _lang !== 'undefined') {
+        localStorage.setItem('myxai_locale', _lang);
+      }
+      initI18n().then(function() {
+        applyLanguage();
+      }).catch(function(e) {
+        console.warn("i18n init failed, using fallback:", e);
+      });
       var stored = localStorage.getItem("nanobot_lang") || "auto";
       var radio = document.querySelector('input[name="lang-radio"][value="' + stored + '"]');
       if (radio) radio.checked = true;

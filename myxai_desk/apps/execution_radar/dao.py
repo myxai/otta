@@ -129,6 +129,7 @@ def init_radar_tables() -> None:
     _gc_backfill = [
         ("original_steps", "INTEGER DEFAULT 0"),
         ("user_text", "TEXT DEFAULT ''"),
+        ("llm_calls_saved", "INTEGER DEFAULT 0"),
     ]
     for col, typedef in _gc_backfill:
         try:
@@ -152,6 +153,7 @@ def init_radar_tables() -> None:
         ("avg_tokens", "INTEGER DEFAULT 0"),
         ("avg_removed_steps", "REAL DEFAULT 0"),
         ("candidates_generated", "INTEGER DEFAULT 0"),
+        ("total_llm_saveable", "INTEGER DEFAULT 0"),
     ]
     for col, typedef in _backfill_columns:
         try:
@@ -328,8 +330,8 @@ def save_daily_metrics(m: dict) -> None:
             multi_tasks, multi_hits, multi_hit_rate, multi_avg_attempts,
             multi_avg_effective, avg_attempts, avg_tokens,
             top_error_codes, top_tools, report_text,
-            avg_removed_steps, candidates_generated)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            avg_removed_steps, candidates_generated, total_llm_saveable)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             m["date"],
             m.get("total_tasks", 0),
@@ -351,6 +353,7 @@ def save_daily_metrics(m: dict) -> None:
             m.get("report_text", ""),
             m.get("avg_removed_steps", 0.0),
             m.get("candidates_generated", 0),
+            m.get("total_llm_saveable", 0),
         ),
     )
 
@@ -443,9 +446,9 @@ def upsert_candidates(candidates: list[dict]) -> None:
     execute_many(
         """INSERT OR REPLACE INTO golden_candidates
            (candidate_id, case_key, source_run_id, candidate_plan_json,
-            quality_score, removed_steps, original_steps, user_text,
-            created_at, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            quality_score, removed_steps, llm_calls_saved, original_steps,
+            user_text, created_at, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (
                 c["candidate_id"],
@@ -454,6 +457,7 @@ def upsert_candidates(candidates: list[dict]) -> None:
                 c.get("candidate_plan_json", "[]"),
                 c.get("quality_score", 0.0),
                 c.get("removed_steps", 0),
+                c.get("llm_calls_saved", 0),
                 c.get("original_steps", 0),
                 c.get("user_text", "")[:200],
                 c["created_at"],

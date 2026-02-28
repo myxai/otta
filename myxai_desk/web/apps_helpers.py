@@ -132,6 +132,18 @@ APP_CATALOG = {
         "category": "analytics",
         "min_mode": "Observer",
     },
+    "strategy_hub": {
+        "id": "strategy_hub",
+        "name": _t("app.strategy_hub.name"),
+        "name_en": "Strategy Hub",
+        "icon": "🎛️",
+        "description": _t("app.strategy_hub.desc"),
+        "description_en": "Strategy hub — golden asset governance, templates, instances & candidates lifecycle management",
+        "version": "1.0.0",
+        "author": "nanobot",
+        "category": "analytics",
+        "min_mode": "Observer",
+    },
 }
 
 DEFAULT_DIGEST_CONFIG = {
@@ -152,6 +164,8 @@ DEFAULT_INTENT_ENGINE_CONFIG = {
     "plan_reuse_enabled": False,
     "schedule_time": "03:30",
 }
+
+DEFAULT_STRATEGY_HUB_CONFIG: dict = {}
 
 DEFAULT_EMAIL_CONFIG = {
     "imap_host": "",

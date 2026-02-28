@@ -15,6 +15,7 @@ from myxai_desk.web.apps_helpers import (
     DEFAULT_DIGEST_CONFIG,
     DEFAULT_EMAIL_CONFIG,
     DEFAULT_EXECUTION_RADAR_CONFIG,
+    DEFAULT_STRATEGY_HUB_CONFIG,
     DEFAULT_INTENT_ENGINE_CONFIG,
     _t,
     load_apps_prefs,
@@ -130,6 +131,7 @@ def install(app_id):
         "email_summary": DEFAULT_EMAIL_CONFIG,
         "execution_radar": DEFAULT_EXECUTION_RADAR_CONFIG,
         "intent_engine": DEFAULT_INTENT_ENGINE_CONFIG,
+        "strategy_hub": DEFAULT_STRATEGY_HUB_CONFIG,
     }
     registry[app_id] = {
         "installed_at": datetime.now(timezone.utc).isoformat(),
