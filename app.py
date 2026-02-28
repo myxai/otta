@@ -2507,28 +2507,46 @@ def api_history_delete(session_id):
 
 
 def _get_model_config() -> dict:
-    """Read model/api_key/api_base/brave_api_key/baidu_api_key from nanobot config."""
+    """Read model/api_key/api_base/brave_api_key/baidu_api_key from nanobot config.
+
+    Uses ``config_service.get_config()`` for the API key so that
+    ``<<KEYRING>>`` placeholders are resolved to real secrets.
+    """
     if not NANOBOT_AVAILABLE:
         return {}
     try:
-        from nanobot.config.loader import get_config_path, load_config
+        from nanobot.config.loader import load_config
 
         config = load_config()
         model = config.agents.defaults.model
-        p = config.get_provider(model)
+        provider_name = config.get_provider_name(model)
+        api_base = config.get_api_base(model) or None
         brave_key = config.tools.web.search.api_key if config.tools.web.search else None
+
+        api_key = None
         baidu_key = None
         try:
-            raw = json.loads(get_config_path().read_text(encoding="utf-8"))
+            from myxai_desk.core.config_service import get_config
+            merged = get_config()
+            if provider_name:
+                p_cfg = merged.get("providers", {}).get(provider_name, {})
+                api_key = p_cfg.get("apiKey") or None
+                if api_key == "<<KEYRING>>":
+                    api_key = None
             baidu_key = (
-                raw.get("tools", {}).get("web", {}).get("search", {}).get("baiduApiKey") or None
+                merged.get("tools", {}).get("web", {}).get("search", {}).get("baiduApiKey") or None
             )
         except Exception:
-            log.debug("Failed to read baidu API key from config", exc_info=True)
+            p = config.get_provider(model)
+            api_key = p.api_key if p else None
+            if api_key == "<<KEYRING>>":
+                api_key = None
+            log.debug("config_service unavailable, fell back to nanobot loader", exc_info=True)
+
         return {
             "model": model,
-            "api_key": p.api_key if p else None,
-            "api_base": config.get_api_base(model) or None,
+            "api_key": api_key,
+            "api_base": api_base,
             "brave_api_key": brave_key or None,
             "baidu_api_key": baidu_key or None,
         }

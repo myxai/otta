@@ -290,6 +290,8 @@ const FALLBACK_I18N = {
     "er.stepStatus":"状态","er.stepEffective":"判定",
     "er.effective":"有效","er.ineffective":"无效",
     "er.config":"设置","er.scheduleTime":"每日扫描时间","er.saveConfig":"保存设置","er.configSaved":"设置已保存","er.configFail":"保存失败",
+    "er.avgRemovedSteps":"平均剪枝步数","er.candidatesUnit":"条候选",
+    "er.goldenCandidates":"候选黄金路径","er.qualityScore":"质量分","er.removedSteps":"剪枝步数","er.candidateLen":"候选长度","er.candidateStatus":"状态",
     "ie.title":"意图引擎","ie.switches":"开关配置","ie.thresholds":"阈值调节",
     "ie.routingEnabled":"意图路由","ie.caseRetrieval":"Case 检索","ie.planReuse":"计划复用",
     "ie.routeConfLow":"路由置信阈值","ie.caseReuseSim":"复用相似度阈值","ie.hintsMaxLen":"Hints 最大长度",
@@ -530,6 +532,8 @@ const FALLBACK_I18N = {
     "er.stepStatus":"Status","er.stepEffective":"Verdict",
     "er.effective":"Effective","er.ineffective":"Ineffective",
     "er.config":"Settings","er.scheduleTime":"Daily Scan Time","er.saveConfig":"Save Settings","er.configSaved":"Settings saved","er.configFail":"Save failed",
+    "er.avgRemovedSteps":"Avg Pruned Steps","er.candidatesUnit":"candidates",
+    "er.goldenCandidates":"Golden Path Candidates","er.qualityScore":"Quality","er.removedSteps":"Pruned","er.candidateLen":"Length","er.candidateStatus":"Status",
     "ie.title":"Intent Engine","ie.switches":"Switches","ie.thresholds":"Thresholds",
     "ie.routingEnabled":"Intent Routing","ie.caseRetrieval":"Case Retrieval","ie.planReuse":"Plan Reuse",
     "ie.routeConfLow":"Route Confidence Threshold","ie.caseReuseSim":"Reuse Similarity Threshold","ie.hintsMaxLen":"Hints Max Length",
@@ -2973,9 +2977,18 @@ async function openExecutionRadarDetail() {
       <div class="er-card"><div class="er-card-label">${t("er.successRate")}</div><div class="er-card-value" id="er-success-rate">--</div></div>
       <div class="er-card"><div class="er-card-label">${t("er.singleHitRate")}</div><div class="er-card-value" id="er-single-hit">--</div><div class="er-card-sub" id="er-single-avg">--</div></div>
       <div class="er-card"><div class="er-card-label">${t("er.multiHitRate")}</div><div class="er-card-value" id="er-multi-hit">--</div><div class="er-card-sub" id="er-multi-avg">--</div></div>
+      <div class="er-card"><div class="er-card-label">${t("er.avgRemovedSteps")}</div><div class="er-card-value" id="er-avg-removed">--</div><div class="er-card-sub" id="er-candidates-count">--</div></div>
     </div>
 
     <div id="er-report-text" style="display:none;margin-bottom:18px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary);font-size:13px;line-height:1.6"></div>
+
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;cursor:pointer" onclick="toggleErCandidates()">
+        <span style="font-weight:600">${t("er.goldenCandidates")}</span>
+        <span id="er-candidates-toggle" style="font-size:12px;color:var(--subtext0)">▼</span>
+      </div>
+      <div id="er-candidates-panel" style="display:none"><div class="er-table-placeholder">${t("er.loading")}</div></div>
+    </div>
 
     <div class="app-detail-section" style="margin-bottom:18px">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;cursor:pointer" onclick="toggleErTaskDetail()">
@@ -3049,6 +3062,7 @@ async function _refreshAllErPanels() {
   await loadErTrends(activeW ? parseInt(activeW.dataset.w) : 7);
   await loadErTopTools(d);
   await loadErTaskDetail(d);
+  await loadErCandidates(d);
 }
 
 function switchErDate(dateStr) {
@@ -3070,6 +3084,10 @@ async function loadErSummary(dateStr) {
     const ma = d.multi_avg_attempts || 0;
     const mae = d.multi_avg_effective || 0;
     document.getElementById("er-multi-avg").textContent = ma > 0 ? `${t("er.avgPrefix")} ${ma} ${t("er.avgSuffixPerEff").replace("{n}", mae)}` : "-";
+    const avgRemoved = d.avg_removed_steps || 0;
+    document.getElementById("er-avg-removed").textContent = avgRemoved > 0 ? avgRemoved.toFixed(1) : "0";
+    const cg = d.candidates_generated || 0;
+    document.getElementById("er-candidates-count").textContent = cg > 0 ? `${cg} ${t("er.candidatesUnit")}` : "-";
     const reportEl = document.getElementById("er-report-text");
     if (d.report_text) {
       reportEl.style.display = "block";
@@ -3166,6 +3184,86 @@ function toggleErTaskDetail() {
   } else {
     panel.style.display = "none";
     toggle.textContent = "▼";
+  }
+}
+
+function toggleErCandidates() {
+  const panel = document.getElementById("er-candidates-panel");
+  const toggle = document.getElementById("er-candidates-toggle");
+  if (panel.style.display === "none") {
+    panel.style.display = "block";
+    toggle.textContent = "▲";
+  } else {
+    panel.style.display = "none";
+    toggle.textContent = "▼";
+  }
+}
+
+async function loadErCandidates(dateStr) {
+  try {
+    const dt = dateStr || _getErDate();
+    const d = await api(`/api/apps/execution_radar/golden_candidates?date=${dt}&limit=10`);
+    const el = document.getElementById("er-candidates-panel");
+    if (!d.candidates || d.candidates.length === 0) {
+      el.innerHTML = `<div class="er-table-placeholder">${t("er.noData")}</div>`;
+      return;
+    }
+    let html = `<table class="er-table"><thead><tr>
+      <th style="width:30px"></th>
+      <th>#</th>
+      <th>${t("er.taskContent")}</th>
+      <th>${t("er.qualityScore")}</th>
+      <th>${t("er.totalSteps")}</th>
+      <th>${t("er.candidateLen")}</th>
+      <th>${t("er.removedSteps")}</th>
+      <th>${t("er.candidateStatus")}</th>
+    </tr></thead><tbody>`;
+    d.candidates.forEach((c, i) => {
+      const statusBadge = c.status === "promoted"
+        ? `<span class="er-badge er-badge-ok">${c.status}</span>`
+        : `<span class="er-badge er-badge-dim">${c.status}</span>`;
+      const userText = _escHtml((c.user_text || "").slice(0, 50));
+      html += `<tr class="er-task-row" onclick="toggleErCandidatePlan(this)" style="cursor:pointer">
+        <td><span class="er-arrow">▶</span></td>
+        <td>${i + 1}</td>
+        <td title="${_escHtml(c.user_text || "")}">${userText}</td>
+        <td>${c.quality_score}</td>
+        <td>${c.original_steps || "-"}</td>
+        <td>${c.candidate_len}</td>
+        <td>${c.removed_steps}</td>
+        <td>${statusBadge}</td>
+      </tr>`;
+      const planSteps = c.candidate_plan || [];
+      let planHtml = `<table class="er-table er-steps-inner"><thead><tr>
+        <th>${t("er.stepIndex")}</th><th>${t("er.toolName")}</th><th>${t("er.stepArgs")}</th>
+      </tr></thead><tbody>`;
+      planSteps.forEach((s, si) => {
+        let argsPreview = "";
+        try {
+          const parsed = typeof s.args_json === "string" ? JSON.parse(s.args_json) : s.args_json;
+          const keys = Object.keys(parsed || {});
+          if (keys.length > 0) argsPreview = String(parsed[keys[0]] || "").slice(0, 80);
+        } catch (_) { argsPreview = String(s.args_json || "").slice(0, 80); }
+        planHtml += `<tr><td>${si + 1}</td><td><code>${_escHtml(s.tool_name || "")}</code></td><td class="er-args-cell" title="${_escHtml(s.args_json || "")}">${_escHtml(argsPreview)}</td></tr>`;
+      });
+      planHtml += `</tbody></table>`;
+      html += `<tr class="er-steps-row" style="display:none"><td colspan="8"><div class="er-steps-container">${planHtml}</div></td></tr>`;
+    });
+    html += `</tbody></table>`;
+    el.innerHTML = html;
+  } catch (e) { console.warn("er candidates", e); }
+}
+
+function toggleErCandidatePlan(row) {
+  const next = row.nextElementSibling;
+  if (!next || !next.classList.contains("er-steps-row")) return;
+  const arrow = row.querySelector(".er-arrow");
+  if (next.style.display === "none") {
+    next.style.display = "table-row";
+    if (arrow) arrow.textContent = "▼";
+  } else {
+    next.style.display = "none";
+    if (arrow) arrow.textContent = "▶";
   }
 }
 

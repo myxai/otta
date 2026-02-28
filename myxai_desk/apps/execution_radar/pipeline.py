@@ -10,8 +10,10 @@ The pipeline extracts tool execution data *directly* from sessions.json's
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import re
 from collections import Counter
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -20,6 +22,7 @@ from uuid import uuid4
 from myxai_desk.apps.execution_radar.dao import (
     delete_date_data,
     save_daily_metrics,
+    upsert_candidates,
     upsert_steps,
     upsert_tasks,
 )
@@ -43,7 +46,9 @@ def run_daily_radar(run_date: str | None = None, *, skip_report: bool = False) -
     raw = extract(date_str)
     tasks = normalize(raw, date_str)
     tasks = verify(tasks)
-    metrics = aggregate(tasks, date_str)
+
+    candidates = generate_candidates(tasks, date_str)
+    metrics = aggregate(tasks, date_str, candidates)
 
     if not skip_report:
         report = generate_report(metrics, tasks)
@@ -61,8 +66,15 @@ def run_daily_radar(run_date: str | None = None, *, skip_report: bool = False) -
         if all_steps:
             upsert_steps(all_steps)
 
-    log.info("[execution_radar] pipeline done for %s — %d tasks, %d with steps",
-             date_str, len(tasks), sum(1 for t in tasks if t.get("total_steps", 0) > 0))
+    if candidates:
+        upsert_candidates(candidates)
+
+    log.info(
+        "[execution_radar] pipeline done for %s — %d tasks, %d with steps, %d candidates",
+        date_str, len(tasks),
+        sum(1 for t in tasks if t.get("total_steps", 0) > 0),
+        len(candidates),
+    )
     return metrics
 
 
@@ -362,7 +374,7 @@ def _compute_effective_steps(steps: list[dict]) -> tuple[int, set[int]]:
 # ── Stage 4: Aggregate ─────────────────────────────────────────────
 
 
-def aggregate(tasks: list[dict], date_str: str) -> dict:
+def aggregate(tasks: list[dict], date_str: str, candidates: list[dict] | None = None) -> dict:
     """Compute daily aggregate metrics from verified tasks.
 
     Classification (per user spec):
@@ -424,6 +436,13 @@ def aggregate(tasks: list[dict], date_str: str) -> dict:
         if all_success else 0
     )
 
+    cands = candidates or []
+    candidates_generated = len(cands)
+    avg_removed_steps = (
+        round(sum(c.get("removed_steps", 0) for c in cands) / len(cands), 1)
+        if cands else 0.0
+    )
+
     return {
         "date": date_str,
         "total_tasks": total,
@@ -441,7 +460,98 @@ def aggregate(tasks: list[dict], date_str: str) -> dict:
         "avg_attempts": avg_attempts,
         "top_tools": top_tools,
         "report_text": "",
+        "avg_removed_steps": avg_removed_steps,
+        "candidates_generated": candidates_generated,
     }
+
+
+# ── Stage 4b: Candidate Golden Path Generation ────────────────────
+
+
+def generate_candidates(tasks: list[dict], date_str: str) -> list[dict]:
+    """Generate candidate golden paths from successful tasks.
+
+    Delegates to ``candidate.make_candidate`` for the per-task extraction,
+    then deduplicates by ``case_key`` (keep best quality_score).
+    """
+    from myxai_desk.apps.execution_radar.candidate import (
+        candidate_metrics,
+        make_candidate,
+        plan_to_json,
+        steps_from_dicts,
+    )
+
+    raw: list[dict] = []
+
+    for task in tasks:
+        if not task.get("success"):
+            continue
+        step_dicts = task.get("steps", [])
+        total = len(step_dicts)
+        if total < 2:
+            continue
+
+        steps = steps_from_dicts(step_dicts)
+        plan = make_candidate(steps)
+        if not plan:
+            continue
+
+        metrics = candidate_metrics(steps, plan)
+        removed = metrics["removed_steps"]
+        if removed == 0:
+            continue
+
+        case_key = _generate_case_key(task, step_dicts)
+        quality = round(1.0 + 2.0 * removed - 0.1 * len(plan), 2)
+
+        raw.append({
+            "candidate_id": uuid4().hex[:16],
+            "case_key": case_key,
+            "source_run_id": task.get("task_id", ""),
+            "candidate_plan_json": json.dumps(plan_to_json(plan), ensure_ascii=False),
+            "quality_score": quality,
+            "removed_steps": removed,
+            "original_steps": total,
+            "user_text": (task.get("user_text", "") or "")[:200],
+            "created_at": f"{date_str}T00:00:00",
+            "status": "new",
+        })
+
+    candidates = _dedup_candidates(raw)
+
+    log.info(
+        "[execution_radar] generated %d candidates (%d before dedup) "
+        "from %d successful tasks",
+        len(candidates), len(raw),
+        sum(1 for t in tasks if t.get("success")),
+    )
+    return candidates
+
+
+# ── dedup & case key ───────────────────────────────────────────────
+
+
+def _dedup_candidates(candidates: list[dict]) -> list[dict]:
+    """Keep only the best candidate per case_key."""
+    best: dict[str, dict] = {}
+    for c in candidates:
+        key = c["case_key"]
+        if key not in best or c["quality_score"] > best[key]["quality_score"]:
+            best[key] = c
+    return list(best.values())
+
+
+def _generate_case_key(task: dict, steps: list[dict]) -> str:
+    """Deterministic key: ``sha256(tools_signature + norm_keywords)[:24]``."""
+    tool_names = sorted({s.get("tool_name", "") for s in steps if s.get("tool_name")})
+    tools_sig = "|".join(tool_names)
+
+    user_text = task.get("user_text", "") or ""
+    tokens = re.findall(r"[\w\u4e00-\u9fff]+", user_text.lower())
+    norm_kw = "|".join(sorted(set(tokens)))
+
+    raw = f"{tools_sig}::{norm_kw}"
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
 
 # ── Stage 5: Report (LLM, optional) ───────────────────────────────

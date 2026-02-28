@@ -1,6 +1,7 @@
-"""Data-access layer for execution radar tables (er_tasks, er_steps, er_daily_metrics).
+"""Data-access layer for execution radar tables.
 
-All three tables live in the shared ``myxai.db`` SQLite database.
+Tables: ``er_tasks``, ``er_steps``, ``er_daily_metrics``, ``golden_candidates``.
+All live in the shared ``myxai.db`` SQLite database.
 """
 
 from __future__ import annotations
@@ -109,6 +110,37 @@ def init_radar_tables() -> None:
         """,
     )
 
+    ensure_table(
+        "golden_candidates",
+        """
+        candidate_id TEXT PRIMARY KEY,
+        case_key TEXT NOT NULL,
+        source_run_id TEXT NOT NULL,
+        candidate_plan_json TEXT DEFAULT '[]',
+        quality_score REAL DEFAULT 0,
+        removed_steps INTEGER DEFAULT 0,
+        original_steps INTEGER DEFAULT 0,
+        user_text TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        status TEXT DEFAULT 'new'
+        """,
+    )
+
+    _gc_backfill = [
+        ("original_steps", "INTEGER DEFAULT 0"),
+        ("user_text", "TEXT DEFAULT ''"),
+    ]
+    for col, typedef in _gc_backfill:
+        try:
+            execute(f"SELECT {col} FROM golden_candidates LIMIT 1", readonly=True)
+        except Exception:
+            try:
+                from myxai_desk.core.storage.sqlite import connect
+                with connect() as conn:
+                    conn.execute(f"ALTER TABLE golden_candidates ADD COLUMN {col} {typedef}")
+            except Exception:
+                pass
+
     _backfill_columns = [
         ("instrumented_tasks", "INTEGER DEFAULT 0"),
         ("single_hit_rate", "REAL DEFAULT 0"),
@@ -118,6 +150,8 @@ def init_radar_tables() -> None:
         ("multi_avg_effective", "REAL DEFAULT 0"),
         ("avg_attempts", "REAL DEFAULT 0"),
         ("avg_tokens", "INTEGER DEFAULT 0"),
+        ("avg_removed_steps", "REAL DEFAULT 0"),
+        ("candidates_generated", "INTEGER DEFAULT 0"),
     ]
     for col, typedef in _backfill_columns:
         try:
@@ -137,7 +171,7 @@ def init_radar_tables() -> None:
 
 
 def delete_date_data(date_str: str) -> None:
-    """Remove all tasks and their steps for a given date before re-import."""
+    """Remove all tasks, steps, and candidates for a given date before re-import."""
     init_radar_tables()
     task_ids = execute(
         "SELECT task_id FROM er_tasks WHERE created_at LIKE ?",
@@ -149,6 +183,7 @@ def delete_date_data(date_str: str) -> None:
         placeholders = ",".join("?" * len(ids))
         execute(f"DELETE FROM er_steps WHERE task_id IN ({placeholders})", ids)
     execute("DELETE FROM er_tasks WHERE created_at LIKE ?", (f"{date_str}%",))
+    execute("DELETE FROM golden_candidates WHERE created_at LIKE ?", (f"{date_str}%",))
 
 
 def upsert_task(task: dict) -> None:
@@ -292,8 +327,9 @@ def save_daily_metrics(m: dict) -> None:
             single_hits, single_hit_rate, single_avg_attempts,
             multi_tasks, multi_hits, multi_hit_rate, multi_avg_attempts,
             multi_avg_effective, avg_attempts, avg_tokens,
-            top_error_codes, top_tools, report_text)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            top_error_codes, top_tools, report_text,
+            avg_removed_steps, candidates_generated)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             m["date"],
             m.get("total_tasks", 0),
@@ -313,6 +349,8 @@ def save_daily_metrics(m: dict) -> None:
             json.dumps(m.get("top_error_codes", []), ensure_ascii=False),
             json.dumps(m.get("top_tools", []), ensure_ascii=False),
             m.get("report_text", ""),
+            m.get("avg_removed_steps", 0.0),
+            m.get("candidates_generated", 0),
         ),
     )
 
@@ -392,3 +430,88 @@ def _safe_json(val: Any) -> Any:
         except Exception:
             return []
     return val
+
+
+# ── golden_candidates CRUD ─────────────────────────────────────────
+
+
+def upsert_candidates(candidates: list[dict]) -> None:
+    """Batch-insert candidate golden paths."""
+    if not candidates:
+        return
+    init_radar_tables()
+    execute_many(
+        """INSERT OR REPLACE INTO golden_candidates
+           (candidate_id, case_key, source_run_id, candidate_plan_json,
+            quality_score, removed_steps, original_steps, user_text,
+            created_at, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        [
+            (
+                c["candidate_id"],
+                c["case_key"],
+                c["source_run_id"],
+                c.get("candidate_plan_json", "[]"),
+                c.get("quality_score", 0.0),
+                c.get("removed_steps", 0),
+                c.get("original_steps", 0),
+                c.get("user_text", "")[:200],
+                c["created_at"],
+                c.get("status", "new"),
+            )
+            for c in candidates
+        ],
+    )
+
+
+def get_candidates_for_date(date_str: str) -> list[dict]:
+    """Return all candidates created on *date_str*."""
+    init_radar_tables()
+    rows = execute(
+        "SELECT * FROM golden_candidates WHERE created_at LIKE ? ORDER BY quality_score DESC",
+        (f"{date_str}%",),
+        readonly=True,
+    )
+    for r in rows:
+        r["candidate_plan_json"] = _safe_json(r.get("candidate_plan_json", "[]"))
+    return rows
+
+
+def get_top_candidates(limit: int = 10) -> list[dict]:
+    """Return top candidates globally by quality_score (status = 'new' or 'used')."""
+    init_radar_tables()
+    rows = execute(
+        """SELECT * FROM golden_candidates
+           WHERE status IN ('new', 'used', 'promoted')
+           ORDER BY quality_score DESC LIMIT ?""",
+        (limit,),
+        readonly=True,
+    )
+    for r in rows:
+        r["candidate_plan_json"] = _safe_json(r.get("candidate_plan_json", "[]"))
+    return rows
+
+
+def get_candidate_by_case_key(case_key: str) -> dict | None:
+    """Return the best candidate matching *case_key*."""
+    init_radar_tables()
+    rows = execute(
+        """SELECT * FROM golden_candidates
+           WHERE case_key = ? AND status IN ('new', 'used', 'promoted')
+           ORDER BY quality_score DESC LIMIT 1""",
+        (case_key,),
+        readonly=True,
+    )
+    if not rows:
+        return None
+    r = rows[0]
+    r["candidate_plan_json"] = _safe_json(r.get("candidate_plan_json", "[]"))
+    return r
+
+
+def update_candidate_status(candidate_id: str, status: str) -> None:
+    init_radar_tables()
+    execute(
+        "UPDATE golden_candidates SET status = ? WHERE candidate_id = ?",
+        (status, candidate_id),
+    )

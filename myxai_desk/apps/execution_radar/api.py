@@ -12,9 +12,11 @@ from datetime import date, timedelta
 from flask import Blueprint, jsonify, request
 
 from myxai_desk.apps.execution_radar.dao import (
+    get_candidates_for_date,
     get_daily_metrics,
     get_metrics_range,
     get_tasks_with_steps,
+    get_top_candidates,
     get_top_tools,
 )
 
@@ -50,6 +52,8 @@ def radar_summary():
             "top_tools": [],
             "report_text": "",
             "success_rate": 0,
+            "avg_removed_steps": 0,
+            "candidates_generated": 0,
         })
 
     if "single_hit_rate" not in metrics:
@@ -170,3 +174,34 @@ def radar_run():
 def radar_run_status():
     """Return status of the current / last manual run."""
     return jsonify(_run_status)
+
+
+@bp.route("/golden_candidates")
+def radar_golden_candidates():
+    """Return golden path candidates for a given date or global top-N."""
+    date_str = request.args.get("date")
+    limit = int(request.args.get("limit", 10))
+
+    if date_str:
+        rows = get_candidates_for_date(date_str)[:limit]
+    else:
+        rows = get_top_candidates(limit)
+
+    result = []
+    for c in rows:
+        plan = c.get("candidate_plan_json", [])
+        candidate_len = len(plan) if isinstance(plan, list) else 0
+        result.append({
+            "candidate_id": c["candidate_id"],
+            "case_key": c["case_key"],
+            "source_run_id": c["source_run_id"],
+            "quality_score": c.get("quality_score", 0),
+            "removed_steps": c.get("removed_steps", 0),
+            "original_steps": c.get("original_steps", 0),
+            "candidate_len": candidate_len,
+            "user_text": c.get("user_text", ""),
+            "created_at": c.get("created_at", ""),
+            "status": c.get("status", "new"),
+            "candidate_plan": plan,
+        })
+    return jsonify({"candidates": result})
