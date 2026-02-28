@@ -1,5 +1,5 @@
 /* ===================================================================
-   MyxAI Desk — Catppuccin Mocha-inspired dark theme
+   Otta — Catppuccin Mocha-inspired dark theme
    =================================================================== */
 
 :root {
@@ -789,6 +789,80 @@ a:hover { text-decoration: underline; }
 .message-usage-sep {
   color: var(--bg-surface2);
 }
+
+/* PR-2: execution source badge */
+.exec-source-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.exec-source-badge .esb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.exec-source-badge .esb-label {
+  font-weight: 600;
+}
+.exec-source-badge .esb-detail {
+  color: var(--subtext0);
+}
+.exec-source-badge.esb-golden-replay {
+  background: rgba(16, 185, 129, 0.10);
+  color: #10b981;
+}
+.exec-source-badge.esb-golden-replay .esb-dot { background: #10b981; }
+.exec-source-badge.esb-golden-candidate {
+  background: rgba(99, 102, 241, 0.10);
+  color: #6366f1;
+}
+.exec-source-badge.esb-golden-candidate .esb-dot { background: #6366f1; }
+.exec-source-badge.esb-reuse-plan {
+  background: rgba(59, 130, 246, 0.10);
+  color: #3b82f6;
+}
+.exec-source-badge.esb-reuse-plan .esb-dot { background: #3b82f6; }
+.exec-source-badge.esb-llm-free {
+  background: var(--bg-surface0);
+  color: var(--subtext0);
+}
+.exec-source-badge.esb-llm-free .esb-dot { background: var(--subtext0); }
+
+/* PR-2: golden KPI row in radar */
+.er-golden-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.er-golden-card {
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 10px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.er-golden-card .er-card-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+.er-golden-card .er-card-label {
+  font-size: 10px;
+  color: var(--subtext0);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
 .message-feedback {
   display: flex;
   align-items: center;

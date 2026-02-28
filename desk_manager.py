@@ -39,12 +39,12 @@ except ImportError:
 
 
 # --------------------------------------------------------------------------- #
-# Tray icon generation — render the 🌀 emoji onto a transparent icon
+# Tray icon generation — render the 🦦 emoji onto a transparent icon
 # --------------------------------------------------------------------------- #
 
 
 def _make_tray_icon(size: int = 64) -> "Image.Image":
-    """Draw a 🌀-style swirl icon programmatically."""
+    """Draw a 🦦-style otter icon programmatically."""
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
@@ -97,7 +97,7 @@ class DeskManager:
 
     _T = {
         "zh": {
-            "open": "打开 MyxAI Desk",
+            "open": "打开 Otta",
             "quit": "退出",
             "unread": "📬 未读消息: {}",
             "no_unread": "📭 无未读消息",
@@ -106,7 +106,7 @@ class DeskManager:
             "wan": "{}万",
         },
         "en": {
-            "open": "Open MyxAI Desk",
+            "open": "Open Otta",
             "quit": "Quit",
             "unread": "📬 Unread: {}",
             "no_unread": "📭 No unread messages",
@@ -170,7 +170,7 @@ class DeskManager:
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(lambda _: self._t("quit"), self._on_tray_quit),
         )
-        self._tray = pystray.Icon("myxai_desk", image, "MyxAI Desk", menu)
+        self._tray = pystray.Icon("myxai_desk", image, "Otta", menu)
         self._tray.run()
 
     def _label_unread(self, item) -> str:
@@ -430,7 +430,7 @@ class DeskManager:
             raise RuntimeError("pywebview is not installed")
 
         self.main_window = webview.create_window(
-            "MyxAI Desk",
+            "Otta",
             self.base_url,
             width=1280,
             height=860,

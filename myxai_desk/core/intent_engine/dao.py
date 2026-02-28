@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 from myxai_desk.core.storage.sqlite import connect, ensure_table, execute
@@ -57,7 +58,30 @@ def init_ie_tables() -> None:
         usage_count INTEGER DEFAULT 0
         """,
     )
+    _backfill_ie_runs_columns()
     _TABLES_READY = True
+
+
+def _backfill_ie_runs_columns() -> None:
+    """Add PR-2 columns to ie_runs if missing."""
+    extras = [
+        ("case_key", "TEXT"),
+        ("candidate_id", "TEXT"),
+        ("removed_steps", "INTEGER"),
+        ("plan_source", "TEXT"),
+        ("attempts_count", "INTEGER"),
+        ("llm_attempts", "INTEGER"),
+        ("golden_version", "INTEGER"),
+    ]
+    for col, typedef in extras:
+        try:
+            execute(f"SELECT {col} FROM ie_runs LIMIT 1", readonly=True)
+        except Exception:
+            try:
+                with connect() as conn:
+                    conn.execute(f"ALTER TABLE ie_runs ADD COLUMN {col} {typedef}")
+            except Exception:
+                pass
 
 
 # ── ie_runs operations ────────────────────────────────────────────
@@ -114,6 +138,28 @@ def update_outcome(run_id: str, outcome: str) -> None:
         execute("UPDATE ie_runs SET outcome = ? WHERE id = ?", (outcome, run_id))
     except Exception:
         log.warning("[ie_dao] update_outcome failed", exc_info=True)
+
+
+_UPDATABLE_IE_RUN_FIELDS = frozenset({
+    "case_key", "candidate_id", "removed_steps", "plan_source",
+    "attempts_count", "llm_attempts", "golden_version", "outcome",
+})
+
+
+def update_ie_run(run_id: str, **fields: Any) -> None:
+    """Flexible update for ie_runs — only touches columns in *fields*."""
+    if not run_id or not fields:
+        return
+    safe = {k: v for k, v in fields.items() if k in _UPDATABLE_IE_RUN_FIELDS}
+    if not safe:
+        return
+    try:
+        init_ie_tables()
+        set_clause = ", ".join(f"{k} = ?" for k in safe)
+        values = list(safe.values()) + [run_id]
+        execute(f"UPDATE ie_runs SET {set_clause} WHERE id = ?", tuple(values))
+    except Exception:
+        log.warning("[ie_dao] update_ie_run failed: %s", list(safe.keys()), exc_info=True)
 
 
 def get_runs(

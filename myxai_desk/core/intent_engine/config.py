@@ -20,6 +20,7 @@ _DEFAULTS: dict[str, Any] = {
     "routing_enabled": True,
     "case_retrieval_enabled": False,
     "plan_reuse_enabled": False,
+    "golden_replay_enabled": True,
     "base_tools_always_included": ["exec", "read_file", "list_dir"],
     "route_conf_low": 0.4,
     "case_reuse_sim_threshold": 0.92,
@@ -76,3 +77,7 @@ def case_retrieval_enabled() -> bool:
 
 def plan_reuse_enabled() -> bool:
     return bool(get("plan_reuse_enabled"))
+
+
+def golden_replay_enabled() -> bool:
+    return bool(get("golden_replay_enabled"))

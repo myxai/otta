@@ -1,5 +1,5 @@
 /* ===================================================================
-   MyxAI Desk — Frontend Logic
+   Otta — Frontend Logic
    =================================================================== */
 
 // Build version probe — server injects __myxai_expected_build in <head>.
@@ -64,11 +64,11 @@ const FALLBACK_I18N = {
   zh: {
     "nav.newChat":"新对话","nav.settings":"设置","nav.status":"状态","nav.gateway":"网关",
     "tasks.btn":"任务","tasks.today":"今日任务","tasks.planned":"待执行","tasks.running":"执行中","tasks.success":"已完成","tasks.failed":"失败","tasks.pendingCatchup":"待补偿","tasks.noTasks":"今日无任务","tasks.catchupNote":"补偿","tasks.runNow":"立即执行","tasks.triggered":"已触发执行","tasks.triggerFail":"触发失败",
-    "setup.welcome":"欢迎使用 MyxAI Desk",
+    "setup.welcome":"欢迎使用 Otta",
     "setup.install.title":"安装 nanobot","setup.install.desc":"在终端运行以下命令：",
     "setup.onboard.title":"初始化配置","setup.onboard.desc":"点击下方按钮自动初始化。","setup.onboard.btn":"初始化 nanobot",
     "setup.apikey.title":"配置 API Key","setup.apikey.desc":"前往「设置」页面填写您的 API Key。","setup.apikey.btn":"前往设置",
-    "chat.ready":"MyxAI Desk 已就绪","chat.readyDesc":"输入消息开始对话，我可以帮你搜索信息、编写代码、管理文件等。",
+    "chat.ready":"Otta 已就绪","chat.readyDesc":"输入消息开始对话，我可以帮你搜索信息、编写代码、管理文件等。",
     "chat.placeholder":"输入消息… (Enter 发送, Shift+Enter 换行)",
     "chat.you":"你","chat.noHistory":"暂无历史对话","chat.newChat":"新对话",
     "chat.rename":"重命名","chat.renameTitle":"修改对话标题","chat.renamePlaceholder":"输入新标题",
@@ -306,7 +306,7 @@ const FALLBACK_I18N = {
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
     "tasks.btn":"Tasks","tasks.today":"Today's Tasks","tasks.planned":"Planned","tasks.running":"Running","tasks.success":"Done","tasks.failed":"Failed","tasks.pendingCatchup":"Catch-up","tasks.noTasks":"No tasks today","tasks.catchupNote":"catch-up","tasks.runNow":"Run Now","tasks.triggered":"Task triggered","tasks.triggerFail":"Trigger failed",
-    "setup.welcome":"Welcome to MyxAI Desk",
+    "setup.welcome":"Welcome to Otta",
     "setup.install.title":"Install nanobot","setup.install.desc":"Run the following command in terminal:",
     "setup.onboard.title":"Initialize","setup.onboard.desc":"Click the button below to auto-initialize.","setup.onboard.btn":"Initialize nanobot",
     "setup.apikey.title":"Configure API Key","setup.apikey.desc":"Go to Settings page to enter your API Key.","setup.apikey.btn":"Go to Settings",
@@ -929,7 +929,7 @@ function renderChatFromHistory() {
   if (!chatMessages.length) {
     container.innerHTML = `
       <div class="welcome-message">
-        <div class="welcome-icon">🌀</div>
+        <div class="welcome-icon">🦦</div>
         <h2>${t("chat.ready")}</h2>
         <p>${t("chat.readyDesc")}</p>
       </div>`;
@@ -940,7 +940,8 @@ function renderChatFromHistory() {
   for (let i = 0; i < chatMessages.length; i++) {
     const msg = chatMessages[i];
     const isLast = (i === lastBotIdx);
-    appendMessageDOM(msg.role, msg.content, !!msg.markdown, i, msg.feedback || null, isLast, msg.steps || null, msg.audit || null);
+    const elId = appendMessageDOM(msg.role, msg.content, !!msg.markdown, i, msg.feedback || null, isLast, msg.steps || null, msg.audit || null);
+    if (msg.decision_meta && elId) _appendDecisionBadge(elId, msg.decision_meta);
   }
 }
 
@@ -995,6 +996,7 @@ function _startBackgroundChat(msgSessionId, text, thinkingId) {
     let finalContent = null;
     let finalUsage = null;
     let finalAudit = null;
+    let finalDecisionMeta = null;
     try {
       const response = await fetch("/api/chat", {
         method: "POST",
@@ -1035,6 +1037,7 @@ function _startBackgroundChat(msgSessionId, text, thinkingId) {
               finalContent = data.content;
               if (data.usage) finalUsage = data.usage;
               if (data.audit) finalAudit = data.audit;
+              if (data.decision_meta) finalDecisionMeta = data.decision_meta;
             } else if (data.type === "error") {
               finalContent = t("chat.error") + data.content;
             }
@@ -1054,6 +1057,7 @@ function _startBackgroundChat(msgSessionId, text, thinkingId) {
         role: "bot", content: finalContent, markdown: isMd, feedback: null,
         steps: progressSteps.length ? progressSteps : undefined,
         audit: finalAudit || undefined,
+        decision_meta: finalDecisionMeta || undefined,
       });
     }
     await _persistSession(msgSessionId, savedMessages);
@@ -1067,11 +1071,13 @@ function _startBackgroundChat(msgSessionId, text, thinkingId) {
         closeProgressBlock(progressBlockId, progressSteps.length, finalAudit);
         if (finalContent !== null) {
           _injectFinalIntoProgressBlock(progressBlockId, finalContent, chatMessages.length - 1, finalUsage, isMd);
+          if (finalDecisionMeta) _appendDecisionBadge(progressBlockId, finalDecisionMeta);
         }
       } else if (hasThinkingDom && finalContent !== null) {
         _removeAllThinking();
         const msgEl = appendMessageDOM("bot", finalContent, isMd, chatMessages.length - 1, null, true);
         if (finalUsage && msgEl) appendUsageBadge(msgEl, finalUsage);
+        if (finalDecisionMeta && msgEl) _appendDecisionBadge(msgEl, finalDecisionMeta);
       } else {
         renderChatFromHistory();
       }
@@ -1134,7 +1140,7 @@ function appendMessageDOM(type, content, renderMd = false, msgIndex = -1, existi
   div.className = className;
   div.id = id;
 
-  const avatar = isUser ? "👤" : "🌀";
+  const avatar = isUser ? "👤" : "🦦";
   const sender = isUser ? t("chat.you") : "nanobot";
 
   let rendered;
@@ -1204,6 +1210,35 @@ function appendUsageBadge(msgElId, usage) {
   body.appendChild(badge);
 }
 
+const _PLAN_SOURCE_LABELS = {
+  golden_replay:    { label: "黄金回放", css: "esb-golden-replay" },
+  golden_candidate: { label: "候选回放", css: "esb-golden-candidate" },
+  reuse_plan:       { label: "计划复用", css: "esb-reuse-plan" },
+  llm_free:         { label: "自由推理", css: "esb-llm-free" },
+};
+
+function _appendDecisionBadge(msgElId, dm) {
+  if (!dm || !dm.plan_source) return;
+  const msgEl = document.getElementById(msgElId);
+  if (!msgEl) return;
+  const body = msgEl.querySelector(".message-body");
+  if (!body) return;
+  if (body.querySelector(".exec-source-badge")) return;
+
+  const info = _PLAN_SOURCE_LABELS[dm.plan_source] || _PLAN_SOURCE_LABELS.llm_free;
+  const parts = [];
+  if (dm.golden_version != null) parts.push(`v${dm.golden_version}`);
+  if (dm.removed_steps > 0) parts.push(`剪枝 -${dm.removed_steps}`);
+  if (dm.promoted) parts.push("promoted → 黄金");
+  parts.push(`尝试 ${dm.attempts_count || 0}`);
+  parts.push(`LLM ${dm.llm_attempts || 0}`);
+
+  const badge = document.createElement("div");
+  badge.className = `exec-source-badge ${info.css}`;
+  badge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${info.label}</span><span class="esb-detail">${parts.join(" · ")}</span>`;
+  body.appendChild(badge);
+}
+
 async function handleFeedback(btn) {
   if (btn.classList.contains("selected-like") || btn.classList.contains("selected-dislike") || btn.classList.contains("dimmed")) return;
   const rating = btn.dataset.rating;
@@ -1259,7 +1294,7 @@ function appendThinking() {
   const id = "thinking-" + Date.now();
   const div = document.createElement("div");
   div.className = "message bot thinking-message"; div.id = id;
-  div.innerHTML = `<div class="message-avatar">🌀</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div></div></div>`;
+  div.innerHTML = `<div class="message-avatar">🦦</div><div class="message-body"><div class="message-sender">nanobot</div><div class="message-content"><div class="thinking-dots"><span></span><span></span><span></span></div></div></div>`;
   container.appendChild(div);
   container.scrollTop = container.scrollHeight;
   return id;
@@ -1275,7 +1310,7 @@ function appendProgressBlock() {
   const div = document.createElement("div");
   div.className = "message bot exec-progress-wrap";
   div.id = id;
-  div.innerHTML = `<div class="message-avatar">🌀</div>
+  div.innerHTML = `<div class="message-avatar">🦦</div>
     <div class="message-body"><div class="message-sender">nanobot</div>
       <details class="exec-details" open>
         <summary class="exec-summary"><span class="exec-summary-icon">⏳</span> <span class="exec-summary-text">${t("chat.executing") || "执行中…"}</span></summary>
@@ -1517,6 +1552,31 @@ function fillConfigForm(cfg) {
   };
   maskKeys(cfgForJson);
   document.getElementById("cfg-json-raw").value = JSON.stringify(cfgForJson, null, 2);
+
+  _loadGoldenReplayToggle();
+}
+
+async function _loadGoldenReplayToggle() {
+  try {
+    const cfg = await api("/api/ie/golden_config");
+    const enabled = cfg.golden_replay_enabled !== false;
+    const el = document.getElementById("golden-replay-toggle");
+    if (el) el.checked = enabled;
+    const st = document.getElementById("golden-replay-status");
+    if (st) st.textContent = enabled ? "已启用" : "已关闭";
+  } catch (_) {}
+}
+
+async function toggleGoldenReplay(on) {
+  try {
+    await fetch("/api/ie/golden_config", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ golden_replay_enabled: on }),
+    });
+    const st = document.getElementById("golden-replay-status");
+    if (st) st.textContent = on ? "已启用" : "已关闭";
+  } catch (e) { toast("保存失败: " + e.message, "error"); }
 }
 
 // ── Search API Usage ────────────────────────────────────────────────────
@@ -2980,6 +3040,14 @@ async function openExecutionRadarDetail() {
       <div class="er-card"><div class="er-card-label">${t("er.avgRemovedSteps")}</div><div class="er-card-value" id="er-avg-removed">--</div><div class="er-card-sub" id="er-candidates-count">--</div></div>
     </div>
 
+    <div class="er-golden-kpi-row" id="er-golden-kpi-row">
+      <div class="er-golden-card"><div class="er-card-label">黄金回放占比</div><div class="er-card-value" id="er-golden-replay-rate">--</div></div>
+      <div class="er-golden-card"><div class="er-card-label">候选回放占比</div><div class="er-card-value" id="er-golden-candidate-rate">--</div></div>
+      <div class="er-golden-card"><div class="er-card-label">平均 LLM 次数</div><div class="er-card-value" id="er-avg-llm">--</div></div>
+      <div class="er-golden-card"><div class="er-card-label">平均尝试次数</div><div class="er-card-value" id="er-avg-attempts-count">--</div></div>
+      <div class="er-golden-card"><div class="er-card-label">平均剪枝步数</div><div class="er-card-value" id="er-avg-removed-golden">--</div></div>
+    </div>
+
     <div id="er-report-text" style="display:none;margin-bottom:18px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary);font-size:13px;line-height:1.6"></div>
 
     <div class="app-detail-section" style="margin-bottom:18px">
@@ -3058,11 +3126,24 @@ function _getErDate() {
 async function _refreshAllErPanels() {
   const d = _getErDate();
   await loadErSummary(d);
+  await loadErGoldenStats();
   const activeW = document.querySelector(".er-window-btn.active");
   await loadErTrends(activeW ? parseInt(activeW.dataset.w) : 7);
   await loadErTopTools(d);
   await loadErTaskDetail(d);
   await loadErCandidates(d);
+}
+
+async function loadErGoldenStats() {
+  try {
+    const d = await api("/api/ie/golden_stats");
+    const _v = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    _v("er-golden-replay-rate", (d.golden_replay_rate || 0) + "%");
+    _v("er-golden-candidate-rate", (d.golden_candidate_rate || 0) + "%");
+    _v("er-avg-llm", d.avg_llm_attempts != null ? d.avg_llm_attempts : "--");
+    _v("er-avg-attempts-count", d.avg_attempts_count != null ? d.avg_attempts_count : "--");
+    _v("er-avg-removed-golden", d.avg_removed_steps != null ? d.avg_removed_steps : "--");
+  } catch (e) { console.warn("er golden stats", e); }
 }
 
 function switchErDate(dateStr) {

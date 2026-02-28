@@ -16,12 +16,34 @@ log = logging.getLogger("myxai")
 
 
 @dataclass
+class ExecMeta:
+    """Execution metadata returned alongside plan output."""
+    final_output: str = ""
+    tool_calls: int = 0
+    duration_ms: int = 0
+    errors: list[str] = field(default_factory=list)
+
+
+@dataclass
 class PlanResult:
     success: bool = False
     steps_executed: int = 0
     failed_at: int | None = None
     results: list[dict] = field(default_factory=list)
     final_summary: str = ""
+    total_duration_ms: int = 0
+
+    def to_exec_meta(self) -> ExecMeta:
+        return ExecMeta(
+            final_output=self.final_summary,
+            tool_calls=self.steps_executed,
+            duration_ms=self.total_duration_ms,
+            errors=[
+                r.get("result_preview", "")
+                for r in self.results
+                if not r.get("ok")
+            ],
+        )
 
 
 async def run_plan(
@@ -40,6 +62,7 @@ async def run_plan(
     on_progress : optional callback for streaming progress
     """
     result = PlanResult()
+    _plan_start = time.time()
 
     for i, step in enumerate(plan_steps):
         tool_name = step.get("tool_name", "")
@@ -93,11 +116,13 @@ async def run_plan(
         if not ok:
             result.failed_at = i
             result.success = False
+            result.total_duration_ms = int((time.time() - _plan_start) * 1000)
             result.final_summary = f"Plan failed at step {i+1}/{len(plan_steps)}: {tool_name}"
             log.warning("[plan_runner] step %d failed: %s", i, tool_name)
             return result
 
     result.success = True
+    result.total_duration_ms = int((time.time() - _plan_start) * 1000)
     result.final_summary = f"Plan completed: {result.steps_executed}/{len(plan_steps)} steps"
     log.info("[plan_runner] plan completed successfully (%d steps)", result.steps_executed)
     return result

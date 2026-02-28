@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MyxAI Desk</title>
+  <title>Otta</title>
   <link rel="stylesheet" href="/static/style.css" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github-dark.min.css" media="print" onload="this.media='all'" />
   <script src="/static/chart.min.js"></script>
@@ -12,8 +12,8 @@
   <!-- Loading splash -->
   <div class="splash" id="splash">
     <div class="splash-inner">
-      <div class="splash-icon">🌀</div>
-      <div class="splash-text">MyxAI Desk</div>
+      <div class="splash-icon">🦦</div>
+      <div class="splash-text">Otta</div>
       <div class="splash-dots"><span></span><span></span><span></span></div>
     </div>
   </div>
@@ -22,8 +22,8 @@
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-brand">
-        <span class="brand-icon">🌀</span>
-        <span class="brand-text">MyxAI Desk</span>
+        <span class="brand-icon">🦦</span>
+        <span class="brand-text">Otta</span>
       </div>
       <button class="new-chat-btn" onclick="newChat()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
@@ -83,8 +83,8 @@
       <!-- Setup Page -->
       <div class="page" id="page-setup" style="display:none;">
         <div class="setup-container">
-          <div class="setup-icon">🌀</div>
-          <h1 data-i18n="setup.welcome">欢迎使用 MyxAI Desk</h1>
+          <div class="setup-icon">🦦</div>
+          <h1 data-i18n="setup.welcome">欢迎使用 Otta</h1>
           <div id="setup-status"></div>
           <div class="setup-steps">
             <div class="setup-step" id="step-install">
@@ -132,8 +132,8 @@
           </div>
           <div class="chat-messages" id="chat-messages">
             <div class="welcome-message">
-              <div class="welcome-icon">🌀</div>
-              <h2 data-i18n="chat.ready">MyxAI Desk 已就绪</h2>
+              <div class="welcome-icon">🦦</div>
+              <h2 data-i18n="chat.ready">Otta 已就绪</h2>
               <p data-i18n="chat.readyDesc">输入消息开始对话，我可以帮你搜索信息、编写代码、管理文件等。</p>
             </div>
           </div>
@@ -502,6 +502,19 @@
 
           <!-- ═══ Tab: Advanced ═══ -->
           <div class="settings-tab-content" data-tab="advanced">
+            <div class="settings-card">
+              <h2>⚡ 智能回放（Golden Replay）</h2>
+              <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;">
+                启用后，重复任务将优先使用历史最佳执行路径回放，减少 LLM 调用，更快更稳定。
+              </p>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <label class="toggle">
+                  <input type="checkbox" id="golden-replay-toggle" checked onchange="toggleGoldenReplay(this.checked)" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span id="golden-replay-status" style="font-size:0.85rem;color:var(--text-sub);">已启用</span>
+              </div>
+            </div>
             <div class="settings-card" id="dev-mode-settings-card">
               <h2 data-i18n="security.devCard.title">🛡️ 开发模式 — 可执行所有操作（高风险）</h2>
               <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;" data-i18n="security.devCard.desc">

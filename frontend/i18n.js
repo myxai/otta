@@ -1,5 +1,5 @@
 /**
- * i18n module for MyxAI Desk frontend
+ * i18n module for Otta frontend
  * 
  * Provides translation services for the web UI.
  */

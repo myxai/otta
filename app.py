@@ -1,4 +1,4 @@
-"""MyxAI Desk — 桌面可视化客户端.
+"""Otta — 桌面可视化客户端.
 
 This file serves as the backward-compatible entry point.  New modules live
 under ``myxai_desk/`` and are progressively taking over responsibility.
@@ -183,6 +183,9 @@ _last_usage_lock = threading.Lock()
 
 _last_turn_audit: dict[str, dict] = {}
 _last_turn_audit_lock = threading.Lock()
+
+_last_decision_meta: dict[str, dict] = {}
+_last_decision_meta_lock = threading.Lock()
 
 
 def _mcp_record(server: str, level: str, message: str):
@@ -779,18 +782,128 @@ def _patch_agent_tool_history(agent):
 
             _cap_guard = CapabilityGuard(self._cap_manager)
 
-        # ── PR-3: PlanRunner — reuse cached plan, skip LLM ──
+        # ── PR-2: Golden / Candidate replay (deterministic, no LLM) ──
         _skip_llm_loop = False
-        if _ie_result and _ie_result.decision == "reuse_plan" and _ie_result.plan_steps:
+        _plan_source: str | None = None
+        _case_key: str | None = None
+        _candidate_id: str | None = None
+        _removed_steps: int | None = None
+        _attempts_count = 0
+        _llm_attempts = 0
+        _golden_version: int | None = None
+
+        if _ie_result:
+            try:
+                from myxai_desk.core.intent_engine.config import golden_replay_enabled as _golden_on
+                if not _golden_on():
+                    raise RuntimeError("golden replay disabled by config")
+
+                from myxai_desk.core.golden_store import (
+                    GoldenStore as _GoldenStore,
+                    compute_case_key as _compute_case_key,
+                    parse_candidate_plan as _parse_candidate_plan,
+                )
+                from myxai_desk.core.intent_engine.dao import update_ie_run as _update_ie_run
+                from myxai_desk.core.intent_engine.plan_runner import run_plan as _run_plan
+
+                _sec_mode = ""
+                try:
+                    _sec_mode = _gcm().value
+                except Exception:
+                    pass
+                _case_key = _compute_case_key(
+                    msg.content,
+                    route_labels=_ie_result.route_labels,
+                    security_mode=_sec_mode,
+                )
+
+                if _ie_result.run_id:
+                    _update_ie_run(_ie_result.run_id, case_key=_case_key)
+
+                _store = _GoldenStore()
+
+                # 1) Verified golden plan — highest priority
+                _gp = _store.get_golden_plan(_case_key)
+                if _gp:
+                    _gp_steps = _parse_candidate_plan(_gp.golden_plan_json)
+                    if _gp_steps:
+                        _gp_result = await _run_plan(_gp_steps, self.tools, key, progress)
+                        _attempts_count += _gp_result.steps_executed
+                        if _gp_result.success:
+                            _store.record_golden_use(
+                                case_key=_case_key, ok=True,
+                                attempts_count=_attempts_count,
+                                duration_ms=_gp_result.total_duration_ms,
+                                run_id=_ie_result.run_id,
+                            )
+                            tools_used = [s["tool_name"] for s in _gp_result.results if s.get("tool_name")]
+                            final_content = _gp_result.final_summary
+                            _plan_source = "golden_replay"
+                            _golden_version = _gp.version
+                            _skip_llm_loop = True
+                            print(f"[agent] golden_replay: version={_gp.version}, steps={_gp_result.steps_executed}")
+                        else:
+                            _store.record_golden_use(
+                                case_key=_case_key, ok=False,
+                                attempts_count=_attempts_count,
+                                run_id=_ie_result.run_id,
+                            )
+                            print(f"[agent] golden_replay FAILED at step {_gp_result.failed_at}, falling through")
+
+                # 2) Candidate replay — verify then promote
+                if not _skip_llm_loop:
+                    _cand = _store.get_best_candidate(_case_key)
+                    if _cand:
+                        _candidate_id = _cand.candidate_id
+                        _removed_steps = _cand.removed_steps
+                        if _ie_result.run_id:
+                            _update_ie_run(
+                                _ie_result.run_id,
+                                candidate_id=_candidate_id,
+                                removed_steps=_removed_steps,
+                            )
+                        _cand_steps = _parse_candidate_plan(_cand.candidate_plan_json)
+                        if _cand_steps:
+                            _cand_result = await _run_plan(_cand_steps, self.tools, key, progress)
+                            _attempts_count += _cand_result.steps_executed
+                            _store.mark_candidate_used(_cand.candidate_id, ok=_cand_result.success)
+
+                            if _cand_result.success:
+                                _gp_new = _store.promote_candidate_to_golden(
+                                    case_key=_case_key,
+                                    candidate_id=_cand.candidate_id,
+                                    golden_plan_json=_cand.candidate_plan_json,
+                                )
+                                _store.record_golden_use(
+                                    case_key=_case_key, ok=True,
+                                    attempts_count=_attempts_count,
+                                    duration_ms=_cand_result.total_duration_ms,
+                                    run_id=_ie_result.run_id,
+                                )
+                                tools_used = [s["tool_name"] for s in _cand_result.results if s.get("tool_name")]
+                                final_content = _cand_result.final_summary
+                                _plan_source = "golden_candidate"
+                                _golden_version = _gp_new.version
+                                _skip_llm_loop = True
+                                print(f"[agent] golden_candidate: promoted to v{_gp_new.version}, steps={_cand_result.steps_executed}")
+                            else:
+                                print(f"[agent] candidate {_cand.candidate_id[:8]} FAILED, falling through")
+            except Exception:
+                log.warning("[agent] golden/candidate replay skipped", exc_info=True)
+
+        # ── PlanRunner — reuse cached plan from ie_cases, skip LLM ──
+        if not _skip_llm_loop and _ie_result and _ie_result.decision == "reuse_plan" and _ie_result.plan_steps:
             try:
                 from myxai_desk.core.intent_engine.plan_runner import run_plan as _run_plan
                 _plan_result = await _run_plan(
                     _ie_result.plan_steps, self.tools, key, progress,
                 )
+                _attempts_count += _plan_result.steps_executed
                 tools_used = [
                     s["tool_name"] for s in _plan_result.results if s.get("tool_name")
                 ]
                 final_content = _plan_result.final_summary
+                _plan_source = "reuse_plan"
                 _skip_llm_loop = True
                 print(f"[agent] plan_runner: success={_plan_result.success}, steps={_plan_result.steps_executed}")
             except Exception:
@@ -799,6 +912,7 @@ def _patch_agent_tool_history(agent):
         try:
             while not _skip_llm_loop and iteration < self.max_iterations:
                 iteration += 1
+                _llm_attempts += 1
                 response = await self.provider.chat(
                     messages=messages,
                     tools=tool_defs,
@@ -839,6 +953,7 @@ def _patch_agent_tool_history(agent):
                     )
                     for tc in response.tool_calls:
                         tools_used.append(tc.name)
+                        _attempts_count += 1
                         if "search" in tc.name.lower():
                             _turn_search += 1
                         print(f"[agent] tool: {tc.name}({str(tc.arguments)[:100]})")
@@ -1149,6 +1264,25 @@ def _patch_agent_tool_history(agent):
                     _ie_outcome = "unknown"
                 _ie_result.write_outcome(_ie_outcome)
 
+                # PR-2: write back plan_source and observability fields
+                if _ie_result.run_id:
+                    try:
+                        from myxai_desk.core.intent_engine.dao import update_ie_run as _update_ie_run
+                        _final_source = _plan_source or ("llm_free" if tools_used else None)
+                        _run_fields: dict = {}
+                        if _final_source:
+                            _run_fields["plan_source"] = _final_source
+                        if _attempts_count:
+                            _run_fields["attempts_count"] = _attempts_count
+                        if _llm_attempts:
+                            _run_fields["llm_attempts"] = _llm_attempts
+                        if _golden_version is not None:
+                            _run_fields["golden_version"] = _golden_version
+                        if _run_fields:
+                            _update_ie_run(_ie_result.run_id, **_run_fields)
+                    except Exception:
+                        log.debug("[agent] ie_run field writeback failed", exc_info=True)
+
                 from myxai_desk.core.intent_engine.config import case_retrieval_enabled as _ie_case_on
                 if _ie_case_on() and tools_used:
                     from myxai_desk.core.intent_engine.case_store import save_case
@@ -1184,6 +1318,25 @@ def _patch_agent_tool_history(agent):
                 "output": _turn_output,
                 "search": _turn_search,
             }
+
+        # PR-2: decision_meta for frontend badge
+        if _plan_source or _case_key:
+            _dm: dict = {}
+            if _plan_source:
+                _dm["plan_source"] = _plan_source
+            if _case_key:
+                _dm["case_key"] = _case_key
+            if _candidate_id:
+                _dm["candidate_id"] = _candidate_id
+            if _golden_version is not None:
+                _dm["golden_version"] = _golden_version
+            if _removed_steps is not None and _removed_steps > 0:
+                _dm["removed_steps"] = _removed_steps
+            _dm["attempts_count"] = _attempts_count
+            _dm["llm_attempts"] = _llm_attempts
+            _dm["promoted"] = bool(_plan_source == "golden_candidate")
+            with _last_decision_meta_lock:
+                _last_decision_meta[key] = _dm
 
         # NEW: Also write to ContextStore (gradual migration)
         try:
@@ -2342,6 +2495,8 @@ def api_chat():
                 _usage_data = _last_usage.pop(session_id, {})
             with _last_turn_audit_lock:
                 _audit_data = _last_turn_audit.pop(session_id, None)
+            with _last_decision_meta_lock:
+                _dm_data = _last_decision_meta.pop(session_id, None)
             _done_payload = {"type": "done", "content": response or "", "request_id": request_id}
             if _usage_data:
                 _done_payload["usage"] = _usage_data
@@ -2351,6 +2506,8 @@ def api_chat():
                     "events": _audit_data["events"],
                     "hash": _audit_data["audit_hash"][:16],
                 }
+            if _dm_data:
+                _done_payload["decision_meta"] = _dm_data
             q.put(json.dumps(_done_payload, ensure_ascii=False))
         except Exception as exc:
             log.exception("[chat] streaming message processing failed")
@@ -2385,6 +2542,90 @@ def api_new_chat():
     global _session_counter
     _session_counter += 1
     return jsonify({"success": True, "session_id": f"desktop:{_session_epoch}_{_session_counter}"})
+
+
+@flask_app.route("/api/ie/last_run")
+def api_ie_last_run():
+    """Return decision_meta from the most recent ie_run (for debugging / page refresh)."""
+    try:
+        from myxai_desk.core.intent_engine.dao import get_runs
+        rows = get_runs(limit=1)
+        if not rows:
+            return jsonify({})
+        r = rows[0]
+        return jsonify({
+            "run_id": r.get("id"),
+            "case_key": r.get("case_key"),
+            "plan_source": r.get("plan_source"),
+            "candidate_id": r.get("candidate_id"),
+            "golden_version": r.get("golden_version"),
+            "removed_steps": r.get("removed_steps"),
+            "attempts_count": r.get("attempts_count"),
+            "llm_attempts": r.get("llm_attempts"),
+            "outcome": r.get("outcome"),
+            "route_label": r.get("route_label"),
+            "created_at": r.get("created_at"),
+        })
+    except Exception:
+        return jsonify({})
+
+
+@flask_app.route("/api/ie/golden_config", methods=["GET", "POST"])
+def api_ie_golden_config():
+    """Read or update golden replay config."""
+    try:
+        from myxai_desk.core.intent_engine import config as ie_config
+        if request.method == "POST":
+            body = request.get_json(silent=True) or {}
+            updates = {}
+            if "golden_replay_enabled" in body:
+                updates["golden_replay_enabled"] = bool(body["golden_replay_enabled"])
+            if updates:
+                ie_config.set_values(updates)
+            return jsonify({"ok": True, **ie_config.get()})
+        return jsonify(ie_config.get())
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@flask_app.route("/api/ie/golden_stats")
+def api_ie_golden_stats():
+    """Aggregate golden/candidate usage stats for radar KPI cards."""
+    try:
+        from myxai_desk.core.storage.sqlite import execute as _sql
+        rows = _sql(
+            """SELECT
+                 COUNT(*) AS total,
+                 SUM(CASE WHEN plan_source='golden_replay' THEN 1 ELSE 0 END) AS golden_replay,
+                 SUM(CASE WHEN plan_source='golden_candidate' THEN 1 ELSE 0 END) AS golden_candidate,
+                 SUM(CASE WHEN plan_source='reuse_plan' THEN 1 ELSE 0 END) AS reuse_plan,
+                 SUM(CASE WHEN plan_source='llm_free' THEN 1 ELSE 0 END) AS llm_free,
+                 AVG(CASE WHEN llm_attempts IS NOT NULL THEN llm_attempts END) AS avg_llm_attempts,
+                 AVG(CASE WHEN attempts_count IS NOT NULL THEN attempts_count END) AS avg_attempts_count,
+                 AVG(CASE WHEN removed_steps IS NOT NULL AND removed_steps > 0 THEN removed_steps END) AS avg_removed_steps
+               FROM ie_runs
+               WHERE local_date >= date('now', '-7 days')
+                 AND plan_source IS NOT NULL""",
+            readonly=True,
+        )
+        if not rows:
+            return jsonify({})
+        r = rows[0]
+        total = r.get("total", 0) or 0
+        return jsonify({
+            "total": total,
+            "golden_replay": r.get("golden_replay", 0) or 0,
+            "golden_candidate": r.get("golden_candidate", 0) or 0,
+            "reuse_plan": r.get("reuse_plan", 0) or 0,
+            "llm_free": r.get("llm_free", 0) or 0,
+            "golden_replay_rate": round((r.get("golden_replay", 0) or 0) / total * 100, 1) if total else 0,
+            "golden_candidate_rate": round((r.get("golden_candidate", 0) or 0) / total * 100, 1) if total else 0,
+            "avg_llm_attempts": round(r.get("avg_llm_attempts", 0) or 0, 1),
+            "avg_attempts_count": round(r.get("avg_attempts_count", 0) or 0, 1),
+            "avg_removed_steps": round(r.get("avg_removed_steps", 0) or 0, 1),
+        })
+    except Exception:
+        return jsonify({})
 
 
 # ---------------------------------------------------------------------------
@@ -3183,7 +3424,7 @@ def _shutdown():
         _async_loop.call_soon_threadsafe(_async_loop.stop)
     _async_loop = None
 
-    print("[MyxAI Desk] Shutdown complete.", flush=True)
+    print("[Otta] Shutdown complete.", flush=True)
 
 
 import atexit

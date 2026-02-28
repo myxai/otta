@@ -542,14 +542,33 @@ def _dedup_candidates(candidates: list[dict]) -> list[dict]:
 
 
 def _generate_case_key(task: dict, steps: list[dict]) -> str:
-    """Deterministic key: ``sha256(tools_signature + norm_keywords)[:24]``."""
+    """Deterministic key aligned with ``golden_store.compute_case_key``.
+
+    Uses route_labels (from intent classifier) + security_mode + normalized
+    keywords so that the execution side can compute the same key at lookup time.
+    Falls back to the old tools-based key if classification is unavailable.
+    """
+    user_text = task.get("user_text", "") or ""
+
+    try:
+        from myxai_desk.core.golden_store import compute_case_key
+        from myxai_desk.core.intent_engine.categories import classify
+
+        route_labels = classify(user_text)
+        sec_mode = ""
+        try:
+            from myxai_desk.core.policy.modes import get_current_mode
+            sec_mode = get_current_mode().value
+        except Exception:
+            pass
+        return compute_case_key(user_text, route_labels, sec_mode)
+    except Exception:
+        pass
+
     tool_names = sorted({s.get("tool_name", "") for s in steps if s.get("tool_name")})
     tools_sig = "|".join(tool_names)
-
-    user_text = task.get("user_text", "") or ""
     tokens = re.findall(r"[\w\u4e00-\u9fff]+", user_text.lower())
     norm_kw = "|".join(sorted(set(tokens)))
-
     raw = f"{tools_sig}::{norm_kw}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:24]
 
