@@ -292,14 +292,13 @@ const FALLBACK_I18N = {
     "er.config":"设置","er.scheduleTime":"每日扫描时间","er.saveConfig":"保存设置","er.configSaved":"设置已保存","er.configFail":"保存失败",
     "er.avgRemovedSteps":"可省LLM调用","er.candidatesUnit":"条候选",
     "er.goldenCandidates":"候选黄金路径","er.qualityScore":"质量分","er.removedSteps":"可省LLM","er.candidateLen":"候选步数","er.candidateStatus":"状态",
-    "ie.title":"意图引擎","ie.switches":"开关配置","ie.thresholds":"阈值调节","ie.trainingTime":"训练时间",
+    "ie.title":"意图引擎","ie.switches":"开关配置","ie.thresholds":"阈值调节",
     "ie.routingEnabled":"意图路由",
     "ie.routeConfLow":"路由置信阈值","ie.hintsMaxLen":"Hints 最大长度",
-    "ie.trends":"最近 7 天趋势","ie.models":"模型管理","ie.recentRuns":"最近路由记录",
+    "ie.trends":"最近 7 天趋势","ie.recentRuns":"最近路由记录",
     "ie.totalRuns":"总路由次数","ie.successRate":"成功率","ie.reuseCount":"复用次数",
     "ie.avgConf":"平均置信度","ie.toolsBefore":"裁剪前工具数","ie.toolsAfter":"裁剪后工具数",
-    "ie.reuseRate":"复用率","ie.train":"训练模型","ie.eval":"评测模型",
-    "ie.noModel":"暂无训练模型","ie.currentVersion":"当前版本","ie.allVersions":"所有版本",
+    "ie.reuseRate":"复用率",
     "ie.noRuns":"暂无路由记录","ie.time":"时间","ie.text":"用户输入",
     "ie.route":"路由","ie.mode":"模式","ie.toolsTrim":"工具裁剪","ie.outcome":"结果",
     "ie.healthOverview":"全局健康概览","ie.routingHealth":"路由健康度",
@@ -550,14 +549,13 @@ const FALLBACK_I18N = {
     "er.config":"Settings","er.scheduleTime":"Daily Scan Time","er.saveConfig":"Save Settings","er.configSaved":"Settings saved","er.configFail":"Save failed",
     "er.avgRemovedSteps":"LLM Calls Saveable","er.candidatesUnit":"candidates",
     "er.goldenCandidates":"Golden Path Candidates","er.qualityScore":"Quality","er.removedSteps":"LLM Saved","er.candidateLen":"Plan Steps","er.candidateStatus":"Status",
-    "ie.title":"Intent Engine","ie.switches":"Switches","ie.thresholds":"Thresholds","ie.trainingTime":"Training Time",
+    "ie.title":"Intent Engine","ie.switches":"Switches","ie.thresholds":"Thresholds",
     "ie.routingEnabled":"Intent Routing",
     "ie.routeConfLow":"Route Confidence Threshold","ie.hintsMaxLen":"Hints Max Length",
-    "ie.trends":"Last 7 Days Trend","ie.models":"Model Management","ie.recentRuns":"Recent Routing Logs",
+    "ie.trends":"Last 7 Days Trend","ie.recentRuns":"Recent Routing Logs",
     "ie.totalRuns":"Total Routes","ie.successRate":"Success Rate","ie.reuseCount":"Reuse Count",
     "ie.avgConf":"Avg Confidence","ie.toolsBefore":"Tools Before","ie.toolsAfter":"Tools After",
-    "ie.reuseRate":"Reuse Rate","ie.train":"Train Model","ie.eval":"Evaluate Model",
-    "ie.noModel":"No trained model yet","ie.currentVersion":"Current Version","ie.allVersions":"All Versions",
+    "ie.reuseRate":"Reuse Rate",
     "ie.noRuns":"No routing logs yet","ie.time":"Time","ie.text":"User Input",
     "ie.route":"Route","ie.mode":"Mode","ie.toolsTrim":"Tool Trim","ie.outcome":"Outcome",
     "ie.healthOverview":"Health Overview","ie.routingHealth":"Routing Health",
@@ -3641,7 +3639,7 @@ async function openIntentEngineDetail() {
       </details>
     </div>
 
-    <!-- 5. Advanced Config & Models (collapsed by default) -->
+    <!-- 5. Advanced Config (collapsed by default) -->
     <div class="app-detail-section">
       <details id="ie-config-panel">
         <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--subtext0)">Advanced</summary>
@@ -3652,22 +3650,7 @@ async function openIntentEngineDetail() {
               <input type="number" id="ie-conf-low" value="${cfg.route_conf_low || 0.4}" step="0.05" min="0" max="1"
                      onchange="updateIeConfigAdvanced('route_conf_low', parseFloat(this.value))" class="form-input">
             </div>
-            <div class="form-group">
-              <label>${t("ie.trainingTime")}</label>
-              <input type="time" id="ie-training-time" value="${_escAttr(cfg.schedule_time || '03:30')}" class="form-input" />
-            </div>
           </div>
-          <div class="digest-actions" style="margin-bottom:16px">
-            <button class="btn btn-primary" onclick="saveIeConfig()">${t("settings.save")}</button>
-          </div>
-          <h4>🤖 ${t("ie.models")}</h4>
-          <div id="ie-model-info" style="margin-bottom:12px;"></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn btn-primary" id="ie-train-btn" onclick="ieRunTrain()">🏋️ ${t("ie.train")}</button>
-            <button class="btn" id="ie-eval-btn" onclick="ieRunEval()">📝 ${t("ie.eval")}</button>
-          </div>
-          <div id="ie-train-status" style="margin-top:8px;"></div>
-          <div id="ie-eval-results" style="margin-top:12px;"></div>
         </div>
       </details>
     </div>
@@ -3689,7 +3672,6 @@ async function _ieRefreshAll() {
     _ieLoadTrends(),
     _ieLoadDistribution(),
     _ieLoadRuns(),
-    _ieLoadModels(),
   ]);
 }
 
@@ -3705,14 +3687,6 @@ async function updateIeConfigAdvanced(key, value) {
     await api("/api/apps/intent_engine/config", "POST", {[key]: value});
     toast(`${key} → ${value}`, "success");
   } catch(e) { toast("Config update failed: " + e.message, "error"); }
-}
-
-async function saveIeConfig() {
-  const trainingTime = document.getElementById("ie-training-time")?.value || "03:30";
-  try {
-    await api("/api/apps/intent_engine/config", "POST", {schedule_time: trainingTime});
-    toast(t("settings.saved"), "success");
-  } catch(e) { toast("Config save failed: " + e.message, "error"); }
 }
 
 // ── 1. Health Metrics ────────────────────────────────────────────
@@ -4029,105 +4003,6 @@ function _ieOutcomeBadge(outcome) {
 
 // ── 5. Models ────────────────────────────────────────────────────
 
-async function _ieLoadModels() {
-  const el = document.getElementById("ie-model-info");
-  if (!el) return;
-  try {
-    const d = await api("/api/apps/intent_engine/models");
-    const versions = d.versions || [];
-    if (!versions.length) {
-      el.innerHTML = `<p style="color:var(--text-secondary)">${t("ie.noModel")}</p>`;
-      return;
-    }
-    const current = versions[versions.length - 1];
-    el.innerHTML = `
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
-        <span><strong>${t("ie.currentVersion")}:</strong> v${current.version}</span>
-        <span><strong>Precision:</strong> ${(current.train_precision * 100).toFixed(1)}%</span>
-        <span><strong>Recall:</strong> ${(current.train_recall * 100).toFixed(1)}%</span>
-        <span><strong>Labels:</strong> ${current.n_labels}</span>
-        <span style="color:var(--text-secondary)">${current.created_at ? current.created_at.slice(0,16) : ""}</span>
-      </div>
-      ${versions.length > 1 ? `
-        <details style="margin-top:8px;">
-          <summary style="cursor:pointer;color:var(--text-secondary)">${t("ie.allVersions")} (${versions.length})</summary>
-          <table class="er-task-table" style="margin-top:6px;">
-            <thead><tr><th>Version</th><th>Precision</th><th>Recall</th><th>Date</th><th></th></tr></thead>
-            <tbody>${versions.map(v => `<tr>
-              <td>v${v.version}</td>
-              <td>${(v.train_precision * 100).toFixed(1)}%</td>
-              <td>${(v.train_recall * 100).toFixed(1)}%</td>
-              <td>${(v.created_at || "").slice(0,10)}</td>
-              <td><button class="btn btn-sm" onclick="ieRollback(${v.version})">↩</button></td>
-            </tr>`).join("")}</tbody>
-          </table>
-        </details>
-      ` : ""}
-    `;
-  } catch(e) { el.innerHTML = `<p style="color:var(--text-secondary)">模型信息加载失败</p>`; }
-}
-
-async function ieRunTrain() {
-  const btn = document.getElementById("ie-train-btn");
-  const statusEl = document.getElementById("ie-train-status");
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = "⏳ 训练中...";
-  statusEl.innerHTML = '<span style="color:var(--text-secondary)">训练进行中，请稍候...</span>';
-  try {
-    await api("/api/apps/intent_engine/train", "POST");
-    for (let i = 0; i < 30; i++) {
-      await new Promise(r => setTimeout(r, 2000));
-      const st = await api("/api/apps/intent_engine/status");
-      if (!st.running) {
-        const res = st.last_result || {};
-        statusEl.innerHTML = res.status === "ok"
-          ? `<span style="color:#10b981">✅ 训练完成 (v${(res.result||{}).version || "?"})</span>`
-          : `<span style="color:#f59e0b">⚠ ${res.reason || res.error || "完成"}</span>`;
-        await _ieLoadModels();
-        break;
-      }
-    }
-  } catch(e) {
-    statusEl.innerHTML = `<span style="color:#ef4444">❌ ${e.message}</span>`;
-  }
-  btn.disabled = false;
-  btn.textContent = `🏋️ ${t("ie.train")}`;
-}
-
-async function ieRunEval() {
-  const btn = document.getElementById("ie-eval-btn");
-  const el = document.getElementById("ie-eval-results");
-  if (!btn) return;
-  btn.disabled = true;
-  btn.textContent = "⏳ 评测中...";
-  try {
-    const res = await api("/api/apps/intent_engine/eval", "POST");
-    if (res.status === "ok") {
-      el.innerHTML = `
-        <div style="background:var(--bg-surface0);border-radius:8px;padding:12px;margin-top:8px;">
-          <strong>评测结果</strong> — Accuracy: ${((res.accuracy||0)*100).toFixed(1)}%,
-          Mismatch: ${((res.route_mismatch_rate||0)*100).toFixed(1)}%,
-          Total: ${res.total || 0}
-        </div>`;
-    } else {
-      el.innerHTML = `<span style="color:#f59e0b">${res.note || res.error || "评测跳过"}</span>`;
-    }
-  } catch(e) {
-    el.innerHTML = `<span style="color:#ef4444">评测失败: ${e.message}</span>`;
-  }
-  btn.disabled = false;
-  btn.textContent = `📝 ${t("ie.eval")}`;
-}
-
-async function ieRollback(version) {
-  if (!confirm(`确认回滚到 v${version}？`)) return;
-  try {
-    await api("/api/apps/intent_engine/models/rollback", "POST", { version });
-    toast(`已回滚到 v${version}`, "success");
-    await _ieLoadModels();
-  } catch(e) { toast("回滚失败: " + e.message, "error"); }
-}
 
 // ── End Intent Engine Visualization Dashboard ─────────────────────
 

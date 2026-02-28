@@ -6,7 +6,6 @@ Prefix: ``/api/apps/intent_engine``
 from __future__ import annotations
 
 import logging
-import threading
 
 from flask import Blueprint, jsonify, request
 
@@ -14,53 +13,20 @@ log = logging.getLogger("myxai")
 
 bp = Blueprint("intent_engine", __name__, url_prefix="/api/apps/intent_engine")
 
-_run_lock = threading.Lock()
-_run_status: dict = {"running": False, "last_result": None}
-
 
 # ── Config ─────────────────────────────────────────────────────────
 
 @bp.route("/config", methods=["GET"])
 def get_config():
     from myxai_desk.core.intent_engine.config import get
-    result = get()
-    # Merge schedule_time from app registry
-    from myxai_desk.web.apps_helpers import load_apps_registry
-    registry = load_apps_registry()
-    app = registry.get("intent_engine", {})
-    config = app.get("config", {})
-    result["schedule_time"] = config.get("schedule_time", "03:30")
-    return jsonify(result)
+    return jsonify(get())
 
 
 @bp.route("/config", methods=["POST"])
 def update_config():
     updates = request.get_json(force=True) or {}
-    
-    # Split updates: schedule_time goes to app registry, others to IE config
-    schedule_time = updates.pop("schedule_time", None)
-    
-    # Update IE config (routing, golden, thresholds, etc.)
-    if updates:
-        from myxai_desk.core.intent_engine.config import set_values
-        set_values(updates)
-    
-    # Update app registry config for schedule_time
-    if schedule_time is not None:
-        from myxai_desk.web.apps_helpers import load_apps_registry, save_apps_registry
-        registry = load_apps_registry()
-        if "intent_engine" not in registry:
-            registry["intent_engine"] = {"enabled": True, "config": {}}
-        if "config" not in registry["intent_engine"]:
-            registry["intent_engine"]["config"] = {}
-        registry["intent_engine"]["config"]["schedule_time"] = schedule_time
-        save_apps_registry(registry)
-    
-    # Return merged config
-    from myxai_desk.core.intent_engine.config import get as get_ie_config
-    result = get_ie_config()
-    if schedule_time is not None:
-        result["schedule_time"] = schedule_time
+    from myxai_desk.core.intent_engine.config import set_values
+    result = set_values(updates)
     return jsonify(result)
 
 
@@ -125,89 +91,6 @@ def get_cases():
     from myxai_desk.core.intent_engine.dao import get_cases as dao_get_cases
     rows = dao_get_cases(outcome=outcome, limit=limit, offset=offset)
     return jsonify(rows)
-
-
-# ── Training ───────────────────────────────────────────────────────
-
-@bp.route("/train", methods=["POST"])
-def trigger_train():
-    if not _run_lock.acquire(blocking=False):
-        return jsonify({"error": "training already in progress"}), 409
-    _run_status["running"] = True
-    _run_status["last_result"] = None
-
-    def _do_train():
-        try:
-            from myxai_desk.core.intent_engine.trainer.dataset_builder import build_dataset
-            from myxai_desk.core.intent_engine.trainer.train_fasttext import train
-
-            ds_path, ds_stats = build_dataset()
-            if ds_path is None:
-                _run_status["last_result"] = {"status": "skip", "reason": "insufficient data", "stats": ds_stats}
-                return
-
-            result = train(ds_path)
-            _run_status["last_result"] = {"status": "ok", "result": result, "dataset": ds_stats}
-        except Exception as e:
-            _run_status["last_result"] = {"status": "error", "error": str(e)}
-            log.warning("[ie_api] training failed", exc_info=True)
-        finally:
-            _run_status["running"] = False
-            _run_lock.release()
-
-    threading.Thread(target=_do_train, daemon=True).start()
-    return jsonify({"status": "started"})
-
-
-# ── Evaluation ─────────────────────────────────────────────────────
-
-@bp.route("/eval", methods=["POST"])
-def trigger_eval():
-    try:
-        from myxai_desk.core.intent_engine.trainer.eval_runner import run_eval
-        result = run_eval()
-        return jsonify(result)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@bp.route("/eval/history", methods=["GET"])
-def eval_history():
-    limit = request.args.get("limit", 10, type=int)
-    from myxai_desk.core.intent_engine.trainer.eval_runner import get_eval_history
-    return jsonify(get_eval_history(limit=limit))
-
-
-# ── Models ─────────────────────────────────────────────────────────
-
-@bp.route("/models", methods=["GET"])
-def list_models():
-    from myxai_desk.core.intent_engine.trainer.train_fasttext import list_versions, get_current_model_path
-    current = get_current_model_path()
-    return jsonify({
-        "current": str(current) if current else None,
-        "versions": list_versions(),
-    })
-
-
-@bp.route("/models/rollback", methods=["POST"])
-def rollback_model():
-    data = request.get_json(force=True) or {}
-    version = data.get("version")
-    if not version:
-        return jsonify({"error": "version required"}), 400
-    from myxai_desk.core.intent_engine.trainer.train_fasttext import rollback
-    result = rollback(int(version))
-    if result is None:
-        return jsonify({"error": f"version {version} not found"}), 404
-    return jsonify(result)
-
-
-# ── Status ─────────────────────────────────────────────────────────
-
-@bp.route("/status", methods=["GET"])
-def run_status():
-    return jsonify(_run_status)
 
 
 # ── Data Repair ────────────────────────────────────────────────────

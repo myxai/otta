@@ -160,7 +160,6 @@ DEFAULT_EXECUTION_RADAR_CONFIG = {
 
 DEFAULT_INTENT_ENGINE_CONFIG = {
     "routing_enabled": True,
-    "schedule_time": "03:30",
 }
 
 DEFAULT_STRATEGY_HUB_CONFIG: dict = {}

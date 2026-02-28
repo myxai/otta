@@ -3256,48 +3256,16 @@ def _exec_execution_radar(task: "_TaskDescriptor", slot: "_DueSlot", trigger: st
     run_execution_radar(task, slot, trigger)
 
 
-def _load_intent_engine_tasks() -> list["_TaskDescriptor"]:
-    """Build a TaskDescriptor for daily intent engine training."""
-    registry = load_apps_registry()
-    app = registry.get("intent_engine", {})
-    if not app.get("enabled"):
-        return []
-    config = app.get("config", {})
-    schedule_time = config.get("schedule_time", "03:30")
-    hh, mm = schedule_time.split(":")[:2]
-    cron_expr = f"{mm} {hh} * * *"
-    return [
-        _TaskDescriptor(
-            task_id="daily_ie_training",
-            schedule={"enabled": True, "mode": "daily", "time": schedule_time},
-            cron_expr=cron_expr,
-            created_at=app.get("installed_at", "2026-01-01T00:00:00"),
-            last_success_at=app.get("last_run"),
-            catchup_policy="LATEST_ONLY",
-            catchup_window_hours=48,
-            max_catchup_runs=1,
-            extra={"kind": "intent_engine"},
-        )
-    ]
-
-
-def _exec_intent_engine(task: "_TaskDescriptor", slot: "_DueSlot", trigger: str) -> None:
-    from myxai_desk.core.intent_engine.trainer.scheduler_job import run_ie_training
-    run_ie_training(task, slot, trigger)
-
-
 def _init_scheduler_service():
     """Register task loaders and executors with the global SchedulerService."""
     _scheduler_svc.register_task_loader(_load_official_tasks)
     _scheduler_svc.register_task_loader(_load_custom_tasks)
     _scheduler_svc.register_task_loader(_load_execution_radar_tasks)
-    _scheduler_svc.register_task_loader(_load_intent_engine_tasks)
     _scheduler_svc.register_executor("daily_digest", _exec_daily_digest)
     _scheduler_svc.register_executor("email_summary", _exec_email_summary)
     _scheduler_svc.register_executor("custom", _exec_custom_app)
     _scheduler_svc.register_executor("custom_summary", _exec_custom_summary)
     _scheduler_svc.register_executor("execution_radar", _exec_execution_radar)
-    _scheduler_svc.register_executor("intent_engine", _exec_intent_engine)
 
 
 def _start_app_scheduler():
