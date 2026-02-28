@@ -45,26 +45,68 @@ except ImportError:
 
 def _make_tray_icon(size: int = 64) -> "Image.Image":
     """Draw a 🦦-style otter icon programmatically."""
+    # Transparent background
     img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    cx, cy = size / 2, size / 2
-    draw.ellipse([1, 1, size - 1, size - 1], fill=(30, 30, 46, 255))
-
-    steps = 200
-    max_r = size * 0.38
-    for i in range(steps):
-        t = i / steps
-        angle = t * 4 * math.pi
-        r = max_r * t
-        x = cx + r * math.cos(angle)
-        y = cy + r * math.sin(angle)
-        dot = max(1.5, 3.0 * (1 - t * 0.5))
-        alpha = int(255 * (0.5 + 0.5 * t))
-        color = (137, 180, 250, alpha)
-        draw.ellipse([x - dot, y - dot, x + dot, y + dot], fill=color)
-
-    draw.ellipse([cx - 3, cy - 3, cx + 3, cy + 3], fill=(137, 180, 250, 255))
+    # Try to render 🦦 emoji using system fonts
+    try:
+        # Try common emoji font paths (platform-specific)
+        import platform
+        system = platform.system()
+        
+        font_candidates = []
+        if system == "Windows":
+            font_candidates = [
+                "C:/Windows/Fonts/seguiemj.ttf",  # Segoe UI Emoji
+                "C:/Windows/Fonts/seguisym.ttf",
+            ]
+        elif system == "Darwin":  # macOS
+            font_candidates = [
+                "/System/Library/Fonts/Apple Color Emoji.ttc",
+            ]
+        else:  # Linux
+            font_candidates = [
+                "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+                "/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf",
+            ]
+        
+        font_obj = None
+        for font_path in font_candidates:
+            try:
+                # Use 80% of icon size for larger emoji
+                font_obj = ImageFont.truetype(font_path, int(size * 0.8))
+                break
+            except Exception:
+                continue
+        
+        if font_obj:
+            # Draw emoji centered and larger
+            emoji = "🦦"
+            bbox = draw.textbbox((0, 0), emoji, font=font_obj)
+            text_width = bbox[2] - bbox[0]
+            text_height = bbox[3] - bbox[1]
+            x = (size - text_width) / 2 - bbox[0]
+            y = (size - text_height) / 2 - bbox[1]
+            draw.text((x, y), emoji, font=font_obj, embedded_color=True)
+            return img
+    except Exception:
+        pass
+    
+    # Fallback: draw a larger simple otter-like shape (no background)
+    # Use more of the canvas (0.1 to 0.9 instead of 0.2 to 0.8)
+    # Brown body
+    draw.ellipse([size*0.1, size*0.35, size*0.9, size*0.95], fill=(139, 90, 43, 255))
+    # Head (larger)
+    draw.ellipse([size*0.15, size*0.05, size*0.85, size*0.60], fill=(160, 100, 50, 255))
+    # Eyes (bigger)
+    draw.ellipse([size*0.30, size*0.25, size*0.42, size*0.37], fill=(255, 255, 255, 255))
+    draw.ellipse([size*0.58, size*0.25, size*0.70, size*0.37], fill=(255, 255, 255, 255))
+    draw.ellipse([size*0.34, size*0.28, size*0.38, size*0.34], fill=(0, 0, 0, 255))
+    draw.ellipse([size*0.62, size*0.28, size*0.66, size*0.34], fill=(0, 0, 0, 255))
+    # Nose (bigger)
+    draw.ellipse([size*0.43, size*0.40, size*0.57, size*0.48], fill=(80, 50, 30, 255))
+    
     return img
 
 
