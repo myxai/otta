@@ -93,6 +93,39 @@ Otta is designed to fix that.
 
 ---
 
+## 🧠 Smart Core
+
+Four core engines working in concert — Otta gets smarter the more you use it.
+
+### 🎯 Intent Engine
+
+- Automatically classifies user intent and selects the optimal toolset
+- Reuses execution plans from historical cases to reduce LLM calls
+- Route confidence visible in real time
+
+### 🧠 Strategy Hub
+
+- Crystallizes high-frequency tasks into Golden templates and instances
+- Structured replay: identical tasks completed at zero LLM cost
+- Automatic candidate extraction and template lifecycle management
+
+### 💎 Execution Prism
+
+- Daily execution quality analytics: success rates, step counts, tool usage
+- Error trend tracking, automatic bottleneck detection
+- Golden candidate discovery that feeds back into strategy accumulation
+
+### 🌲 Capability Forest
+
+- Recommends new capabilities based on your daily tasks (MCP / Skills / built-in)
+- Trial mechanism: 7-day observation window, auto-promotion on passing criteria
+- Auto-prune after 30 days of inactivity — keeps the routing space clean
+- Never auto-installs; activation requires confirmation; fully explainable
+
+> Grow naturally from 2–3 capabilities to 20–30, with full control throughout.
+
+---
+
 ## 🛡️ Use with Confidence
 
 Security by design.
@@ -112,10 +145,12 @@ You stay in control.
 | Layer | Technology |
 |---|---|
 | Desktop | pywebview |
-| Backend | Flask |
+| Backend | Flask + SQLite |
 | Frontend | Vanilla HTML/CSS/JS |
 | AI Engine | nanobot + litellm |
 | Search | Baidu / Brave API |
+| Tool Extension | MCP (Model Context Protocol) |
+| Security | 4-tier security modes + Policy engine + Audit chain |
 
 ---
 
@@ -147,6 +182,7 @@ Configure your LLM API key in Settings and start.
 - Deeper cost optimization
 - Open app ecosystem
 - More advanced long-term memory
+- Capability Forest → ML-based recommendation engine
 
 ---
 
