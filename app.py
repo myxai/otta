@@ -142,6 +142,7 @@ from myxai_desk.web.reports_routes import bp as reports_bp
 from myxai_desk.apps.execution_radar.api import bp as execution_radar_bp
 from myxai_desk.apps.intent_engine.api import bp as intent_engine_bp
 from myxai_desk.apps.strategy_hub.api import bp as strategy_hub_bp
+from myxai_desk.apps.cap_forest.api import bp as cap_forest_bp
 
 flask_app.register_blueprint(gateway_bp)
 flask_app.register_blueprint(scheduler_bp)
@@ -158,6 +159,7 @@ flask_app.register_blueprint(reports_bp)
 flask_app.register_blueprint(execution_radar_bp)
 flask_app.register_blueprint(intent_engine_bp)
 flask_app.register_blueprint(strategy_hub_bp)
+flask_app.register_blueprint(cap_forest_bp)
 
 # ---------------------------------------------------------------------------
 # Global state
@@ -771,6 +773,15 @@ def _patch_agent_tool_history(agent):
                 tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
         except Exception:
             tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
+
+        # ── Capability Forest: override tool routing if enabled ──
+        try:
+            from myxai_desk.apps.cap_forest.router import cap_forest_enabled, capability_router, clear_wake_once
+            if cap_forest_enabled():
+                tool_defs = capability_router(msg.content, _ie_result, all_tool_defs)
+                clear_wake_once()
+        except Exception:
+            pass
         # ── Intent Engine: inject case hints into system message ──
         if _ie_result and _ie_result.hints:
             _hint_block = f"\n\n[EXPERIENCE HINTS]\n{_ie_result.hints}"

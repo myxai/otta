@@ -12,6 +12,7 @@ log = logging.getLogger("myxai.web.apps_routes")
 
 from myxai_desk.web.apps_helpers import (
     APP_CATALOG,
+    DEFAULT_CAP_FOREST_CONFIG,
     DEFAULT_DIGEST_CONFIG,
     DEFAULT_EMAIL_CONFIG,
     DEFAULT_EXECUTION_RADAR_CONFIG,
@@ -132,6 +133,7 @@ def install(app_id):
         "execution_radar": DEFAULT_EXECUTION_RADAR_CONFIG,
         "intent_engine": DEFAULT_INTENT_ENGINE_CONFIG,
         "strategy_hub": DEFAULT_STRATEGY_HUB_CONFIG,
+        "cap_forest": DEFAULT_CAP_FOREST_CONFIG,
     }
     registry[app_id] = {
         "installed_at": datetime.now(timezone.utc).isoformat(),

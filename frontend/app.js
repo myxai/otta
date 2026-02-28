@@ -79,6 +79,7 @@ const FALLBACK_I18N = {
     "chat.executing":"执行中…","chat.execDone":"执行完成","chat.steps":"步",
     "settings.title":"设置","settings.save":"保存配置",
     "settings.tabGeneral":"通用","settings.tabModel":"模型","settings.tabTools":"工具","settings.tabPrivacy":"隐私","settings.tabAdvanced":"高级",
+    "settings.smartCore":"智能核心","settings.smartCoreDesc":"意图理解、策略沉淀、执行分析与能力增长——四大核心引擎协同驱动智能决策",
     "settings.closeBehavior":"关闭窗口时","settings.closeMinimize":"最小化到托盘（后台运行）","settings.closeQuit":"完全退出",
     "settings.model":"模型设置","settings.modelName":"模型名称",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"最大工具迭代次数","settings.memoryWindow":"记忆窗口大小",
@@ -336,6 +337,7 @@ const FALLBACK_I18N = {
     "chat.executing":"Executing…","chat.execDone":"Done","chat.steps":"steps",
     "settings.title":"Settings","settings.save":"Save",
     "settings.tabGeneral":"General","settings.tabModel":"Model","settings.tabTools":"Tools","settings.tabPrivacy":"Privacy","settings.tabAdvanced":"Advanced",
+    "settings.smartCore":"Smart Core","settings.smartCoreDesc":"Intent understanding, strategy accumulation, execution analytics & capability growth — four core engines powering intelligent decisions",
     "settings.closeBehavior":"On Window Close","settings.closeMinimize":"Minimize to tray (run in background)","settings.closeQuit":"Quit completely",
     "settings.model":"Model Settings","settings.modelName":"Model Name",
     "settings.maxTokens":"Max Tokens","settings.maxIter":"Max Tool Iterations","settings.memoryWindow":"Memory Window Size",
@@ -2929,7 +2931,7 @@ function renderPermTags(permissions) {
   ).join("")}${permissions.length > 6 ? `<span class="perm-tag">+${permissions.length - 6}</span>` : ""}</div>`;
 }
 
-const _ADVANCED_SETTINGS_APPS = new Set(["intent_engine", "strategy_hub", "execution_radar"]);
+const _ADVANCED_SETTINGS_APPS = new Set(["intent_engine", "strategy_hub", "execution_radar", "cap_forest"]);
 let _currentAppDetailId = null;
 
 function goBackFromAppDetail() {
@@ -3070,6 +3072,7 @@ async function openAppDetail(appId) {
   if (appId === "execution_radar") { await openExecutionRadarDetail(); return; }
   if (appId === "intent_engine") { await openIntentEngineDetail(); return; }
   if (appId === "strategy_hub") { await openStrategyHubDetail(); return; }
+  if (appId === "cap_forest") { await openCapForestDetail(); return; }
   if (appId.startsWith("capp_")) { await openCustomAppDetail(appId); return; }
   toast("This app has no configuration page yet.", "info");
 }
@@ -4366,6 +4369,211 @@ async function _shDeleteCandidate(candidateId) {
 }
 
 // ── End Strategy Hub ──────────────────────────────────────────────────
+
+// ── Capability Forest Detail Page ─────────────────────────────────────
+
+async function openCapForestDetail() {
+  document.getElementById("app-detail-title").textContent = `🌲 ${t("cf.title")}`;
+  switchPage("app-detail");
+  const container = document.getElementById("app-detail-content");
+  container.innerHTML = `<div class="app-detail-loading">${t("cf.loading")}</div>`;
+
+  let data;
+  try {
+    data = await api("/api/apps/cap_forest/overview");
+  } catch (e) {
+    container.innerHTML = `<div class="app-detail-loading">${t("cf.loadFailed")}: ${e.message}</div>`;
+    return;
+  }
+
+  const kpi = data.kpi || {};
+  const active = data.active || [];
+  const trial = data.trial || [];
+  const candidate = data.candidate || [];
+  const dormant = data.dormant || [];
+
+  container.innerHTML = `
+    <!-- KPI Cards -->
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <span style="font-weight:600;font-size:15px">${t("cf.overview")}</span>
+        <button class="btn btn-xs" onclick="cfRunPrune()" title="${t("cf.pruneDesc")}" style="margin-left:auto">${t("cf.prune")}</button>
+      </div>
+      <div class="er-golden-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">
+        <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiActive")}</div><div class="er-card-value">${kpi.active_count || 0}</div></div>
+        <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiTrial")}</div><div class="er-card-value">${kpi.trial_count || 0}</div></div>
+        <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiDormant")}</div><div class="er-card-value">${kpi.dormant_count || 0}</div></div>
+        <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiUse30d")}</div><div class="er-card-value">${kpi.total_use_30d || 0}</div></div>
+        <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiSuccess30d")}</div><div class="er-card-value">${kpi.success_rate_30d || 0}%</div></div>
+      </div>
+    </div>
+
+    <!-- Evergreen (Active) -->
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <h3 style="margin-bottom:10px">🌿 ${t("cf.evergreen")}</h3>
+      <div id="cf-active-list">${_cfRenderCapTable(active, "active")}</div>
+    </div>
+
+    <!-- Sprout (Trial) -->
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <h3 style="margin-bottom:10px">🌱 ${t("cf.sprout")}</h3>
+      <div id="cf-trial-list">${_cfRenderCapTable(trial, "trial")}</div>
+    </div>
+
+    <!-- Seed (Recommendations) -->
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <h3 style="margin-bottom:10px">🫘 ${t("cf.seed")}</h3>
+      <div id="cf-reco-list">${_cfRenderCandidates(candidate)}</div>
+    </div>
+
+    <!-- Dormant -->
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:15px">💤 ${t("cf.dormant")} (${dormant.length})</summary>
+        <div id="cf-dormant-list" style="margin-top:10px">${_cfRenderCapTable(dormant, "dormant")}</div>
+      </details>
+    </div>
+
+    <!-- Events -->
+    <div class="app-detail-section" style="margin-bottom:18px">
+      <details>
+        <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--subtext0)">${t("cf.events")}</summary>
+        <div id="cf-events" style="margin-top:10px"><div class="er-table-placeholder">${t("cf.loading")}</div></div>
+      </details>
+    </div>
+  `;
+
+  _cfLoadEvents();
+}
+
+function _cfRenderCapTable(caps, mode) {
+  if (!caps || caps.length === 0) {
+    const msgKey = mode === "active" ? "cf.noActive" : mode === "trial" ? "cf.noTrial" : "cf.noDormant";
+    return `<div class="er-table-placeholder" style="padding:16px;color:var(--subtext0);font-size:13px">${t(msgKey)}</div>`;
+  }
+  const rows = caps.map(c => {
+    const useCount = c.use_count_30d || 0;
+    const successCount = c.success_count_30d || 0;
+    const successRate = useCount > 0 ? Math.round(successCount / useCount * 100) : 0;
+    const lastUsed = c.last_used_at ? c.last_used_at.slice(0, 10) : "--";
+    const score = (c.score || 0).toFixed(1);
+    const typeBadge = `<span class="cf-type-badge cf-type-${c.cap_type || 'core'}">${c.cap_type || 'core'}</span>`;
+
+    let actions = "";
+    if (mode === "active") {
+      actions = `<button class="btn btn-xs btn-danger" onclick="cfDisableCap('${c.cap_id}')">${t("cf.disable")}</button>`;
+    } else if (mode === "trial") {
+      actions = `<button class="btn btn-xs btn-primary" onclick="cfPromoteCap('${c.cap_id}')">${t("cf.promote")}</button>
+                 <button class="btn btn-xs btn-danger" onclick="cfDisableCap('${c.cap_id}')">${t("cf.disable")}</button>`;
+    } else if (mode === "dormant") {
+      actions = `<button class="btn btn-xs btn-primary" onclick="cfEnableCap('${c.cap_id}','active')">${t("cf.wake")}</button>
+                 <button class="btn btn-xs" onclick="cfEnableCap('${c.cap_id}','trial')">${t("cf.enableTrial")}</button>`;
+    }
+
+    return `<tr>
+      <td style="font-weight:500">${c.name || c.cap_id} ${typeBadge}</td>
+      <td>${useCount}</td>
+      <td>${successRate}%</td>
+      <td>${lastUsed}</td>
+      <td>${score}</td>
+      <td>${actions}</td>
+    </tr>`;
+  }).join("");
+
+  return `<table class="er-table" style="width:100%;font-size:13px">
+    <thead><tr>
+      <th>${t("cf.colName")}</th>
+      <th>${t("cf.colUseCount")}</th>
+      <th>${t("cf.colSuccessRate")}</th>
+      <th>${t("cf.colLastUsed")}</th>
+      <th>${t("cf.colScore")}</th>
+      <th>${t("cf.colActions")}</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function _cfRenderCandidates(caps) {
+  if (!caps || caps.length === 0) {
+    return `<div class="er-table-placeholder" style="padding:16px;color:var(--subtext0);font-size:13px">${t("cf.noReco")}</div>`;
+  }
+  return caps.map(c => {
+    let tags = "";
+    try { tags = JSON.parse(c.tags_json || "[]").join(", "); } catch(_) {}
+    let intents = "";
+    try { intents = JSON.parse(c.intents_json || "[]").join(", "); } catch(_) {}
+    const desc = c.description || "";
+    return `<div class="er-golden-card" style="padding:14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="font-weight:600">${c.name || c.cap_id}</span>
+        <span class="cf-type-badge cf-type-${c.cap_type || 'core'}">${c.cap_type || 'mcp'}</span>
+      </div>
+      <div style="font-size:12px;color:var(--subtext0);margin-bottom:8px">${desc}</div>
+      ${tags ? `<div style="font-size:11px;color:var(--subtext1);margin-bottom:6px">Tags: ${tags}</div>` : ""}
+      ${intents ? `<div style="font-size:11px;color:var(--subtext1);margin-bottom:8px">Intents: ${intents}</div>` : ""}
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-xs btn-primary" onclick="cfEnableCap('${c.cap_id}','trial')">${t("cf.enableTrial")}</button>
+        <button class="btn btn-xs" onclick="cfEnableCap('${c.cap_id}','active')">${t("cf.enable")}</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function _cfLoadEvents() {
+  const el = document.getElementById("cf-events");
+  if (!el) return;
+  try {
+    const data = await api("/api/apps/cap_forest/events?limit=50");
+    const events = data.events || [];
+    if (events.length === 0) {
+      el.innerHTML = `<div class="er-table-placeholder" style="padding:12px;color:var(--subtext0);font-size:12px">${t("cf.noEvents")}</div>`;
+      return;
+    }
+    el.innerHTML = `<table class="er-table" style="width:100%;font-size:12px">
+      <thead><tr><th>Time</th><th>Event</th><th>Capability</th><th>Details</th></tr></thead>
+      <tbody>${events.map(e => {
+        let meta = "";
+        try { const m = JSON.parse(e.meta_json || "{}"); meta = Object.entries(m).map(([k,v])=>`${k}=${v}`).join(", "); } catch(_) {}
+        return `<tr><td>${(e.ts||"").slice(0,19)}</td><td>${e.event_type}</td><td>${e.cap_id}</td><td style="color:var(--subtext0)">${meta}</td></tr>`;
+      }).join("")}</tbody>
+    </table>`;
+  } catch(e) {
+    el.innerHTML = `<div class="er-table-placeholder" style="color:var(--red)">${e.message}</div>`;
+  }
+}
+
+async function cfEnableCap(capId, mode) {
+  try {
+    await api("/api/apps/cap_forest/cap/enable", { method: "POST", body: JSON.stringify({ cap_id: capId, mode }) });
+    await openCapForestDetail();
+  } catch(e) { toast(e.message, "error"); }
+}
+
+async function cfDisableCap(capId) {
+  if (!confirm(t("cf.confirmDisable"))) return;
+  try {
+    await api("/api/apps/cap_forest/cap/disable", { method: "POST", body: JSON.stringify({ cap_id: capId }) });
+    await openCapForestDetail();
+  } catch(e) { toast(e.message, "error"); }
+}
+
+async function cfPromoteCap(capId) {
+  if (!confirm(t("cf.confirmPromote"))) return;
+  try {
+    await api("/api/apps/cap_forest/cap/promote", { method: "POST", body: JSON.stringify({ cap_id: capId }) });
+    await openCapForestDetail();
+  } catch(e) { toast(e.message, "error"); }
+}
+
+async function cfRunPrune() {
+  try {
+    const res = await api("/api/apps/cap_forest/prune/run", { method: "POST" });
+    toast(t("cf.pruned").replace("{count}", res.count || 0), "success");
+    await openCapForestDetail();
+  } catch(e) { toast(e.message, "error"); }
+}
+
+// ── End Capability Forest ─────────────────────────────────────────────
 
 async function openDigestDetail() {
   document.getElementById("app-detail-title").textContent = `🎯 ${t("digest.title")}`;

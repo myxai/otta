@@ -1197,8 +1197,39 @@ a:hover { text-decoration: underline; }
 
 .settings-apps-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
+}
+
+.settings-core-section {
+  background: var(--bg-surface0);
+  border: 1px solid var(--bg-surface1);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.settings-core-section .settings-card {
+  background: var(--bg-mantle);
+}
+.settings-core-header {
+  margin-bottom: 16px;
+}
+.settings-core-header h2 {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+.settings-core-header p {
+  font-size: 0.85rem;
+  color: var(--subtext0);
+  margin: 0;
+}
+.settings-core-section .settings-toggles-row {
+  margin-bottom: 16px;
+}
+.settings-core-section .settings-apps-row {
+  margin-bottom: 0;
 }
 
 @media (max-width: 1200px) {
@@ -4372,4 +4403,28 @@ a:hover { text-decoration: underline; }
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 13px;
+}
+
+/* ── Capability Forest ─────────────────────────────────────────── */
+.cf-type-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.cf-type-core {
+  background: var(--bg-surface1);
+  color: var(--blue, #89b4fa);
+}
+.cf-type-mcp {
+  background: var(--bg-surface1);
+  color: var(--mauve, #cba6f7);
+}
+.cf-type-md_skill {
+  background: var(--bg-surface1);
+  color: var(--green, #a6e3a1);
 }

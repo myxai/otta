@@ -144,6 +144,18 @@ APP_CATALOG = {
         "category": "analytics",
         "min_mode": "Observer",
     },
+    "cap_forest": {
+        "id": "cap_forest",
+        "name": _t("app.cap_forest.name"),
+        "name_en": "Capability Forest",
+        "icon": "🌲",
+        "description": _t("app.cap_forest.desc"),
+        "description_en": "Auto-recommend, trial, settle and prune capabilities — grow from 2-3 to 20-30 with full control",
+        "version": "1.0.0",
+        "author": "nanobot",
+        "category": "analytics",
+        "min_mode": "Observer",
+    },
 }
 
 DEFAULT_DIGEST_CONFIG = {
@@ -163,6 +175,8 @@ DEFAULT_INTENT_ENGINE_CONFIG = {
 }
 
 DEFAULT_STRATEGY_HUB_CONFIG: dict = {}
+
+DEFAULT_CAP_FOREST_CONFIG: dict = {}
 
 DEFAULT_EMAIL_CONFIG = {
     "imap_host": "",

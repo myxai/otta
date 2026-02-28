@@ -503,64 +503,73 @@
           <!-- ═══ Tab: Advanced ═══ -->
           <div class="settings-tab-content" data-tab="advanced">
 
-            <!-- Two toggles in a row -->
+            <!-- Toggles -->
             <div class="settings-toggles-row">
-            <!-- Intent Routing Toggle -->
-            <div class="settings-card">
-              <h2>🧭 意图路由（Intent Routing）</h2>
-              <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;">
-                启用后，系统将根据用户意图自动选择最合适的工具集，提升执行效率和准确性。
-              </p>
-              <div style="display:flex;align-items:center;gap:12px;">
-                <label class="toggle">
-                  <input type="checkbox" id="routing-toggle" checked onchange="toggleRouting(this.checked)" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <span id="routing-status" style="font-size:0.85rem;color:var(--text-sub);">已启用</span>
+              <div class="settings-card">
+                <h2>🧭 意图路由（Intent Routing）</h2>
+                <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;">
+                  启用后，系统将根据用户意图自动选择最合适的工具集，提升执行效率和准确性。
+                </p>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <label class="toggle">
+                    <input type="checkbox" id="routing-toggle" checked onchange="toggleRouting(this.checked)" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <span id="routing-status" style="font-size:0.85rem;color:var(--text-sub);">已启用</span>
+                </div>
+              </div>
+
+              <div class="settings-card">
+                <h2>⚡ 智能回放（Golden Replay）</h2>
+                <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;">
+                  启用后，重复任务将优先使用历史最佳执行路径回放，减少 LLM 调用，更快更稳定。
+                </p>
+                <div style="display:flex;align-items:center;gap:12px;">
+                  <label class="toggle">
+                    <input type="checkbox" id="golden-replay-toggle" checked onchange="toggleGoldenReplay(this.checked)" />
+                    <span class="toggle-slider"></span>
+                  </label>
+                  <span id="golden-replay-status" style="font-size:0.85rem;color:var(--text-sub);">已启用</span>
+                </div>
               </div>
             </div>
 
-            <!-- Golden Replay Toggle -->
-            <div class="settings-card">
-              <h2>⚡ 智能回放（Golden Replay）</h2>
-              <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;">
-                启用后，重复任务将优先使用历史最佳执行路径回放，减少 LLM 调用，更快更稳定。
-              </p>
-              <div style="display:flex;align-items:center;gap:12px;">
-                <label class="toggle">
-                  <input type="checkbox" id="golden-replay-toggle" checked onchange="toggleGoldenReplay(this.checked)" />
-                  <span class="toggle-slider"></span>
-                </label>
-                <span id="golden-replay-status" style="font-size:0.85rem;color:var(--text-sub);">已启用</span>
+            <!-- ── Smart Core Section ── -->
+            <div class="settings-core-section">
+              <div class="settings-core-header">
+                <h2 data-i18n="settings.smartCore">智能核心</h2>
+                <p data-i18n="settings.smartCoreDesc">意图理解、策略沉淀、执行分析与能力增长——四大核心引擎协同驱动智能决策</p>
               </div>
-            </div>
-            </div>
 
-            <!-- Three apps in a row -->
-            <div class="settings-apps-row">
-            <!-- Intent Engine -->
-            <div class="settings-card settings-app-entry" onclick="openAppDetail('intent_engine')">
-              <div>
-                <h2>🎯 <span data-i18n="app.intent_engine.name">意图引擎</span></h2>
-                <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.intent_engine.desc">意图分类、工具路由、Case 检索、计划复用——闭环执行智能</p>
-              </div>
-            </div>
+              <div class="settings-apps-row">
+                <div class="settings-card settings-app-entry" onclick="openAppDetail('intent_engine')">
+                  <div>
+                    <h2>🎯 <span data-i18n="app.intent_engine.name">意图引擎</span></h2>
+                    <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.intent_engine.desc">意图分类、工具路由、Case 检索、计划复用——闭环执行智能</p>
+                  </div>
+                </div>
 
-            <!-- Strategy Hub -->
-            <div class="settings-card settings-app-entry" onclick="openAppDetail('strategy_hub')">
-              <div>
-                <h2>🧠 <span data-i18n="app.strategy_hub.name">策略中枢</span></h2>
-                <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.strategy_hub.desc">策略资产治理——模板、实例、候选的生命周期与健康管理</p>
-              </div>
-            </div>
+                <div class="settings-card settings-app-entry" onclick="openAppDetail('strategy_hub')">
+                  <div>
+                    <h2>🧠 <span data-i18n="app.strategy_hub.name">策略中枢</span></h2>
+                    <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.strategy_hub.desc">策略资产治理——模板、实例、候选的生命周期与健康管理</p>
+                  </div>
+                </div>
 
-            <!-- Execution Prism -->
-            <div class="settings-card settings-app-entry" onclick="openAppDetail('execution_radar')">
-              <div>
-                <h2>💎 <span data-i18n="app.execution_radar.name">执行棱镜</span></h2>
-                <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.execution_radar.desc">每日执行质量分析——命中率、错误趋势、工具诊断</p>
+                <div class="settings-card settings-app-entry" onclick="openAppDetail('execution_radar')">
+                  <div>
+                    <h2>💎 <span data-i18n="app.execution_radar.name">执行棱镜</span></h2>
+                    <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.execution_radar.desc">每日执行质量分析——命中率、错误趋势、工具诊断</p>
+                  </div>
+                </div>
+
+                <div class="settings-card settings-app-entry" onclick="openAppDetail('cap_forest')">
+                  <div>
+                    <h2>🌲 <span data-i18n="app.cap_forest.name">能力森林</span></h2>
+                    <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.cap_forest.desc">自动推荐、试用、沉淀并修剪能力——从 2~3 个自然增长到 20~30 个，全程可控可解释</p>
+                  </div>
+                </div>
               </div>
-            </div>
             </div>
 
             <div class="settings-card" id="dev-mode-settings-card">
