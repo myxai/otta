@@ -1179,6 +1179,37 @@ a:hover { text-decoration: underline; }
   border-radius: var(--radius);
   padding: 22px;
 }
+.settings-card.settings-app-entry {
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.settings-card.settings-app-entry:hover {
+  border-color: var(--blue, #89b4fa);
+  box-shadow: 0 0 0 1px var(--blue, #89b4fa);
+}
+.settings-card.settings-app-entry h2 { margin-bottom: 0; }
+
+.settings-toggles-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.settings-apps-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1200px) {
+  .settings-toggles-row {
+    grid-template-columns: 1fr;
+  }
+  .settings-apps-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .settings-card h2 {
   font-size: 16px;
   margin-bottom: 16px;
@@ -3847,7 +3878,7 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--surface2, rgba(255,255,255,0.1));
 }
 
-/* ── Execution Radar App ──────────────────────────────────────── */
+/* ── Execution Prism App ──────────────────────────────────────── */
 .er-card {
   background: var(--bg-surface0);
   border: 1px solid var(--bg-surface1);

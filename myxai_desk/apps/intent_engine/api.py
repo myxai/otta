@@ -23,14 +23,44 @@ _run_status: dict = {"running": False, "last_result": None}
 @bp.route("/config", methods=["GET"])
 def get_config():
     from myxai_desk.core.intent_engine.config import get
-    return jsonify(get())
+    result = get()
+    # Merge schedule_time from app registry
+    from myxai_desk.web.apps_helpers import load_apps_registry
+    registry = load_apps_registry()
+    app = registry.get("intent_engine", {})
+    config = app.get("config", {})
+    result["schedule_time"] = config.get("schedule_time", "03:30")
+    return jsonify(result)
 
 
 @bp.route("/config", methods=["POST"])
 def update_config():
     updates = request.get_json(force=True) or {}
-    from myxai_desk.core.intent_engine.config import set_values
-    result = set_values(updates)
+    
+    # Split updates: schedule_time goes to app registry, others to IE config
+    schedule_time = updates.pop("schedule_time", None)
+    
+    # Update IE config (routing, golden, thresholds, etc.)
+    if updates:
+        from myxai_desk.core.intent_engine.config import set_values
+        set_values(updates)
+    
+    # Update app registry config for schedule_time
+    if schedule_time is not None:
+        from myxai_desk.web.apps_helpers import load_apps_registry, save_apps_registry
+        registry = load_apps_registry()
+        if "intent_engine" not in registry:
+            registry["intent_engine"] = {"enabled": True, "config": {}}
+        if "config" not in registry["intent_engine"]:
+            registry["intent_engine"]["config"] = {}
+        registry["intent_engine"]["config"]["schedule_time"] = schedule_time
+        save_apps_registry(registry)
+    
+    # Return merged config
+    from myxai_desk.core.intent_engine.config import get as get_ie_config
+    result = get_ie_config()
+    if schedule_time is not None:
+        result["schedule_time"] = schedule_time
     return jsonify(result)
 
 

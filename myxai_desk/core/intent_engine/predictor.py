@@ -105,31 +105,5 @@ def predict(
         result.tools_before = len(all_tool_defs)
         result.tools_after = len(result.filter_tools(all_tool_defs))
 
-    # --- Step 3 (PR-2): case retrieval hints ---
-    if ie_config.case_retrieval_enabled():
-        try:
-            from myxai_desk.core.intent_engine.case_store import retrieve_hints
-            hints = retrieve_hints(
-                user_text,
-                route_labels=result.route_labels,
-                conf=result.route_conf,
-            )
-            if hints:
-                result.hints = hints
-        except Exception:
-            log.debug("[ie] case retrieval skipped", exc_info=True)
-
-    # --- Step 4 (PR-3): plan reuse arbitration ---
-    if ie_config.plan_reuse_enabled():
-        try:
-            from myxai_desk.core.intent_engine.arbiter import maybe_reuse
-            decision, plan_steps = maybe_reuse(user_text, result, ctx)
-            if decision == "reuse_plan" and plan_steps:
-                result.decision = "reuse_plan"
-                result.plan_steps = plan_steps
-                result.decision_mode = "case_reuse"
-        except Exception:
-            log.debug("[ie] plan reuse skipped", exc_info=True)
-
     result.latency_ms = round((time.perf_counter() - t0) * 1000, 2)
     return result

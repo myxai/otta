@@ -1,1 +1,1 @@
-"""Execution Radar application — daily execution quality analytics."""
+"""Execution Prism application — daily execution quality analytics."""

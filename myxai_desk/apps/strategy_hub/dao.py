@@ -1,10 +1,9 @@
 """Strategy Hub DAO — data access layer for golden asset governance.
 
-Reads from all golden-related tables:
-  - golden_templates   (Golden 2.0)
-  - golden_instances   (Golden 2.0)
-  - golden_candidates  (Execution Radar)
-  - golden_plans       (Legacy Golden 1.0)
+Reads from:
+  - golden_templates   (templates)
+  - golden_instances   (instances)
+  - golden_candidates  (Execution Prism)
 """
 
 from __future__ import annotations
@@ -480,7 +479,7 @@ def list_candidates(
 
 
 def promote_candidate_to_instance(candidate_id: str) -> dict:
-    """Promote a candidate to a golden instance."""
+    """Promote a candidate to a golden v2 instance."""
     try:
         rows = execute(
             "SELECT * FROM golden_candidates WHERE candidate_id = ?",
@@ -491,15 +490,7 @@ def promote_candidate_to_instance(candidate_id: str) -> dict:
             return {"ok": False, "error": "candidate not found"}
 
         c = rows[0]
-        from myxai_desk.core.golden_store import GoldenStore
-
-        gs = GoldenStore()
         plan_json = c.get("candidate_plan_json", "[]")
-        gp = gs.promote_candidate_to_golden(
-            case_key=c["case_key"],
-            candidate_id=candidate_id,
-            golden_plan_json=plan_json,
-        )
 
         from myxai_desk.core.golden.store import GoldenV2Store
         from myxai_desk.core.golden_store import parse_candidate_plan
@@ -514,7 +505,16 @@ def promote_candidate_to_instance(candidate_id: str) -> dict:
             resolved_plan=resolved,
         )
 
-        return {"ok": True, "case_key": gp.case_key}
+        # Mark candidate as promoted
+        try:
+            execute(
+                "UPDATE golden_candidates SET status = 'promoted' WHERE candidate_id = ?",
+                (candidate_id,),
+            )
+        except Exception:
+            pass
+
+        return {"ok": True, "case_key": c["case_key"]}
     except Exception as e:
         log.warning("Failed to promote candidate %s", candidate_id, exc_info=True)
         return {"ok": False, "error": str(e)}

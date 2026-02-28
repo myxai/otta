@@ -412,18 +412,42 @@ def get_exec_steps_for_date(date_str: str) -> list[dict]:
             return []
 
 
-def get_top_tools(date_str: str, limit: int = 10) -> list[dict]:
-    """Aggregate top tools by call count for a date from er_steps."""
+def get_top_tools(date_str: str, limit: int = 10, window: int = 1) -> list[dict]:
+    """Aggregate top tools by call count for a date or date range from er_steps.
+    
+    Args:
+        date_str: End date (inclusive)
+        limit: Max number of tools to return
+        window: Number of days to include (1 = single day, 7 = last 7 days)
+    """
     init_radar_tables()
-    return execute(
-        """SELECT tool_name, COUNT(*) as cnt,
-                  SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) as fail_cnt
-           FROM er_steps
-           WHERE created_at LIKE ?
-           GROUP BY tool_name ORDER BY cnt DESC LIMIT ?""",
-        (f"{date_str}%", limit),
-        readonly=True,
-    )
+    from datetime import datetime, timedelta
+    
+    if window <= 1:
+        # Single day query
+        return execute(
+            """SELECT tool_name, COUNT(*) as cnt,
+                      SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) as fail_cnt
+               FROM er_steps
+               WHERE created_at LIKE ?
+               GROUP BY tool_name ORDER BY cnt DESC LIMIT ?""",
+            (f"{date_str}%", limit),
+            readonly=True,
+        )
+    else:
+        # Multi-day range query
+        end_date = datetime.fromisoformat(date_str)
+        start_date = end_date - timedelta(days=window - 1)
+        start_str = start_date.date().isoformat()
+        return execute(
+            """SELECT tool_name, COUNT(*) as cnt,
+                      SUM(CASE WHEN status != 'ok' THEN 1 ELSE 0 END) as fail_cnt
+               FROM er_steps
+               WHERE DATE(created_at) BETWEEN ? AND ?
+               GROUP BY tool_name ORDER BY cnt DESC LIMIT ?""",
+            (start_str, date_str, limit),
+            readonly=True,
+        )
 
 
 def _safe_json(val: Any) -> Any:

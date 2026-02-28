@@ -269,7 +269,7 @@ const FALLBACK_I18N = {
     "custom.step1":"类型与任务","custom.step2":"定时与总结","custom.step3":"基本信息",
     "custom.next":"下一步","custom.prev":"上一步","custom.cancel":"取消",
     "custom.badge":"自定义",
-    "er.title":"执行雷达","er.summary":"今日雷达","er.runNow":"立即运行",
+    "er.title":"执行棱镜","er.summary":"今日棱镜","er.runNow":"立即运行",
     "er.totalTasks":"任务数","er.successRate":"成功率",
     "er.singleHitRate":"单任务命中率","er.multiHitRate":"多任务命中率",
     "er.avgAttempts":"平均尝试次数","er.avgTokens":"平均 Token",
@@ -278,7 +278,7 @@ const FALLBACK_I18N = {
     "er.errorCode":"错误码","er.count":"次数","er.pct":"占比",
     "er.toolName":"工具名称","er.failCount":"失败次数",
     "er.loading":"加载中…","er.noData":"暂无数据",
-    "er.running":"正在扫描…","er.runStarted":"雷达扫描已启动，数据将在几秒后更新",
+    "er.running":"正在扫描…","er.runStarted":"棱镜扫描已启动，数据将在几秒后更新",
     "er.runFailed":"扫描失败","er.runDone":"扫描完成，数据已更新","er.runTimeout":"扫描仍在进行中，请稍后手动刷新",
     "er.noErrors":"本日无错误，全部执行成功",
     "er.avgPrefix":"平均","er.avgSuffix":"次/任务","er.avgSuffixPerEff":"次/{n}有效步",
@@ -292,9 +292,9 @@ const FALLBACK_I18N = {
     "er.config":"设置","er.scheduleTime":"每日扫描时间","er.saveConfig":"保存设置","er.configSaved":"设置已保存","er.configFail":"保存失败",
     "er.avgRemovedSteps":"可省LLM调用","er.candidatesUnit":"条候选",
     "er.goldenCandidates":"候选黄金路径","er.qualityScore":"质量分","er.removedSteps":"可省LLM","er.candidateLen":"候选步数","er.candidateStatus":"状态",
-    "ie.title":"意图引擎","ie.switches":"开关配置","ie.thresholds":"阈值调节",
-    "ie.routingEnabled":"意图路由","ie.caseRetrieval":"Case 检索","ie.planReuse":"计划复用",
-    "ie.routeConfLow":"路由置信阈值","ie.caseReuseSim":"复用相似度阈值","ie.hintsMaxLen":"Hints 最大长度",
+    "ie.title":"意图引擎","ie.switches":"开关配置","ie.thresholds":"阈值调节","ie.trainingTime":"训练时间",
+    "ie.routingEnabled":"意图路由",
+    "ie.routeConfLow":"路由置信阈值","ie.hintsMaxLen":"Hints 最大长度",
     "ie.trends":"最近 7 天趋势","ie.models":"模型管理","ie.recentRuns":"最近路由记录",
     "ie.totalRuns":"总路由次数","ie.successRate":"成功率","ie.reuseCount":"复用次数",
     "ie.avgConf":"平均置信度","ie.toolsBefore":"裁剪前工具数","ie.toolsAfter":"裁剪后工具数",
@@ -527,7 +527,7 @@ const FALLBACK_I18N = {
     "custom.step1":"Type & Task","custom.step2":"Schedule & Summary","custom.step3":"App Info",
     "custom.next":"Next","custom.prev":"Back","custom.cancel":"Cancel",
     "custom.badge":"Custom",
-    "er.title":"Execution Radar","er.summary":"Today's Radar","er.runNow":"Run Now",
+    "er.title":"Execution Prism","er.summary":"Today's Prism","er.runNow":"Run Now",
     "er.totalTasks":"Tasks","er.successRate":"Success Rate",
     "er.singleHitRate":"Single Hit Rate","er.multiHitRate":"Multi Hit Rate",
     "er.avgAttempts":"Avg Attempts","er.avgTokens":"Avg Tokens",
@@ -550,9 +550,9 @@ const FALLBACK_I18N = {
     "er.config":"Settings","er.scheduleTime":"Daily Scan Time","er.saveConfig":"Save Settings","er.configSaved":"Settings saved","er.configFail":"Save failed",
     "er.avgRemovedSteps":"LLM Calls Saveable","er.candidatesUnit":"candidates",
     "er.goldenCandidates":"Golden Path Candidates","er.qualityScore":"Quality","er.removedSteps":"LLM Saved","er.candidateLen":"Plan Steps","er.candidateStatus":"Status",
-    "ie.title":"Intent Engine","ie.switches":"Switches","ie.thresholds":"Thresholds",
-    "ie.routingEnabled":"Intent Routing","ie.caseRetrieval":"Case Retrieval","ie.planReuse":"Plan Reuse",
-    "ie.routeConfLow":"Route Confidence Threshold","ie.caseReuseSim":"Reuse Similarity Threshold","ie.hintsMaxLen":"Hints Max Length",
+    "ie.title":"Intent Engine","ie.switches":"Switches","ie.thresholds":"Thresholds","ie.trainingTime":"Training Time",
+    "ie.routingEnabled":"Intent Routing",
+    "ie.routeConfLow":"Route Confidence Threshold","ie.hintsMaxLen":"Hints Max Length",
     "ie.trends":"Last 7 Days Trend","ie.models":"Model Management","ie.recentRuns":"Recent Routing Logs",
     "ie.totalRuns":"Total Routes","ie.successRate":"Success Rate","ie.reuseCount":"Reuse Count",
     "ie.avgConf":"Avg Confidence","ie.toolsBefore":"Tools Before","ie.toolsAfter":"Tools After",
@@ -1246,10 +1246,12 @@ function appendUsageBadge(msgElId, usage) {
 }
 
 const _PLAN_SOURCE_LABELS = {
-  golden_replay:    { label: "黄金回放", css: "esb-golden-replay" },
-  golden_candidate: { label: "候选回放", css: "esb-golden-candidate" },
-  reuse_plan:       { label: "计划复用", css: "esb-reuse-plan" },
-  llm_free:         { label: "自由推理", css: "esb-llm-free" },
+  golden_v2_instance: { label: "实例回放", css: "esb-golden-replay" },
+  golden_v2_template: { label: "模板回放", css: "esb-golden-replay" },
+  golden_replay:      { label: "黄金回放", css: "esb-golden-replay" },
+  golden_candidate:   { label: "候选回放", css: "esb-golden-candidate" },
+  reuse_plan:         { label: "计划复用", css: "esb-reuse-plan" },
+  llm_free:           { label: "自由推理", css: "esb-llm-free" },
 };
 
 function _appendDecisionBadge(msgElId, dm) {
@@ -1588,13 +1590,37 @@ function fillConfigForm(cfg) {
   maskKeys(cfgForJson);
   document.getElementById("cfg-json-raw").value = JSON.stringify(cfgForJson, null, 2);
 
+  _loadRoutingToggle();
   _loadGoldenReplayToggle();
+}
+
+async function _loadRoutingToggle() {
+  try {
+    const cfg = await api("/api/ie/golden_config");
+    const enabled = cfg.routing_enabled !== false;
+    const el = document.getElementById("routing-toggle");
+    if (el) el.checked = enabled;
+    const st = document.getElementById("routing-status");
+    if (st) st.textContent = enabled ? "已启用" : "已关闭";
+  } catch (_) {}
+}
+
+async function toggleRouting(on) {
+  try {
+    await fetch("/api/ie/golden_config", {
+      method: "POST",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ routing_enabled: on }),
+    });
+    const st = document.getElementById("routing-status");
+    if (st) st.textContent = on ? "已启用" : "已关闭";
+  } catch (e) { toast("保存失败: " + e.message, "error"); }
 }
 
 async function _loadGoldenReplayToggle() {
   try {
     const cfg = await api("/api/ie/golden_config");
-    const enabled = cfg.golden_replay_enabled !== false;
+    const enabled = cfg.golden_enabled !== false;
     const el = document.getElementById("golden-replay-toggle");
     if (el) el.checked = enabled;
     const st = document.getElementById("golden-replay-status");
@@ -1607,7 +1633,7 @@ async function toggleGoldenReplay(on) {
     await fetch("/api/ie/golden_config", {
       method: "POST",
       headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({ golden_replay_enabled: on }),
+      body: JSON.stringify({ golden_enabled: on }),
     });
     const st = document.getElementById("golden-replay-status");
     if (st) st.textContent = on ? "已启用" : "已关闭";
@@ -2042,8 +2068,8 @@ function _catLabel(key) {
     const appKey = key.slice(4);
     // Map English app names to localized names
     const appNameMap = {
-      'execution_radar': '执行雷达',
-      'healthcheck': '执行雷达',  // legacy
+      'execution_radar': '执行棱镜',
+      'healthcheck': '执行棱镜',  // legacy
       'strategy_hub': '策略中枢',
     };
     return appNameMap[appKey] || appKey;
@@ -2905,7 +2931,21 @@ function renderPermTags(permissions) {
   ).join("")}${permissions.length > 6 ? `<span class="perm-tag">+${permissions.length - 6}</span>` : ""}</div>`;
 }
 
+const _ADVANCED_SETTINGS_APPS = new Set(["intent_engine", "strategy_hub", "execution_radar"]);
+let _currentAppDetailId = null;
+
+function goBackFromAppDetail() {
+  if (_ADVANCED_SETTINGS_APPS.has(_currentAppDetailId)) {
+    switchPage('settings');
+    switchSettingsTab('advanced');
+  } else {
+    switchPage('apps');
+  }
+  _currentAppDetailId = null;
+}
+
 function renderApps(apps) {
+  apps = apps.filter(a => !_ADVANCED_SETTINGS_APPS.has(a.id));
   const grid = document.getElementById("apps-grid");
   if (!apps.length) {
     grid.innerHTML = `<div class="apps-empty">${t("apps.search")}</div>`;
@@ -3026,6 +3066,7 @@ async function uninstallApp(appId) {
 // ── App Detail (Daily Digest) ─────────────────────────────────────────
 
 async function openAppDetail(appId) {
+  _currentAppDetailId = appId;
   if (appId === "daily_digest") { await openDigestDetail(); return; }
   if (appId === "email_summary") { await openEmailDetail(); return; }
   if (appId === "execution_radar") { await openExecutionRadarDetail(); return; }
@@ -3047,11 +3088,11 @@ async function openAppReports(appId) {
   }, 200);
 }
 
-// ── Execution Radar Detail ────────────────────────────────────────────
+// ── Execution Prism Detail ────────────────────────────────────────────
 let _erChart1 = null, _erChart2 = null;
 
 async function openExecutionRadarDetail() {
-  document.getElementById("app-detail-title").textContent = `📡 ${t("er.title")}`;
+  document.getElementById("app-detail-title").textContent = `💎 ${t("er.title")}`;
   switchPage("app-detail");
   const container = document.getElementById("app-detail-content");
 
@@ -3084,8 +3125,6 @@ async function openExecutionRadarDetail() {
       <div class="er-golden-card"><div class="er-card-label">平均尝试次数</div><div class="er-card-value" id="er-avg-attempts-count">--</div></div>
       <div class="er-golden-card"><div class="er-card-label">可省 LLM 调用</div><div class="er-card-value" id="er-avg-removed-golden">--</div></div>
     </div>
-
-    <div id="er-report-text" style="display:none;margin-bottom:18px;padding:12px 16px;border-radius:8px;background:var(--bg-secondary);font-size:13px;line-height:1.6"></div>
 
     <div class="app-detail-section" style="margin-bottom:18px">
       <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;cursor:pointer" onclick="toggleErCandidates()">
@@ -3122,17 +3161,11 @@ async function openExecutionRadarDetail() {
         <button class="btn btn-xs er-window-btn active" data-w="7" onclick="switchErWindow(7)">7d</button>
         <button class="btn btn-xs er-window-btn" data-w="30" onclick="switchErWindow(30)">30d</button>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px">
         <div style="position:relative;height:260px"><canvas id="er-chart-hitrate"></canvas></div>
         <div style="position:relative;height:260px"><canvas id="er-chart-attempts"></canvas></div>
+        <div style="position:relative;height:260px" id="er-tab-tools"><div class="er-table-placeholder">${t("er.loading")}</div></div>
       </div>
-    </div>
-
-    <div class="app-detail-section">
-      <div style="display:flex;gap:8px;margin-bottom:10px">
-        <span style="font-weight:600">${t("er.topTools")}</span>
-      </div>
-      <div id="er-tab-tools" class="er-tab-panel"><div class="er-table-placeholder">${t("er.loading")}</div></div>
     </div>
   `;
 
@@ -3165,8 +3198,9 @@ async function _refreshAllErPanels() {
   await loadErSummary(d);
   await loadErGoldenStats();
   const activeW = document.querySelector(".er-window-btn.active");
-  await loadErTrends(activeW ? parseInt(activeW.dataset.w) : 7);
-  await loadErTopTools(d);
+  const window = activeW ? parseInt(activeW.dataset.w) : 7;
+  await loadErTrends(window);
+  await loadErTopTools(d, window);
   await loadErTaskDetail(d);
   await loadErCandidates(d);
 }
@@ -3271,20 +3305,20 @@ function _renderErAttemptsChart(d) {
   });
 }
 
-async function loadErTopTools(dateStr) {
+async function loadErTopTools(dateStr, window = 7) {
   try {
     const dt = dateStr || _getErDate();
-    const d = await api(`/api/apps/execution_radar/top_tools?date=${dt}`);
+    const d = await api(`/api/apps/execution_radar/top_tools?date=${dt}&window=${window}`);
     const el = document.getElementById("er-tab-tools");
     if (!d.tools || d.tools.length === 0) {
       el.innerHTML = `<div class="er-table-placeholder">${t("er.noData")}</div>`;
       return;
     }
-    let html = `<table class="er-table"><thead><tr><th>#</th><th>${t("er.toolName")}</th><th>${t("er.count")}</th><th>${t("er.failCount")}</th></tr></thead><tbody>`;
-    d.tools.forEach((e, i) => {
-      html += `<tr><td>${i+1}</td><td><code>${e.tool_name}</code></td><td>${e.cnt}</td><td>${e.fail_cnt || 0}</td></tr>`;
+    let html = `<div style="padding:8px;overflow-y:auto;max-height:240px"><table class="er-table"><thead><tr><th>#</th><th>${t("er.toolName")}</th><th>${t("er.count")}</th><th>${t("er.failCount")}</th></tr></thead><tbody>`;
+    d.tools.slice(0, 8).forEach((e, i) => {
+      html += `<tr><td>${i+1}</td><td><code style="font-size:11px">${e.tool_name}</code></td><td>${e.cnt}</td><td>${e.fail_cnt || 0}</td></tr>`;
     });
-    html += "</tbody></table>";
+    html += "</tbody></table></div>";
     el.innerHTML = html;
   } catch (e) { console.warn("er tools", e); }
 }
@@ -3292,6 +3326,8 @@ async function loadErTopTools(dateStr) {
 function switchErWindow(w) {
   document.querySelectorAll(".er-window-btn").forEach(b => b.classList.toggle("active", parseInt(b.dataset.w) === w));
   loadErTrends(w);
+  const d = _getErDate();
+  loadErTopTools(d, w);
 }
 
 function toggleErTaskDetail() {
@@ -3539,7 +3575,7 @@ let _ieChartModePie = null;
 let _ieTimeRange = 7;
 
 async function openIntentEngineDetail() {
-  document.getElementById("app-detail-title").textContent = `🧠 ${t("ie.title")}`;
+  document.getElementById("app-detail-title").textContent = `🎯 ${t("ie.title")}`;
   switchPage("app-detail");
   const container = document.getElementById("app-detail-content");
   container.innerHTML = `<div class="app-detail-loading">${t("status.loading")}</div>`;
@@ -3548,12 +3584,6 @@ async function openIntentEngineDetail() {
   try { cfg = await api("/api/apps/intent_engine/config"); } catch(_) {}
 
   container.innerHTML = `
-    <!-- Repair Button -->
-    <div style="margin-bottom:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end;">
-      <button id="ie-check-btn" class="btn-secondary" style="font-size:11px;padding:4px 10px;">🔍 检查数据问题</button>
-      <button id="ie-repair-btn" class="btn-secondary" style="font-size:11px;padding:4px 10px;">🔧 修复 llm_free 误判</button>
-    </div>
-
     <!-- 1. Health Overview -->
     <div class="app-detail-section ie-health-section">
       <div class="ie-section-header">
@@ -3611,69 +3641,24 @@ async function openIntentEngineDetail() {
       </details>
     </div>
 
-    <!-- 5. Core Switches -->
-    <div class="app-detail-section">
-      <h3>⚙️ ${t("ie.switches")}</h3>
-      <div class="digest-config-grid">
-        <div class="form-group">
-          <label>${t("ie.routingEnabled")}</label>
-          <label class="toggle">
-            <input type="checkbox" id="ie-routing-enabled" ${cfg.routing_enabled ? "checked" : ""}
-                   onchange="updateIeConfig('routing_enabled', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="form-group">
-          <label>Golden Replay</label>
-          <label class="toggle">
-            <input type="checkbox" id="ie-golden-enabled" ${cfg.golden_replay_enabled ? "checked" : ""}
-                   onchange="updateIeConfig('golden_replay_enabled', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="form-group">
-          <label>Golden v2</label>
-          <label class="toggle">
-            <input type="checkbox" id="ie-golden-v2-enabled" ${cfg.golden_v2_enabled ? "checked" : ""}
-                   onchange="updateIeConfig('golden_v2_enabled', this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-    </div>
-
-    <!-- 6. Advanced Config & Models (collapsed by default) -->
+    <!-- 5. Advanced Config & Models (collapsed by default) -->
     <div class="app-detail-section">
       <details id="ie-config-panel">
         <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--subtext0)">Advanced</summary>
         <div style="margin-top:12px;">
           <div class="digest-config-grid" style="margin-bottom:16px;">
             <div class="form-group">
-              <label>${t("ie.caseRetrieval")}</label>
-              <label class="toggle">
-                <input type="checkbox" id="ie-case-enabled" ${cfg.case_retrieval_enabled ? "checked" : ""}
-                       onchange="updateIeConfig('case_retrieval_enabled', this.checked)">
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <div class="form-group">
-              <label>${t("ie.planReuse")}</label>
-              <label class="toggle">
-                <input type="checkbox" id="ie-plan-enabled" ${cfg.plan_reuse_enabled ? "checked" : ""}
-                       onchange="updateIeConfig('plan_reuse_enabled', this.checked)">
-                <span class="toggle-slider"></span>
-              </label>
-            </div>
-            <div class="form-group">
               <label>${t("ie.routeConfLow")}</label>
               <input type="number" id="ie-conf-low" value="${cfg.route_conf_low || 0.4}" step="0.05" min="0" max="1"
-                     onchange="updateIeConfig('route_conf_low', parseFloat(this.value))" class="form-input">
+                     onchange="updateIeConfigAdvanced('route_conf_low', parseFloat(this.value))" class="form-input">
             </div>
             <div class="form-group">
-              <label>${t("ie.caseReuseSim")}</label>
-              <input type="number" id="ie-reuse-sim" value="${cfg.case_reuse_sim_threshold || 0.92}" step="0.01" min="0" max="1"
-                     onchange="updateIeConfig('case_reuse_sim_threshold', parseFloat(this.value))" class="form-input">
+              <label>${t("ie.trainingTime")}</label>
+              <input type="time" id="ie-training-time" value="${_escAttr(cfg.schedule_time || '03:30')}" class="form-input" />
             </div>
+          </div>
+          <div class="digest-actions" style="margin-bottom:16px">
+            <button class="btn btn-primary" onclick="saveIeConfig()">${t("settings.save")}</button>
           </div>
           <h4>🤖 ${t("ie.models")}</h4>
           <div id="ie-model-info" style="margin-bottom:12px;"></div>
@@ -3706,51 +3691,6 @@ async function _ieRefreshAll() {
     _ieLoadRuns(),
     _ieLoadModels(),
   ]);
-  
-  // Attach check button handler
-  const checkBtn = document.getElementById("ie-check-btn");
-  if (checkBtn) {
-    checkBtn.addEventListener("click", async () => {
-      checkBtn.disabled = true;
-      checkBtn.textContent = "检查中...";
-      try {
-        const res = await api("/api/apps/intent_engine/repair/llm_free/check");
-        if (res.count > 0) {
-          const msg = `发现 ${res.count} 条矛盾数据（plan_source=llm_free 但 llm_attempts>0）\n\n示例：\n${res.samples.slice(0,3).map(r => 
-            `- ${r.user_text?.substring(0,30) || r.id}: llm_attempts=${r.llm_attempts}`
-          ).join('\n')}`;
-          alert(msg);
-        } else {
-          toast("数据正常，没有发现矛盾", "success");
-        }
-      } catch(e) {
-        toast("检查失败: " + e.message, "error");
-      } finally {
-        checkBtn.disabled = false;
-        checkBtn.textContent = "🔍 检查数据问题";
-      }
-    });
-  }
-  
-  // Attach repair button handler
-  const repairBtn = document.getElementById("ie-repair-btn");
-  if (repairBtn) {
-    repairBtn.addEventListener("click", async () => {
-      if (!confirm("这将修正历史数据中的 llm_free 误判（llm_attempts>0 的行），确认？")) return;
-      repairBtn.disabled = true;
-      repairBtn.textContent = "修复中...";
-      try {
-        const res = await api("/api/apps/intent_engine/repair/llm_free", "POST");
-        toast(`已修复 ${res.affected} 条记录`, "success");
-        openIntentEngineDetail(); // 重新加载
-      } catch(e) {
-        toast("修复失败: " + e.message, "error");
-      } finally {
-        repairBtn.disabled = false;
-        repairBtn.textContent = "🔧 修复 llm_free 误判";
-      }
-    });
-  }
 }
 
 async function updateIeConfig(key, value) {
@@ -3758,6 +3698,21 @@ async function updateIeConfig(key, value) {
     await api("/api/apps/intent_engine/config", "POST", {[key]: value});
     toast(`${key} → ${value}`, "success");
   } catch(e) { toast("Config update failed: " + e.message, "error"); }
+}
+
+async function updateIeConfigAdvanced(key, value) {
+  try {
+    await api("/api/apps/intent_engine/config", "POST", {[key]: value});
+    toast(`${key} → ${value}`, "success");
+  } catch(e) { toast("Config update failed: " + e.message, "error"); }
+}
+
+async function saveIeConfig() {
+  const trainingTime = document.getElementById("ie-training-time")?.value || "03:30";
+  try {
+    await api("/api/apps/intent_engine/config", "POST", {schedule_time: trainingTime});
+    toast(t("settings.saved"), "success");
+  } catch(e) { toast("Config save failed: " + e.message, "error"); }
 }
 
 // ── 1. Health Metrics ────────────────────────────────────────────
@@ -4013,7 +3968,7 @@ async function _ieLoadRuns() {
         <tbody>${runs.map((r, i) => {
           const reduction = r.tools_before > 0
             ? Math.round((r.tools_before - r.tools_after) / r.tools_before * 100) : 0;
-          const golden = r.golden_hit || (r.plan_source && (r.plan_source === "golden_v2" || r.plan_source === "golden_replay"));
+          const golden = r.golden_hit || (r.plan_source && ["golden_v2_instance","golden_v2_template","golden_replay","golden_candidate"].includes(r.plan_source));
           const toolGroup = (() => { try { return JSON.parse(r.tool_group || "[]"); } catch(_) { return []; } })();
           const confidence = r.route_conf != null ? (r.route_conf * 100).toFixed(0) + '%' : '-';
           const effectiveSteps = r.effective_steps ?? '-';
@@ -4179,7 +4134,7 @@ async function ieRollback(version) {
 // ── Strategy Hub Detail Page ──────────────────────────────────────────
 
 async function openStrategyHubDetail() {
-  document.getElementById("app-detail-title").textContent = `🎛️ ${t("sh.title")}`;
+  document.getElementById("app-detail-title").textContent = `🧠 ${t("sh.title")}`;
   switchPage("app-detail");
 
   const container = document.getElementById("app-detail-content");

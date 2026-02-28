@@ -1,4 +1,4 @@
-"""Flask Blueprint for the Execution Radar application.
+"""Flask Blueprint for the Execution Prism application.
 
 Prefix: ``/api/apps/execution_radar``
 """
@@ -102,11 +102,12 @@ def radar_trends():
 
 @bp.route("/top_tools")
 def radar_top_tools():
-    """Return top tools by call count."""
+    """Return top tools by call count for a date or window."""
     date_str = request.args.get("date", (date.today() - timedelta(days=1)).isoformat())
+    window = int(request.args.get("window", 1))
     limit = int(request.args.get("limit", 10))
-    tools = get_top_tools(date_str, limit)
-    return jsonify({"date": date_str, "tools": tools})
+    tools = get_top_tools(date_str, limit, window)
+    return jsonify({"date": date_str, "window": window, "tools": tools})
 
 
 @bp.route("/tasks")

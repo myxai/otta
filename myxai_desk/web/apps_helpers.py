@@ -88,7 +88,7 @@ APP_CATALOG = {
         "id": "daily_digest",
         "name": _t("app.daily_digest.name"),
         "name_en": "Daily Briefing",
-        "icon": "🎯",
+        "icon": "📰",
         "description": _t("app.daily_digest.desc"),
         "description_en": "Your personal curator — daily picks based on your interests, with deep-dive exploration",
         "version": "2.0.0",
@@ -111,8 +111,8 @@ APP_CATALOG = {
     "execution_radar": {
         "id": "execution_radar",
         "name": _t("app.execution_radar.name"),
-        "name_en": "Execution Radar",
-        "icon": "📡",
+        "name_en": "Execution Prism",
+        "icon": "💎",
         "description": _t("app.execution_radar.desc"),
         "description_en": "Daily execution quality analytics — hit rates, error trends, tool diagnostics",
         "version": "1.0.0",
@@ -124,9 +124,9 @@ APP_CATALOG = {
         "id": "intent_engine",
         "name": _t("app.intent_engine.name"),
         "name_en": "Intent Engine",
-        "icon": "🧠",
+        "icon": "🎯",
         "description": _t("app.intent_engine.desc"),
-        "description_en": "Intent classification, tool routing, case retrieval, plan reuse — closed-loop execution intelligence",
+        "description_en": "Intent classification, tool routing, golden replay — efficient execution decisions",
         "version": "1.0.0",
         "author": "nanobot",
         "category": "analytics",
@@ -136,7 +136,7 @@ APP_CATALOG = {
         "id": "strategy_hub",
         "name": _t("app.strategy_hub.name"),
         "name_en": "Strategy Hub",
-        "icon": "🎛️",
+        "icon": "🧠",
         "description": _t("app.strategy_hub.desc"),
         "description_en": "Strategy hub — golden asset governance, templates, instances & candidates lifecycle management",
         "version": "1.0.0",
@@ -160,8 +160,6 @@ DEFAULT_EXECUTION_RADAR_CONFIG = {
 
 DEFAULT_INTENT_ENGINE_CONFIG = {
     "routing_enabled": True,
-    "case_retrieval_enabled": False,
-    "plan_reuse_enabled": False,
     "schedule_time": "03:30",
 }
 

@@ -10,12 +10,14 @@ from myxai_desk.web.state import get_state
 bp = Blueprint("scheduler", __name__, url_prefix="/api/scheduler")
 
 # Official app display names / icons
-_ER_META = {"name_zh": "执行雷达", "name_en": "Execution Radar", "icon": "📡"}
+_ER_META = {"name_zh": "执行棱镜", "name_en": "Execution Prism", "icon": "💎"}
+_IE_META = {"name_zh": "意图引擎训练", "name_en": "Intent Engine Training", "icon": "🎯"}
 _OFFICIAL_APP_META = {
-    "daily_digest": {"name_zh": "每日私享", "name_en": "Daily Briefing", "icon": "🎯"},
+    "daily_digest": {"name_zh": "每日私享", "name_en": "Daily Briefing", "icon": "📰"},
     "email_summary": {"name_zh": "邮件简报", "name_en": "Email Briefing", "icon": "📧"},
     "daily_execution_radar": _ER_META,
     "daily_healthcheck": _ER_META,  # legacy alias
+    "daily_ie_training": _IE_META,
 }
 
 
@@ -86,13 +88,13 @@ def today():
         get_today_runs,
     )
     from myxai_desk.core.timeutil import local_date_str, now_local
-    from app import _load_official_tasks, _load_custom_tasks, _load_execution_radar_tasks
+    from app import _load_official_tasks, _load_custom_tasks, _load_execution_radar_tasks, _load_intent_engine_tasks
     
     now = now_local()
     today_str = local_date_str()
     
     # Collect all task descriptors
-    tasks = _load_official_tasks() + _load_custom_tasks() + _load_execution_radar_tasks()
+    tasks = _load_official_tasks() + _load_custom_tasks() + _load_execution_radar_tasks() + _load_intent_engine_tasks()
     
     # Build a lookup: task_id -> (name_zh, name_en, icon, schedule_time)
     task_meta: dict[str, dict] = {}
@@ -138,8 +140,15 @@ def today():
     items = []
     seen_tasks = set()
     
+    # Build a set of currently active task IDs
+    active_task_ids = {t.task_id for t in tasks}
+    
     # 1) Tasks with existing runs today
     for task_id, runs in run_by_task.items():
+        # Skip tasks that are no longer active (app uninstalled/disabled or custom app deleted)
+        if task_id not in active_task_ids:
+            continue
+        
         seen_tasks.add(task_id)
         meta = task_meta.get(task_id)
         if not meta:

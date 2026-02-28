@@ -622,7 +622,7 @@ def generate_report(metrics: dict, tasks: list[dict] | None = None) -> str:
         if instr else "N/A"
     )
 
-    prompt = f"""你是执行质量分析助手。请根据以下结构化数据，生成一段简短的"执行雷达日报"（2-3 段，总计不超过 200 字）。
+    prompt = f"""你是执行质量分析助手。请根据以下结构化数据，生成一段简短的"执行棱镜日报"（2-3 段，总计不超过 200 字）。
 
 要求：
 - 说明昨日整体变化

@@ -1,14 +1,10 @@
-"""Golden 2.0 DB tables — golden_templates and golden_instances.
-
-Additive migration: existing golden_plans / golden_candidates tables
-are left untouched for backward compatibility.
-"""
+"""Golden DB tables — golden_templates and golden_instances."""
 
 from __future__ import annotations
 
 import logging
 
-from myxai_desk.core.storage.sqlite import connect, ensure_table, execute
+from myxai_desk.core.storage.sqlite import connect, ensure_table
 
 log = logging.getLogger("myxai")
 
@@ -69,40 +65,3 @@ def _ensure_indexes() -> None:
             pass
 
 
-def migrate_golden_plans_to_instances() -> int:
-    """One-time migration: copy golden_plans rows into golden_instances.
-
-    Only copies rows whose case_key doesn't already exist in golden_instances.
-    Returns the number of rows migrated.
-    """
-    init_golden_v2_tables()
-
-    try:
-        rows = execute(
-            """SELECT gp.case_key, gp.golden_plan_json, gp.created_at, gp.last_used_at
-               FROM golden_plans gp
-               WHERE gp.replayable = 1
-                 AND gp.case_key NOT IN (SELECT case_key FROM golden_instances)""",
-            readonly=True,
-        )
-    except Exception:
-        return 0
-
-    count = 0
-    for r in rows:
-        try:
-            execute(
-                """INSERT OR IGNORE INTO golden_instances
-                   (case_key, template_id, intent_label, slot_values_json,
-                    resolved_plan_json, stats_json, created_at, last_used_at)
-                   VALUES (?, NULL, '', '{}', ?, '{}', ?, ?)""",
-                (r["case_key"], r["golden_plan_json"],
-                 r["created_at"], r.get("last_used_at")),
-            )
-            count += 1
-        except Exception:
-            continue
-
-    if count:
-        log.info("[golden_v2] migrated %d golden_plans -> golden_instances", count)
-    return count

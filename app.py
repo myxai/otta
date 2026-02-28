@@ -889,10 +889,10 @@ def _patch_agent_tool_history(agent):
             except Exception:
                 log.warning("[agent] golden_v2 replay skipped", exc_info=True)
 
-        # ── Priority 3: PR-2 Candidate replay (legacy golden_plans + candidates) ──
+        # ── Priority 3: Candidate replay → promote to v2 Instance ──
         if not _skip_llm_loop and _ie_result:
             try:
-                from myxai_desk.core.intent_engine.config import golden_replay_enabled as _golden_on
+                from myxai_desk.core.intent_engine.config import golden_enabled as _golden_on
                 if not _golden_on():
                     raise RuntimeError("golden replay disabled by config")
 
@@ -919,75 +919,44 @@ def _patch_agent_tool_history(agent):
                     _update_ie_run(_ie_result.run_id, case_key=_case_key)
 
                 _store = _GoldenStore()
+                _cand = _store.get_best_candidate(_case_key)
+                if _cand:
+                    _candidate_id = _cand.candidate_id
+                    _removed_steps = _cand.removed_steps
+                    if _ie_result.run_id:
+                        _update_ie_run(
+                            _ie_result.run_id,
+                            candidate_id=_candidate_id,
+                            removed_steps=_removed_steps,
+                        )
+                    _cand_steps = _parse_candidate_plan(_cand.candidate_plan_json)
+                    if _cand_steps:
+                        _cand_result = await _run_plan(_cand_steps, self.tools, key, progress)
+                        _attempts_count += _cand_result.steps_executed
+                        _store.mark_candidate_used(_cand.candidate_id, ok=_cand_result.success)
 
-                # 3a) Verified golden plan
-                _gp = _store.get_golden_plan(_case_key)
-                if _gp:
-                    _gp_steps = _parse_candidate_plan(_gp.golden_plan_json)
-                    if _gp_steps:
-                        _gp_result = await _run_plan(_gp_steps, self.tools, key, progress)
-                        _attempts_count += _gp_result.steps_executed
-                        if _gp_result.success:
-                            _store.record_golden_use(
-                                case_key=_case_key, ok=True,
-                                attempts_count=_attempts_count,
-                                duration_ms=_gp_result.total_duration_ms,
-                                run_id=_ie_result.run_id,
-                            )
-                            tools_used = [s["tool_name"] for s in _gp_result.results if s.get("tool_name")]
-                            final_content = _gp_result.final_summary
-                            _plan_source = "golden_replay"
-                            _golden_version = _gp.version
-                            _skip_llm_loop = True
-                            print(f"[agent] golden_replay: version={_gp.version}, steps={_gp_result.steps_executed}")
-                        else:
-                            _store.record_golden_use(
-                                case_key=_case_key, ok=False,
-                                attempts_count=_attempts_count,
-                                run_id=_ie_result.run_id,
-                            )
-                            print(f"[agent] golden_replay FAILED at step {_gp_result.failed_at}, falling through")
-
-                # 3b) Candidate replay — verify then promote
-                if not _skip_llm_loop:
-                    _cand = _store.get_best_candidate(_case_key)
-                    if _cand:
-                        _candidate_id = _cand.candidate_id
-                        _removed_steps = _cand.removed_steps
-                        if _ie_result.run_id:
-                            _update_ie_run(
-                                _ie_result.run_id,
-                                candidate_id=_candidate_id,
-                                removed_steps=_removed_steps,
-                            )
-                        _cand_steps = _parse_candidate_plan(_cand.candidate_plan_json)
-                        if _cand_steps:
-                            _cand_result = await _run_plan(_cand_steps, self.tools, key, progress)
-                            _attempts_count += _cand_result.steps_executed
-                            _store.mark_candidate_used(_cand.candidate_id, ok=_cand_result.success)
-
-                            if _cand_result.success:
-                                _gp_new = _store.promote_candidate_to_golden(
+                        if _cand_result.success:
+                            # Save as v2 Instance instead of legacy golden_plan
+                            try:
+                                from myxai_desk.core.golden.store import GoldenV2Store as _GV2Promote
+                                _GV2Promote().save_instance(
                                     case_key=_case_key,
-                                    candidate_id=_cand.candidate_id,
-                                    golden_plan_json=_cand.candidate_plan_json,
+                                    template_id=None,
+                                    intent_label=",".join(_ie_result.route_labels) if _ie_result.route_labels else "",
+                                    slot_values={},
+                                    resolved_plan=_cand_steps,
                                 )
-                                _store.record_golden_use(
-                                    case_key=_case_key, ok=True,
-                                    attempts_count=_attempts_count,
-                                    duration_ms=_cand_result.total_duration_ms,
-                                    run_id=_ie_result.run_id,
-                                )
-                                tools_used = [s["tool_name"] for s in _cand_result.results if s.get("tool_name")]
-                                final_content = _cand_result.final_summary
-                                _plan_source = "golden_candidate"
-                                _golden_version = _gp_new.version
-                                _skip_llm_loop = True
-                                print(f"[agent] golden_candidate: promoted to v{_gp_new.version}, steps={_cand_result.steps_executed}")
-                            else:
-                                print(f"[agent] candidate {_cand.candidate_id[:8]} FAILED, falling through")
+                            except Exception:
+                                log.debug("[agent] candidate→v2 instance save failed", exc_info=True)
+                            tools_used = [s["tool_name"] for s in _cand_result.results if s.get("tool_name")]
+                            final_content = _cand_result.final_summary
+                            _plan_source = "golden_candidate"
+                            _skip_llm_loop = True
+                            print(f"[agent] golden_candidate: promoted to v2 instance, steps={_cand_result.steps_executed}")
+                        else:
+                            print(f"[agent] candidate {_cand.candidate_id[:8]} FAILED, falling through")
             except Exception:
-                log.warning("[agent] golden/candidate replay skipped", exc_info=True)
+                log.warning("[agent] candidate replay skipped", exc_info=True)
 
         # ── PlanRunner — reuse cached plan from ie_cases, skip LLM ──
         if not _skip_llm_loop and _ie_result and _ie_result.decision == "reuse_plan" and _ie_result.plan_steps:
@@ -1387,7 +1356,7 @@ def _patch_agent_tool_history(agent):
                             _run_fields["golden_version"] = _golden_version
                         _run_fields["golden_hit"] = 1 if _plan_source in (
                             "golden_v2_instance", "golden_v2_template",
-                            "golden_replay", "golden_candidate",
+                            "golden_candidate",
                         ) else 0
                         
                         # Calculate effective_steps (last occurrence of each tool in successful runs)
@@ -1406,22 +1375,6 @@ def _patch_agent_tool_history(agent):
                         _update_ie_run(_ie_result.run_id, **_run_fields)
                     except Exception:
                         log.debug("[agent] ie_run field writeback failed", exc_info=True)
-
-                from myxai_desk.core.intent_engine.config import case_retrieval_enabled as _ie_case_on
-                if _ie_case_on() and tools_used:
-                    from myxai_desk.core.intent_engine.case_store import save_case
-                    _plan_steps = [
-                        {"tool_name": e.get("tool", ""), "action": e.get("action", "")}
-                        for e in _turn_events if e.get("tool")
-                    ]
-                    save_case(
-                        task_text=msg.content,
-                        route_label=",".join(_ie_result.route_labels),
-                        plan_steps=_plan_steps,
-                        outcome=_ie_outcome,
-                        pitfalls="" if _ie_outcome == "success" else str(final_content)[:200],
-                        fail_reason="" if _ie_outcome == "success" else str(locals().get("_loop_err", ""))[:200],
-                    )
 
                 # Golden 2.0: save successful LLM runs as instances
                 if _ie_outcome == "success" and tools_used and _plan_source is None:
@@ -2721,16 +2674,21 @@ def api_ie_last_run():
 
 @flask_app.route("/api/ie/golden_config", methods=["GET", "POST"])
 def api_ie_golden_config():
-    """Read or update golden replay config."""
+    """Read or update intent engine config."""
     try:
         from myxai_desk.core.intent_engine import config as ie_config
         if request.method == "POST":
             body = request.get_json(silent=True) or {}
             updates = {}
-            if "golden_replay_enabled" in body:
-                updates["golden_replay_enabled"] = bool(body["golden_replay_enabled"])
-            if "golden_v2_enabled" in body:
-                updates["golden_v2_enabled"] = bool(body["golden_v2_enabled"])
+            if "routing_enabled" in body:
+                updates["routing_enabled"] = bool(body["routing_enabled"])
+            if "golden_enabled" in body:
+                updates["golden_enabled"] = bool(body["golden_enabled"])
+            # Backward compat: map legacy keys
+            elif "golden_replay_enabled" in body:
+                updates["golden_enabled"] = bool(body["golden_replay_enabled"])
+            elif "golden_v2_enabled" in body:
+                updates["golden_enabled"] = bool(body["golden_v2_enabled"])
             if updates:
                 ie_config.set_values(updates)
             return jsonify({"ok": True, **ie_config.get()})
@@ -2747,7 +2705,7 @@ def api_ie_golden_stats():
         rows = _sql(
             """SELECT
                  COUNT(*) AS total,
-                 SUM(CASE WHEN plan_source='golden_replay' THEN 1 ELSE 0 END) AS golden_replay,
+                 SUM(CASE WHEN plan_source IN ('golden_v2_instance','golden_v2_template','golden_replay') THEN 1 ELSE 0 END) AS golden_instance,
                  SUM(CASE WHEN plan_source='golden_candidate' THEN 1 ELSE 0 END) AS golden_candidate,
                  SUM(CASE WHEN plan_source='reuse_plan' THEN 1 ELSE 0 END) AS reuse_plan,
                  SUM(CASE WHEN plan_source='llm_free' THEN 1 ELSE 0 END) AS llm_free,
@@ -2763,14 +2721,16 @@ def api_ie_golden_stats():
             return jsonify({})
         r = rows[0]
         total = r.get("total", 0) or 0
+        golden_inst = r.get("golden_instance", 0) or 0
+        golden_cand = r.get("golden_candidate", 0) or 0
         return jsonify({
             "total": total,
-            "golden_replay": r.get("golden_replay", 0) or 0,
-            "golden_candidate": r.get("golden_candidate", 0) or 0,
+            "golden_replay": golden_inst,
+            "golden_candidate": golden_cand,
             "reuse_plan": r.get("reuse_plan", 0) or 0,
             "llm_free": r.get("llm_free", 0) or 0,
-            "golden_replay_rate": round((r.get("golden_replay", 0) or 0) / total * 100, 1) if total else 0,
-            "golden_candidate_rate": round((r.get("golden_candidate", 0) or 0) / total * 100, 1) if total else 0,
+            "golden_replay_rate": round(golden_inst / total * 100, 1) if total else 0,
+            "golden_candidate_rate": round(golden_cand / total * 100, 1) if total else 0,
             "avg_llm_attempts": round(r.get("avg_llm_attempts", 0) or 0, 1),
             "avg_attempts_count": round(r.get("avg_attempts_count", 0) or 0, 1),
             "avg_removed_steps": round(r.get("avg_removed_steps", 0) or 0, 1),

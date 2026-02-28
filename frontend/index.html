@@ -477,7 +477,7 @@
                   </div>
                 </div>
                 <div class="data-locality-item send">
-                  <span class="data-locality-icon">📡</span>
+                  <span class="data-locality-icon">💎</span>
                   <div>
                     <span class="data-locality-label" data-i18n="privacy.sentToApi">发送到外部 API</span>
                     <span class="data-locality-desc" data-i18n="privacy.sentToApiDesc">当前对话消息会发送到 LLM 提供商；搜索查询会发送到搜索 API。对话历史和画像不会自动发送。</span>
@@ -502,6 +502,25 @@
 
           <!-- ═══ Tab: Advanced ═══ -->
           <div class="settings-tab-content" data-tab="advanced">
+
+            <!-- Two toggles in a row -->
+            <div class="settings-toggles-row">
+            <!-- Intent Routing Toggle -->
+            <div class="settings-card">
+              <h2>🧭 意图路由（Intent Routing）</h2>
+              <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;">
+                启用后，系统将根据用户意图自动选择最合适的工具集，提升执行效率和准确性。
+              </p>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <label class="toggle">
+                  <input type="checkbox" id="routing-toggle" checked onchange="toggleRouting(this.checked)" />
+                  <span class="toggle-slider"></span>
+                </label>
+                <span id="routing-status" style="font-size:0.85rem;color:var(--text-sub);">已启用</span>
+              </div>
+            </div>
+
+            <!-- Golden Replay Toggle -->
             <div class="settings-card">
               <h2>⚡ 智能回放（Golden Replay）</h2>
               <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;">
@@ -515,6 +534,35 @@
                 <span id="golden-replay-status" style="font-size:0.85rem;color:var(--text-sub);">已启用</span>
               </div>
             </div>
+            </div>
+
+            <!-- Three apps in a row -->
+            <div class="settings-apps-row">
+            <!-- Intent Engine -->
+            <div class="settings-card settings-app-entry" onclick="openAppDetail('intent_engine')">
+              <div>
+                <h2>🎯 <span data-i18n="app.intent_engine.name">意图引擎</span></h2>
+                <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.intent_engine.desc">意图分类、工具路由、Case 检索、计划复用——闭环执行智能</p>
+              </div>
+            </div>
+
+            <!-- Strategy Hub -->
+            <div class="settings-card settings-app-entry" onclick="openAppDetail('strategy_hub')">
+              <div>
+                <h2>🧠 <span data-i18n="app.strategy_hub.name">策略中枢</span></h2>
+                <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.strategy_hub.desc">策略资产治理——模板、实例、候选的生命周期与健康管理</p>
+              </div>
+            </div>
+
+            <!-- Execution Prism -->
+            <div class="settings-card settings-app-entry" onclick="openAppDetail('execution_radar')">
+              <div>
+                <h2>💎 <span data-i18n="app.execution_radar.name">执行棱镜</span></h2>
+                <p style="font-size:0.88rem;color:var(--text-sub);margin:4px 0 0;" data-i18n="app.execution_radar.desc">每日执行质量分析——命中率、错误趋势、工具诊断</p>
+              </div>
+            </div>
+            </div>
+
             <div class="settings-card" id="dev-mode-settings-card">
               <h2 data-i18n="security.devCard.title">🛡️ 开发模式 — 可执行所有操作（高风险）</h2>
               <p style="font-size:0.88rem;color:var(--text-sub);margin:0 0 12px;" data-i18n="security.devCard.desc">
@@ -672,7 +720,7 @@
       <div class="page" id="page-app-detail" style="display:none;">
         <div class="page-header">
           <div class="app-detail-back">
-            <button class="btn btn-sm" onclick="switchPage('apps')">← <span data-i18n="apps.back">返回</span></button>
+            <button class="btn btn-sm" id="app-detail-back-btn" onclick="goBackFromAppDetail()">← <span data-i18n="apps.back">返回</span></button>
             <h1 id="app-detail-title"></h1>
           </div>
         </div>

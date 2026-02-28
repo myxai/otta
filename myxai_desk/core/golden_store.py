@@ -1,8 +1,11 @@
-"""Golden Store — DB read/write layer for golden plans and candidate lifecycle.
+"""Golden Store — candidate lifecycle and shared utilities.
 
-Owns: ``golden_plans`` table creation, golden/candidate queries,
-promotion, and stats recording.  ``golden_candidates`` table is
-owned by execution_radar; this module only reads/updates it.
+Owns: ``golden_candidates`` column backfill, candidate queries.
+``golden_candidates`` table is owned by execution_radar/dao.py;
+this module only reads/updates it.
+
+Utility functions ``compute_case_key`` and ``parse_candidate_plan``
+are used by both the v2 golden system and execution radar.
 """
 
 from __future__ import annotations
@@ -11,11 +14,11 @@ import hashlib
 import json
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
-from myxai_desk.core.storage.sqlite import connect, ensure_table, execute
+from myxai_desk.core.storage.sqlite import execute
 
 log = logging.getLogger("myxai")
 
@@ -25,18 +28,6 @@ CANDIDATE_FAIL_THRESHOLD = 3
 
 
 # ── Data classes ──────────────────────────────────────────────────
-
-
-@dataclass
-class GoldenPlan:
-    case_key: str
-    version: int
-    golden_plan_json: str
-    replayable: bool
-    source_candidate_id: Optional[str]
-    created_at: str
-    last_used_at: Optional[str]
-    stats: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -56,36 +47,18 @@ class GoldenCandidate:
 # ── Table init ────────────────────────────────────────────────────
 
 
-def _init_golden_tables() -> None:
+def _init_tables() -> None:
     global _TABLES_READY
     if _TABLES_READY:
         return
-
-    ensure_table(
-        "golden_plans",
-        """
-        case_key            TEXT PRIMARY KEY,
-        version             INTEGER NOT NULL DEFAULT 1,
-        golden_plan_json    TEXT NOT NULL,
-        replayable          INTEGER NOT NULL DEFAULT 1,
-        source_candidate_id TEXT,
-        created_at          TEXT NOT NULL,
-        last_used_at        TEXT,
-        stats_json          TEXT NOT NULL DEFAULT '{}'
-        """,
-    )
-
-    try:
-        execute("SELECT 1 FROM golden_plans LIMIT 0", readonly=True)
-    except Exception:
-        pass
-
     _backfill_candidate_columns()
     _TABLES_READY = True
 
 
 def _backfill_candidate_columns() -> None:
-    """Ensure golden_candidates has the extra columns PR-2 needs."""
+    """Ensure golden_candidates has the extra columns needed for replay."""
+    from myxai_desk.core.storage.sqlite import connect
+
     extras = [
         ("used_count", "INTEGER NOT NULL DEFAULT 0"),
         ("fail_count", "INTEGER NOT NULL DEFAULT 0"),
@@ -130,33 +103,11 @@ def compute_case_key(
 
 
 class GoldenStore:
-    """All golden-plan / candidate DB operations in one place."""
+    """Candidate DB operations for the replay pipeline."""
 
     def __init__(self) -> None:
-        _init_golden_tables()
+        _init_tables()
 
-    # 1) Fetch verified golden plan
-    def get_golden_plan(self, case_key: str) -> Optional[GoldenPlan]:
-        rows = execute(
-            "SELECT * FROM golden_plans WHERE case_key = ? AND replayable = 1",
-            (case_key,),
-            readonly=True,
-        )
-        if not rows:
-            return None
-        r = rows[0]
-        return GoldenPlan(
-            case_key=r["case_key"],
-            version=r["version"],
-            golden_plan_json=r["golden_plan_json"],
-            replayable=bool(r["replayable"]),
-            source_candidate_id=r.get("source_candidate_id"),
-            created_at=r["created_at"],
-            last_used_at=r.get("last_used_at"),
-            stats=_safe_json(r.get("stats_json", "{}")),
-        )
-
-    # 2) Fetch best candidate (new or used, not invalid/promoted)
     def get_best_candidate(self, case_key: str) -> Optional[GoldenCandidate]:
         rows = execute(
             """SELECT * FROM golden_candidates
@@ -184,7 +135,6 @@ class GoldenStore:
             last_used_at=r.get("last_used_at"),
         )
 
-    # 3) Mark candidate usage result
     def mark_candidate_used(self, candidate_id: str, ok: bool) -> None:
         now = _now_iso()
         if ok:
@@ -205,103 +155,6 @@ class GoldenStore:
                    WHERE candidate_id = ?""",
                 (now, CANDIDATE_FAIL_THRESHOLD, candidate_id),
             )
-
-    # 4) Promote candidate → golden plan
-    def promote_candidate_to_golden(
-        self,
-        *,
-        case_key: str,
-        candidate_id: str,
-        golden_plan_json: str,
-        now_iso: str | None = None,
-    ) -> GoldenPlan:
-        now = now_iso or _now_iso()
-
-        old_version = 0
-        rows = execute(
-            "SELECT version FROM golden_plans WHERE case_key = ?",
-            (case_key,),
-            readonly=True,
-        )
-        if rows:
-            old_version = rows[0].get("version", 0)
-
-        new_version = old_version + 1
-
-        execute(
-            """INSERT OR REPLACE INTO golden_plans
-               (case_key, version, golden_plan_json, replayable,
-                source_candidate_id, created_at, last_used_at, stats_json)
-               VALUES (?, ?, ?, 1, ?, ?, ?, '{}')""",
-            (case_key, new_version, golden_plan_json, candidate_id, now, now),
-        )
-
-        execute(
-            "UPDATE golden_candidates SET status = 'promoted' WHERE candidate_id = ?",
-            (candidate_id,),
-        )
-
-        return GoldenPlan(
-            case_key=case_key,
-            version=new_version,
-            golden_plan_json=golden_plan_json,
-            replayable=True,
-            source_candidate_id=candidate_id,
-            created_at=now,
-            last_used_at=now,
-            stats={},
-        )
-
-    # 5) Record golden usage stats
-    def record_golden_use(
-        self,
-        *,
-        case_key: str,
-        ok: bool,
-        attempts_count: int = 0,
-        duration_ms: int | None = None,
-        run_id: str | None = None,
-        now_iso: str | None = None,
-    ) -> None:
-        now = now_iso or _now_iso()
-
-        rows = execute(
-            "SELECT stats_json FROM golden_plans WHERE case_key = ?",
-            (case_key,),
-            readonly=True,
-        )
-        if not rows:
-            return
-
-        stats: dict[str, Any] = _safe_json(rows[0].get("stats_json", "{}"))
-        sc = stats.get("success_count", 0)
-        fc = stats.get("fail_count", 0)
-
-        if ok:
-            stats["success_count"] = sc + 1
-        else:
-            stats["fail_count"] = fc + 1
-
-        total = sc + fc + 1
-        old_avg = stats.get("avg_attempts", 0.0)
-        stats["avg_attempts"] = round(
-            old_avg + (attempts_count - old_avg) / total, 2
-        )
-
-        if duration_ms is not None:
-            old_dur = stats.get("avg_duration_ms", 0.0)
-            stats["avg_duration_ms"] = round(
-                old_dur + (duration_ms - old_dur) / total, 2
-            )
-
-        stats["last_outcome"] = "success" if ok else "fail"
-        if run_id:
-            stats["last_run_id"] = run_id
-
-        execute(
-            "UPDATE golden_plans SET last_used_at = ?, stats_json = ? WHERE case_key = ?",
-            (now, json.dumps(stats, ensure_ascii=False), case_key),
-        )
 
 
 # ── Helpers ───────────────────────────────────────────────────────
@@ -327,15 +180,6 @@ def parse_candidate_plan(candidate_plan_json: str) -> list[dict]:
                 args = {}
         steps.append({"tool_name": tool_name, "args": args})
     return steps
-
-
-def _safe_json(val: Any) -> Any:
-    if isinstance(val, str):
-        try:
-            return json.loads(val)
-        except Exception:
-            return {}
-    return val if isinstance(val, dict) else {}
 
 
 def _now_iso() -> str:
