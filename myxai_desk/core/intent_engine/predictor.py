@@ -26,7 +26,7 @@ from myxai_desk.core.intent_engine.dao import insert_run, update_outcome
 
 log = logging.getLogger("myxai")
 
-_FALLBACK_CONF = 0.70
+_FALLBACK_CONF = 0.65
 _SEARCH_DOMINANCE_WINDOW = 200
 _SEARCH_DOMINANCE_THRESHOLD = 0.60
 _SEARCH_DOMINANCE_PENALTY = 0.15

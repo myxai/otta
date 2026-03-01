@@ -1288,8 +1288,14 @@ const _PLAN_SOURCE_LABELS = {
   llm_free:           { label: "自由推理", css: "esb-llm-free" },
 };
 
+const _CATEGORY_ICONS = {
+  search: "\u{1F50D}", fs: "\u{1F4C1}", math: "\u{1F522}", creative: "\u{270F}\u{FE0F}",
+  ask: "\u{2753}", chat: "\u{1F4AC}", system: "\u{2699}\u{FE0F}", browser: "\u{1F310}",
+  schedule: "\u{1F4C5}", general: "\u{1F4A1}",
+};
+
 function _appendDecisionBadge(msgElId, dm) {
-  if (!dm || (!dm.plan_source && !dm.cost_reason)) return;
+  if (!dm || (!dm.plan_source && !dm.cost_reason && !dm.composite)) return;
   const msgEl = document.getElementById(msgElId);
   if (!msgEl) return;
   const body = msgEl.querySelector(".message-body");
@@ -1300,25 +1306,69 @@ function _appendDecisionBadge(msgElId, dm) {
     const info = _PLAN_SOURCE_LABELS[dm.plan_source] || _PLAN_SOURCE_LABELS.llm_free;
     const parts = [];
     if (dm.golden_version != null) parts.push(`v${dm.golden_version}`);
-    if (dm.removed_steps > 0) parts.push(`剪枝 -${dm.removed_steps}`);
-    if (dm.promoted) parts.push("promoted → 黄金");
-    parts.push(`尝试 ${dm.attempts_count || 0}`);
+    if (dm.removed_steps > 0) parts.push(`\u526A\u679D -${dm.removed_steps}`);
+    if (dm.promoted) parts.push("promoted \u2192 \u9EC4\u91D1");
+    parts.push(`\u5C1D\u8BD5 ${dm.attempts_count || 0}`);
     parts.push(`LLM ${dm.llm_attempts || 0}`);
 
     const badge = document.createElement("div");
     badge.className = `exec-source-badge ${info.css}`;
-    badge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${info.label}</span><span class="esb-detail">${parts.join(" · ")}</span>`;
+    badge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${info.label}</span><span class="esb-detail">${parts.join(" \xB7 ")}</span>`;
     body.appendChild(badge);
   }
 
   if (dm.cost_reason) {
-    const tierLabel = {"turbo": "⚡ Turbo", "plus": "➕ Plus", "max": "🔥 Max"}[dm.cost_tier] || dm.cost_tier;
+    const tierLabel = {"turbo": "\u26A1 Turbo", "plus": "\u2795 Plus", "max": "\u{1F525} Max"}[dm.cost_tier] || dm.cost_tier;
     const blocked = dm.cost_blocked;
     const costBadge = document.createElement("div");
     costBadge.className = `exec-source-badge ${blocked ? "esb-cost-blocked" : "esb-cost-downgrade"}`;
     const pctText = dm.daily_usage_pct != null ? `${dm.daily_usage_pct.toFixed(0)}%` : "";
-    costBadge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${blocked ? "预算已满" : tierLabel}</span><span class="esb-detail">${dm.cost_reason}${dm.effective_model ? " · 模型: " + dm.effective_model : ""}${pctText ? " · 用量: " + pctText : ""}</span>`;
+    costBadge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${blocked ? "\u9884\u7B97\u5DF2\u6EE1" : tierLabel}</span><span class="esb-detail">${dm.cost_reason}${dm.effective_model ? " \xB7 \u6A21\u578B: " + dm.effective_model : ""}${pctText ? " \xB7 \u7528\u91CF: " + pctText : ""}</span>`;
     body.appendChild(costBadge);
+  }
+
+  // Composite intent badge — shows multi-step task breakdown
+  if (dm.composite && dm.composite.mode === "composite" && dm.composite.intent_count > 1) {
+    const ci = dm.composite;
+    const wrapper = document.createElement("div");
+    wrapper.className = "composite-intent-badge";
+
+    const header = document.createElement("div");
+    header.className = "cib-header";
+    header.innerHTML = `<span class="cib-icon">\u{1F9E9}</span><span class="cib-title">\u7EC4\u5408\u4EFB\u52A1 \xB7 ${ci.intent_count} \u6B65</span>`;
+    header.style.cursor = "pointer";
+    wrapper.appendChild(header);
+
+    const detail = document.createElement("div");
+    detail.className = "cib-detail";
+    detail.style.display = "none";
+
+    ci.intents.forEach(function(seg, idx) {
+      const icon = _CATEGORY_ICONS[seg.category] || "\u{1F4A1}";
+      const step = document.createElement("div");
+      step.className = "cib-step";
+      step.innerHTML =
+        `<span class="cib-step-num">${idx + 1}</span>` +
+        `<span class="cib-step-icon">${icon}</span>` +
+        `<span class="cib-step-cat">${seg.category}</span>` +
+        `<span class="cib-step-text">${seg.text}</span>` +
+        `<span class="cib-step-conf">${(seg.confidence * 100).toFixed(0)}%</span>`;
+      detail.appendChild(step);
+      if (idx < ci.intents.length - 1 && ci.edges[idx]) {
+        const arrow = document.createElement("div");
+        arrow.className = "cib-arrow";
+        arrow.textContent = ci.edges[idx].type === "parallel" ? "\u2195 \u5E76\u884C" : "\u2193";
+        detail.appendChild(arrow);
+      }
+    });
+
+    wrapper.appendChild(detail);
+    header.addEventListener("click", function() {
+      detail.style.display = detail.style.display === "none" ? "block" : "none";
+      header.classList.toggle("cib-expanded");
+    });
+
+    body.appendChild(wrapper);
   }
 }
 
@@ -3690,6 +3740,24 @@ async function openIntentEngineDetail() {
       </div>
     </div>
 
+    <!-- 3.5. Composite Intent Metrics -->
+    <div class="app-detail-section">
+      <details id="ie-composite-panel">
+        <summary style="cursor:pointer;font-weight:600;font-size:15px;">
+          \u{1F9E9} \u7EC4\u5408\u610F\u56FE\u76D1\u63A7
+          <span style="font-size:11px;color:var(--subtext0);margin-left:8px;">Composite vs Single \u7EDF\u8BA1</span>
+        </summary>
+        <div id="ie-composite-metrics" style="margin-top:12px;"></div>
+        <div id="ie-composite-test" style="margin-top:12px;">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px;">
+            <input type="text" id="ie-composite-input" class="form-input" placeholder="\u8F93\u5165\u6D4B\u8BD5\u6587\u672C\u2026" style="flex:1;font-size:13px;">
+            <button class="btn btn-sm btn-primary" onclick="ieCompositeTest()">\u6D4B\u8BD5</button>
+          </div>
+          <div id="ie-composite-result" style="font-size:12px;"></div>
+        </div>
+      </details>
+    </div>
+
     <!-- 4. Execution Detail -->
     <div class="app-detail-section">
       <details id="ie-detail-panel">
@@ -3820,7 +3888,102 @@ async function _ieRefreshAll() {
     _ieLoadDistribution(),
     _ieLoadRuns(),
     _ieLoadLearningPanel(),
+    _ieLoadCompositeMetrics(),
   ]);
+}
+
+// ── Composite Intent Metrics ─────────────────────────────────────
+
+async function _ieLoadCompositeMetrics() {
+  const el = document.getElementById("ie-composite-metrics");
+  if (!el) return;
+  try {
+    const d = await api("/api/ie/composite/metrics");
+    if (!d || d.total_requests === 0) {
+      el.innerHTML = '<div style="color:var(--subtext0);font-size:12px;">\u6682\u65E0\u7EC4\u5408\u610F\u56FE\u6570\u636E\uFF0C\u53D1\u9001\u6D88\u606F\u540E\u5C06\u81EA\u52A8\u7EDF\u8BA1</div>';
+      return;
+    }
+    const cats = Object.entries(d.category_distribution || {}).sort((a,b) => b[1] - a[1]);
+    const catHtml = cats.slice(0, 8).map(function(c) {
+      const icon = _CATEGORY_ICONS[c[0]] || "\u{1F4A1}";
+      return `<span class="cib-cat-chip">${icon} ${c[0]} <b>${c[1]}</b></span>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="ie-metrics-grid" style="margin-bottom:12px;">
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${d.total_requests}</div>
+          <div class="ie-metric-label">\u603B\u8BF7\u6C42</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${d.single_count}</div>
+          <div class="ie-metric-label">\u5355\u6B65\u4EFB\u52A1</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value" style="color:var(--lavender)">${d.composite_count}</div>
+          <div class="ie-metric-label">\u7EC4\u5408\u4EFB\u52A1</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value" style="color:var(--mauve)">${d.composite_pct}%</div>
+          <div class="ie-metric-label">\u7EC4\u5408\u5360\u6BD4</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${d.avg_intents_per_composite}</div>
+          <div class="ie-metric-label">\u5E73\u5747\u6B65\u9AA4\u6570</div>
+        </div>
+      </div>
+      <div style="margin-bottom:8px;">
+        <span style="font-weight:600;font-size:12px;">\u610F\u56FE\u7C7B\u522B\u5206\u5E03</span>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">${catHtml || '<span style="color:var(--subtext0);font-size:11px;">-</span>'}</div>
+      </div>
+      ${d.recent && d.recent.length ? `
+        <details style="margin-top:8px;">
+          <summary style="cursor:pointer;font-size:12px;color:var(--subtext0);">\u6700\u8FD1 ${d.recent.length} \u6761\u8BB0\u5F55</summary>
+          <div style="margin-top:6px;max-height:200px;overflow-y:auto;">
+            <table style="width:100%;font-size:11px;border-collapse:collapse;">
+              <tr style="color:var(--subtext0);"><th style="text-align:left;padding:2px 6px;">\u6A21\u5F0F</th><th>\u4E3B\u7C7B\u522B</th><th>\u6B65\u9AA4</th><th>\u7F6E\u4FE1\u5EA6</th></tr>
+              ${d.recent.map(function(r) {
+                return `<tr style="border-top:1px solid var(--surface0);">
+                  <td style="padding:2px 6px;">${r.mode === "composite" ? "\u{1F9E9}" : "\u2022"} ${r.mode}</td>
+                  <td style="text-align:center;">${r.primary}</td>
+                  <td style="text-align:center;">${r.intents}</td>
+                  <td style="text-align:center;">${(r.conf * 100).toFixed(0)}%</td>
+                </tr>`;
+              }).join("")}
+            </table>
+          </div>
+        </details>
+      ` : ""}
+    `;
+  } catch(e) {
+    el.innerHTML = '<div style="color:var(--red);font-size:12px;">\u52A0\u8F7D\u5931\u8D25: ' + e.message + '</div>';
+  }
+}
+
+async function ieCompositeTest() {
+  const input = document.getElementById("ie-composite-input");
+  const resultEl = document.getElementById("ie-composite-result");
+  if (!input || !resultEl) return;
+  const text = input.value.trim();
+  if (!text) return;
+  resultEl.innerHTML = '<span style="color:var(--subtext0);">\u5206\u6790\u4E2D\u2026</span>';
+  try {
+    const d = await api("/api/ie/predict", "POST", { text });
+    if (d.mode === "single") {
+      resultEl.innerHTML = `<div style="padding:6px 0;"><b>\u5355\u6B65\u6A21\u5F0F</b> \xB7 \u7C7B\u522B: <code>${d.primary_category}</code> \xB7 \u7F6E\u4FE1\u5EA6: ${(d.route_conf * 100).toFixed(0)}%</div>`;
+    } else {
+      let stepsHtml = d.intents.map(function(s, i) {
+        const icon = _CATEGORY_ICONS[s.category] || "\u{1F4A1}";
+        return `<div class="cib-step"><span class="cib-step-num">${i+1}</span><span class="cib-step-icon">${icon}</span><span class="cib-step-cat">${s.category}</span><span class="cib-step-text">${s.text}</span><span class="cib-step-conf">${(s.confidence*100).toFixed(0)}%</span></div>`;
+      }).join("");
+      let edgesHtml = d.edges.map(function(e) {
+        return `<div class="cib-arrow">${e.type === "parallel" ? "\u2195 \u5E76\u884C" : "\u2193 \u987A\u5E8F"}</div>`;
+      }).join("");
+      resultEl.innerHTML = `<div style="padding:6px 0;"><b>\u{1F9E9} \u7EC4\u5408\u6A21\u5F0F</b> \xB7 ${d.intents.length} \u6B65 \xB7 \u4E3B\u7C7B\u522B: <code>${d.primary_category}</code></div><div class="composite-intent-badge" style="margin-top:4px;"><div class="cib-detail" style="display:block;">${stepsHtml}</div></div>`;
+    }
+    _ieLoadCompositeMetrics();
+  } catch(e) {
+    resultEl.innerHTML = '<span style="color:var(--red);">\u5206\u6790\u5931\u8D25: ' + e.message + '</span>';
+  }
 }
 
 async function updateIeConfig(key, value) {

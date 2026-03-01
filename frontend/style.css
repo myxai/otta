@@ -846,6 +846,87 @@ a:hover { text-decoration: underline; }
 }
 .exec-source-badge.esb-cost-blocked .esb-dot { background: #ef4444; }
 
+/* Composite Intent Badge */
+.composite-intent-badge {
+  margin-top: 8px;
+  border: 1px solid var(--surface1, #45475a);
+  border-radius: 10px;
+  overflow: hidden;
+  font-size: 12px;
+}
+.cib-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--surface0, #313244);
+  transition: background 0.15s;
+}
+.cib-header:hover { background: var(--surface1, #45475a); }
+.cib-header.cib-expanded { border-bottom: 1px solid var(--surface1, #45475a); }
+.cib-icon { font-size: 14px; }
+.cib-title { font-weight: 600; color: var(--lavender, #b4befe); }
+.cib-detail { padding: 6px 10px; }
+.cib-step {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: background 0.12s;
+}
+.cib-step:hover { background: var(--surface0, #313244); }
+.cib-step-num {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--lavender, #b4befe);
+  color: var(--base, #1e1e2e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.cib-step-icon { font-size: 14px; flex-shrink: 0; }
+.cib-step-cat {
+  font-weight: 600;
+  color: var(--mauve, #cba6f7);
+  min-width: 54px;
+}
+.cib-step-text {
+  flex: 1;
+  color: var(--text, #cdd6f4);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cib-step-conf {
+  color: var(--subtext0, #a6adc8);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+.cib-arrow {
+  text-align: center;
+  color: var(--overlay1, #7f849c);
+  font-size: 11px;
+  padding: 1px 0;
+  line-height: 1;
+}
+
+.cib-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--surface0, #313244);
+  font-size: 11px;
+  color: var(--text, #cdd6f4);
+}
+.cib-cat-chip b { color: var(--lavender, #b4befe); }
+
 /* PR-2: golden KPI row in radar */
 .er-golden-kpi-row {
   display: grid;

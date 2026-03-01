@@ -99,11 +99,12 @@ RULES: list[Rule] = [
         category="math",
         pattern=re.compile(
             r"\d+\s*[+\-*/÷×^%]\s*\d|=\s*\?|"
-            r"计算.*(?:sin|cos|tan|log|平方|立方|阶乘|导数|积分|极限)|"
-            r"算一下|求值|求解|方程|等于多少|"
+            r"计算|算一下|求值|求解|方程|等于多少|标准差|平均数|中位数|众数|方差|"
+            r"加法|减法|乘法|除法|开方|根号|"
             r"√|∑|∫|sin\b|cos\b|tan\b|log\b|ln\b|π|sqrt|"
-            r"平方|立方|阶乘|导数|积分|极限|概率|排列|组合|"
-            r"calculate|compute|solve|factorial|equation|divided\s+by",
+            r"平方|立方|阶乘|导数|积分|极限|概率|排列|组合|统计|"
+            r"calculate|compute|solve|factorial|equation|divided\s+by|"
+            r"mean|median|mode|variance|standard\s+deviation",
             re.IGNORECASE,
         ),
         negative=re.compile(
@@ -120,14 +121,16 @@ RULES: list[Rule] = [
         rule_id="creative_write",
         category="creative",
         pattern=re.compile(
-            r"写.*(?:诗|文|故事|小说|文案|脚本|歌词|对联|散文|段落|作文|邮件|信)|"
+            r"写.*(?:诗|文|故事|小说|文案|脚本|歌词|对联|散文|段落|作文|邮件|信|注释|说明)|"
+            r"讲.*(?:故事|笑话|段子)|"
             r"来一首|来一篇|来一段|来个.*(?:故事|笑话|段子)|"
             r"生成.*(?:文本|内容|文章|报告)|创作|编写|改写|润色|续写|仿写|"
-            r"翻译|translate|"
-            r"write\s+.*(?:poem|story|article|essay|email|script|lyrics|paragraph|letter)|"
-            r"generate\s+.*(?:text|content|description|report)|"
+            r"翻译|translate|comment|documentation|"
+            r"write\s+.*(?:poem|story|article|essay|email|script|lyrics|paragraph|letter|comment)|"
+            r"generate\s+.*(?:text|content|description|report|documentation)|"
             r"create\s+.*(?:story|poem|slogan|content)|"
-            r"compose|draft|rewrite|polish|rephrase|paraphrase|summarize|summary",
+            r"compose|draft|rewrite|polish|rephrase|paraphrase|summarize|summary|"
+            r"tell\s+.*(?:story|tale|joke)",
             re.IGNORECASE,
         ),
         negative=re.compile(
@@ -193,7 +196,7 @@ RULES: list[Rule] = [
             re.IGNORECASE,
         ),
         priority=70,
-        base_conf=0.75,
+        base_conf=0.78,
         strong_features=_STRONG_SEARCH,
         weak_features=_WEAK_PHRASES,
     ),
@@ -207,7 +210,9 @@ RULES: list[Rule] = [
             re.IGNORECASE,
         ),
         negative=re.compile(
-            r"文件|目录|统计.*(?:目录|文件|磁盘)",
+            r"文件|目录|统计.*(?:目录|文件|磁盘)|"
+            r"^(?:写|生成|创作|制作).*(?:报告|简报|报表)|"  # 排除"写报告"、"生成报告"
+            r"保存.*(?:报告|报表)|导出.*(?:报告|报表)",  # 排除"保存报告"
             re.IGNORECASE,
         ),
         priority=70,
@@ -237,6 +242,10 @@ RULES: list[Rule] = [
             r"安装|pip\s+install|npm\s+install|apt\s+|brew\s+|"
             r"系统设置|网络配置|防火墙|注册表|registry|systemctl|service\s+|"
             r"环境变量|PATH|chmod|chown|sudo|"
+            r"磁盘.*(?:空间|剩余|容量)|CPU.*使用率|内存.*使用|"
+            r"disk.*(?:space|usage)|cpu.*usage|memory.*usage|"
+            r"重启|restart|杀掉|kill|停止|stop|启动|start|"  # 新增
+            r"进程|process|服务|service.*(?:重启|启动|停止)|"  # 新增
             r"install.*(?:python|node|java|package)",
             re.IGNORECASE,
         ),
@@ -253,9 +262,12 @@ RULES: list[Rule] = [
         pattern=re.compile(
             r"文件|目录|读取|写入|编辑|创建.*文件|删除.*文件|"
             r"移动.*(?:文件|目录|文件夹)|复制.*(?:文件|目录)|重命名|"
-            r"压缩|解压|整理.*(?:文件|目录|下载)|read_file|write_file|edit_file|list_dir|"
+            r"压缩|解压|整理.*(?:文件|目录|下载)|"
+            r"保存到|保存为|另存为|导出为|导出到|写入到|"  # 新增：明确的保存操作
+            r"read_file|write_file|edit_file|list_dir|"
             r"delete.*file|move.*file|copy.*file|read.*(?:file|config)|edit.*\.(py|js|json|txt|md)|"
-            r"list.*(?:file|directory|dir)",
+            r"list.*(?:file|directory|dir)|"
+            r"save\s+to|save\s+as|export\s+to|export\s+as|write\s+to",  # 新增英文
             re.IGNORECASE,
         ),
         priority=50,
@@ -268,6 +280,8 @@ RULES: list[Rule] = [
         category="fs",
         pattern=re.compile(
             r"git\s|git\b|命令|终端|terminal|shell|cmd|"
+            r"查看.*git|查git|git.*状态|git.*历史|git.*日志|"
+            r"提交|commit|推送|push|拉取|pull|合并|merge|"  # 新增：Git操作
             r"编译|构建|build|compile|运行.*(?:脚本|程序|代码)|执行.*(?:脚本|命令)",
             re.IGNORECASE,
         ),
@@ -276,7 +290,7 @@ RULES: list[Rule] = [
             re.IGNORECASE,
         ),
         priority=45,
-        base_conf=0.65,
+        base_conf=0.72,
         strong_features=_STRONG_FS,
         weak_features=_WEAK_PHRASES,
     ),

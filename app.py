@@ -753,10 +753,15 @@ def _patch_agent_tool_history(agent):
 
         all_tool_defs = self.tools.get_definitions()
         _ie_result = None
+        _composite_result = None
         try:
             from myxai_desk.core.intent_engine.config import routing_enabled as _ie_routing_enabled
             if _ie_routing_enabled():
                 from myxai_desk.core.intent_engine import predict as _ie_predict
+                from myxai_desk.core.intent_engine.composite import (
+                    predict_composite as _ie_predict_composite,
+                    format_composite_result as _format_composite,
+                )
                 _mcp_names = [d.get("function", {}).get("name", "") for d in all_tool_defs
                               if d.get("function", {}).get("name", "").startswith("mcp_")]
                 _ie_result = _ie_predict(
@@ -769,6 +774,14 @@ def _patch_agent_tool_history(agent):
                 tool_defs = _ie_result.filter_tools(all_tool_defs)
                 _ie_result.save(session_id=key, user_text=msg.content,
                                 context={"exec_mode": exec_mode})
+
+                # Composite intent analysis (non-blocking, enriches metadata)
+                try:
+                    _composite_result = _ie_predict_composite(msg.content)
+                    from myxai_desk.core.intent_engine.composite import _metrics
+                    _metrics.record(_composite_result)
+                except Exception:
+                    log.debug("[agent] composite intent analysis skipped", exc_info=True)
             else:
                 tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
         except Exception:
@@ -1374,6 +1387,24 @@ def _patch_agent_tool_history(agent):
                     _dm["cap_wake_suggestions"] = [
                         s["cap_id"] for s in _cap_advice.wake_suggestions
                     ]
+            if _composite_result:
+                _dm["composite"] = {
+                    "mode": _composite_result.mode,
+                    "intent_count": len(_composite_result.intents),
+                    "intents": [
+                        {
+                            "id": seg.id,
+                            "category": seg.category,
+                            "text": seg.text,
+                            "confidence": round(seg.confidence, 2),
+                        }
+                        for seg in _composite_result.intents
+                    ],
+                    "edges": [
+                        {"from": e.from_id, "to": e.to_id, "type": e.edge_type}
+                        for e in _composite_result.edges
+                    ],
+                }
             with _last_decision_meta_lock:
                 _last_decision_meta[key] = _dm
 
@@ -2600,6 +2631,34 @@ def api_new_chat():
     global _session_counter
     _session_counter += 1
     return jsonify({"success": True, "session_id": f"desktop:{_session_epoch}_{_session_counter}"})
+
+
+@flask_app.route("/api/ie/predict", methods=["POST"])
+def api_ie_predict():
+    """Real-time composite intent prediction endpoint."""
+    data = request.json or {}
+    text = data.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "text is required"}), 400
+    try:
+        from myxai_desk.core.intent_engine.composite import (
+            predict_composite, format_composite_result,
+        )
+        result = predict_composite(text)
+        return jsonify(format_composite_result(result))
+    except Exception as e:
+        log.exception("[ie/predict] failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@flask_app.route("/api/ie/composite/metrics")
+def api_ie_composite_metrics():
+    """Return composite intent monitoring metrics."""
+    try:
+        from myxai_desk.core.intent_engine.composite import _metrics
+        return jsonify(_metrics.snapshot())
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @flask_app.route("/api/ie/last_run")
