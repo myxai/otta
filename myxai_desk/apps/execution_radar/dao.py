@@ -126,6 +126,20 @@ def init_radar_tables() -> None:
         """,
     )
 
+    _er_tasks_backfill = [
+        ("effective_count", "INTEGER DEFAULT 0"),
+    ]
+    for col, typedef in _er_tasks_backfill:
+        try:
+            execute(f"SELECT {col} FROM er_tasks LIMIT 1", readonly=True)
+        except Exception:
+            try:
+                from myxai_desk.core.storage.sqlite import connect
+                with connect() as conn:
+                    conn.execute(f"ALTER TABLE er_tasks ADD COLUMN {col} {typedef}")
+            except Exception:
+                pass
+
     _gc_backfill = [
         ("original_steps", "INTEGER DEFAULT 0"),
         ("user_text", "TEXT DEFAULT ''"),
@@ -193,8 +207,9 @@ def upsert_task(task: dict) -> None:
     execute(
         """INSERT OR REPLACE INTO er_tasks
            (task_id, session_id, created_at, user_text, total_steps,
-            success, hit_rate, attempts, total_tokens, final_error_code)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            success, hit_rate, attempts, total_tokens, final_error_code,
+            effective_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (
             task["task_id"],
             task["session_id"],
@@ -206,6 +221,7 @@ def upsert_task(task: dict) -> None:
             task.get("attempts", 0),
             task.get("total_tokens", 0),
             task.get("final_error_code", ""),
+            task.get("effective_count", 0),
         ),
     )
 
@@ -215,8 +231,9 @@ def upsert_tasks(tasks: list[dict]) -> None:
     execute_many(
         """INSERT OR REPLACE INTO er_tasks
            (task_id, session_id, created_at, user_text, total_steps,
-            success, hit_rate, attempts, total_tokens, final_error_code)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            success, hit_rate, attempts, total_tokens, final_error_code,
+            effective_count)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         [
             (
                 t["task_id"],
@@ -229,6 +246,7 @@ def upsert_tasks(tasks: list[dict]) -> None:
                 t.get("attempts", 0),
                 t.get("total_tokens", 0),
                 t.get("final_error_code", ""),
+                t.get("effective_count", 0),
             )
             for t in tasks
         ],
@@ -298,7 +316,13 @@ def get_tasks_with_steps(date_str: str) -> list[dict]:
         t_steps = steps_by_task.get(tid, [])
         is_success = bool(t.get("success"))
 
-        if is_success and t_steps:
+        stored_ec = t.get("effective_count") or 0
+        if stored_ec > 0 and is_success:
+            # Use pipeline-computed value (the single source of truth)
+            t["effective_count"] = stored_ec
+            _mark_effective_by_legacy(t_steps)
+        elif is_success and t_steps:
+            # Fallback for old data without stored effective_count
             last_idx_by_tool: dict[str, int] = {}
             for i, s in enumerate(t_steps):
                 tool = s.get("tool_name", "")
@@ -316,6 +340,18 @@ def get_tasks_with_steps(date_str: str) -> list[dict]:
         t["steps"] = t_steps
 
     return tasks
+
+
+def _mark_effective_by_legacy(steps: list[dict]) -> None:
+    """Mark step-level effective flags using legacy distinct-tool heuristic."""
+    last_idx_by_tool: dict[str, int] = {}
+    for i, s in enumerate(steps):
+        tool = s.get("tool_name", "")
+        if tool:
+            last_idx_by_tool[tool] = i
+    effective_indices = set(last_idx_by_tool.values())
+    for i, s in enumerate(steps):
+        s["effective"] = i in effective_indices
 
 
 # ── er_daily_metrics CRUD ──────────────────────────────────────────

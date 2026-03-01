@@ -6,6 +6,7 @@ HNSW index for fast similarity search.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 from typing import Any
@@ -17,6 +18,8 @@ from myxai_desk.core.intent_engine.hnsw_index import add as hnsw_add
 from myxai_desk.core.intent_engine.hnsw_index import count as hnsw_count
 from myxai_desk.core.intent_engine.hnsw_index import init as hnsw_init
 from myxai_desk.core.intent_engine.hnsw_index import search as hnsw_search
+
+_EMBEDDING_MODEL = "text-embedding-3-small"
 
 log = logging.getLogger("myxai")
 
@@ -36,6 +39,7 @@ def _ensure_init() -> None:
 def save_case(
     *,
     task_text: str,
+    text_norm: str = "",
     route_label: str = "",
     plan_steps: list[dict] | None = None,
     outcome: str = "success",
@@ -43,10 +47,16 @@ def save_case(
     fail_reason: str = "",
     context_fp: str = "",
 ) -> str | None:
-    """Persist a case and add its embedding to the HNSW index."""
+    """Persist a case and add its embedding to the HNSW index.
+
+    *task_text* is the raw user input (stored for display/audit).
+    *text_norm* is the normalised text used for embedding.  When omitted the
+    raw text is used as fallback, but callers should always provide norm.
+    """
     _ensure_init()
 
-    vec = embed_text(task_text)
+    embed_source = text_norm or task_text
+    vec = embed_text(embed_source)
     if vec is None:
         log.warning("[case_store] embedding failed, skipping case")
         return None
@@ -63,6 +73,20 @@ def save_case(
     )
     if case_id:
         hnsw_add(case_id, vec)
+        try:
+            from myxai_desk.core.storage.sqlite import execute as _exec
+            norm_hash = hashlib.md5(embed_source.encode()).hexdigest()[:12]
+            _exec(
+                """UPDATE ie_cases
+                   SET text_norm = ?,
+                       norm_hash = ?,
+                       embedding_dim = ?,
+                       embedding_model = ?
+                   WHERE id = ?""",
+                (text_norm, norm_hash, len(vec), _EMBEDDING_MODEL, case_id),
+            )
+        except Exception:
+            pass
     return case_id
 
 

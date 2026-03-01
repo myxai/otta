@@ -456,6 +456,18 @@ def get_overview() -> dict:
     total_use = sum(r.get("use_count_30d", 0) or 0 for r in rows)
     total_success = sum(r.get("success_count_30d", 0) or 0 for r in rows)
 
+    advise_count = 0
+    try:
+        ac_row = execute(
+            """SELECT COUNT(*) AS cnt FROM cap_events
+               WHERE event_type = 'advise'
+               AND ts >= datetime('now', '-30 days')""",
+            readonly=True,
+        )
+        advise_count = (ac_row[0]["cnt"] if ac_row else 0)
+    except Exception:
+        pass
+
     return {
         "active": active,
         "trial": trial,
@@ -469,5 +481,7 @@ def get_overview() -> dict:
             "candidate_count": len(candidate),
             "total_use_30d": total_use,
             "success_rate_30d": round(total_success / total_use * 100, 1) if total_use else 0,
+            "advise_count_30d": advise_count,
+            "mode": "advisory",
         },
     }

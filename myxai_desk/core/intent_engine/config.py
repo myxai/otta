@@ -23,6 +23,7 @@ _DEFAULTS: dict[str, Any] = {
     "route_conf_low": 0.4,
     "hints_max_length": 600,
     "high_risk_tools": ["exec"],
+    "router_model": "",  # cheap/fast model for LLM arbitration; empty = use main model
 }
 
 

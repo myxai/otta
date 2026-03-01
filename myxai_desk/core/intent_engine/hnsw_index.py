@@ -25,6 +25,7 @@ _index: Any | None = None
 _id_map: list[str] = []
 _brute_vecs: list[list[float]] = []
 _use_hnswlib = False
+_current_dim: int = 0
 
 
 def _ensure_dir() -> None:
@@ -47,8 +48,9 @@ def _save_id_map(mapping: list[str]) -> None:
 
 def init(dim: int, max_elements: int = 50000) -> None:
     """Initialise or load the HNSW index."""
-    global _index, _id_map, _use_hnswlib, _brute_vecs
+    global _index, _id_map, _use_hnswlib, _brute_vecs, _current_dim
     with _lock:
+        _current_dim = dim
         _id_map = _load_id_map()
         try:
             import hnswlib
@@ -67,8 +69,12 @@ def init(dim: int, max_elements: int = 50000) -> None:
 
 
 def add(case_id: str, vector: list[float]) -> None:
-    """Add a vector to the index."""
+    """Add a vector to the index. Rejects vectors with mismatched dimensions."""
     global _id_map, _brute_vecs
+    if _current_dim and len(vector) != _current_dim:
+        log.error("[hnsw] dim mismatch: vector=%d, index=%d — rejecting add for %s",
+                  len(vector), _current_dim, case_id)
+        return
     with _lock:
         idx = len(_id_map)
         _id_map.append(case_id)
@@ -86,6 +92,10 @@ def add(case_id: str, vector: list[float]) -> None:
 
 def search(vector: list[float], top_k: int = 5) -> list[tuple[str, float]]:
     """Return up to *top_k* ``(case_id, similarity)`` pairs."""
+    if _current_dim and len(vector) != _current_dim:
+        log.error("[hnsw] search dim mismatch: vector=%d, index=%d — returning empty",
+                  len(vector), _current_dim)
+        return []
     with _lock:
         if not _id_map:
             return []

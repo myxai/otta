@@ -835,6 +835,16 @@ a:hover { text-decoration: underline; }
   color: var(--subtext0);
 }
 .exec-source-badge.esb-llm-free .esb-dot { background: var(--subtext0); }
+.exec-source-badge.esb-cost-downgrade {
+  background: rgba(245, 158, 11, 0.10);
+  color: #f59e0b;
+}
+.exec-source-badge.esb-cost-downgrade .esb-dot { background: #f59e0b; }
+.exec-source-badge.esb-cost-blocked {
+  background: rgba(239, 68, 68, 0.10);
+  color: #ef4444;
+}
+.exec-source-badge.esb-cost-blocked .esb-dot { background: #ef4444; }
 
 /* PR-2: golden KPI row in radar */
 .er-golden-kpi-row {
@@ -4309,6 +4319,9 @@ a:hover { text-decoration: underline; }
   background: var(--bg-surface1);
   color: var(--text);
 }
+.ie-risk-low { color: #10b981; font-weight: 600; }
+.ie-risk-medium { color: #f59e0b; font-weight: 600; }
+.ie-risk-high { color: #ef4444; font-weight: 600; }
 
 /* ── Strategy Hub ────────────────────────────────────────────── */
 

@@ -313,11 +313,14 @@ const FALLBACK_I18N = {
     "ie.keptRate":"保留率","ie.execDetail":"单次执行明细","ie.caseKey":"Case Key",
     "ie.goldenHit":"Golden","ie.llmCalls":"LLM次数","ie.latency":"耗时",
     "ie.routeLabels":"路由标签","ie.allowedTools":"保留工具","ie.reductionRate":"裁剪率",
-    "ie.planSource":"决策来源","ie.decisionModes":"决策模式分布",
+    "ie.planSource":"决策来源","ie.decisionModes":"路由方式","ie.decisions":"执行路径",
+    "ie.routingMethod":"路由方式","ie.execPath":"执行路径","ie.riskDist":"风险分布",
+    "ie.fallbackRate":"兜底率","ie.misrouteCount":"疑似误路由",
     "ie.good":"良好","ie.fair":"一般","ie.poor":"较差",
     "ie.last7d":"近7天","ie.last14d":"近14天","ie.last30d":"近30天",
     "ie.configAndModels":"配置与模型",
     "ie.intentConfidence":"意图置信度","ie.effectiveSteps":"有效步数","ie.costScore":"Token数",
+    "ie.correctCategory":"纠正类别","ie.submitCorrection":"提交纠正","ie.correctionSaved":"纠正已保存","ie.alreadyCorrected":"已纠正",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
@@ -571,11 +574,14 @@ const FALLBACK_I18N = {
     "ie.keptRate":"Kept Rate","ie.execDetail":"Execution Detail","ie.caseKey":"Case Key",
     "ie.goldenHit":"Golden","ie.llmCalls":"LLM Calls","ie.latency":"Latency",
     "ie.routeLabels":"Route Labels","ie.allowedTools":"Allowed Tools","ie.reductionRate":"Reduction",
-    "ie.planSource":"Decision Source","ie.decisionModes":"Decision Modes",
+    "ie.planSource":"Decision Source","ie.decisionModes":"Routing Method","ie.decisions":"Execution Path",
+    "ie.routingMethod":"Routing Method","ie.execPath":"Execution Path","ie.riskDist":"Risk Distribution",
+    "ie.fallbackRate":"Fallback Rate","ie.misrouteCount":"Suspected Misroutes",
     "ie.good":"Good","ie.fair":"Fair","ie.poor":"Poor",
     "ie.last7d":"7 Days","ie.last14d":"14 Days","ie.last30d":"30 Days",
     "ie.configAndModels":"Config & Models",
     "ie.intentConfidence":"Intent Confidence","ie.effectiveSteps":"Effective Steps","ie.costScore":"Tokens",
+    "ie.correctCategory":"Correct Category","ie.submitCorrection":"Submit","ie.correctionSaved":"Correction saved","ie.alreadyCorrected":"Corrected",
   },
 };
 
@@ -1255,25 +1261,37 @@ const _PLAN_SOURCE_LABELS = {
 };
 
 function _appendDecisionBadge(msgElId, dm) {
-  if (!dm || !dm.plan_source) return;
+  if (!dm || (!dm.plan_source && !dm.cost_reason)) return;
   const msgEl = document.getElementById(msgElId);
   if (!msgEl) return;
   const body = msgEl.querySelector(".message-body");
   if (!body) return;
   if (body.querySelector(".exec-source-badge")) return;
 
-  const info = _PLAN_SOURCE_LABELS[dm.plan_source] || _PLAN_SOURCE_LABELS.llm_free;
-  const parts = [];
-  if (dm.golden_version != null) parts.push(`v${dm.golden_version}`);
-  if (dm.removed_steps > 0) parts.push(`剪枝 -${dm.removed_steps}`);
-  if (dm.promoted) parts.push("promoted → 黄金");
-  parts.push(`尝试 ${dm.attempts_count || 0}`);
-  parts.push(`LLM ${dm.llm_attempts || 0}`);
+  if (dm.plan_source) {
+    const info = _PLAN_SOURCE_LABELS[dm.plan_source] || _PLAN_SOURCE_LABELS.llm_free;
+    const parts = [];
+    if (dm.golden_version != null) parts.push(`v${dm.golden_version}`);
+    if (dm.removed_steps > 0) parts.push(`剪枝 -${dm.removed_steps}`);
+    if (dm.promoted) parts.push("promoted → 黄金");
+    parts.push(`尝试 ${dm.attempts_count || 0}`);
+    parts.push(`LLM ${dm.llm_attempts || 0}`);
 
-  const badge = document.createElement("div");
-  badge.className = `exec-source-badge ${info.css}`;
-  badge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${info.label}</span><span class="esb-detail">${parts.join(" · ")}</span>`;
-  body.appendChild(badge);
+    const badge = document.createElement("div");
+    badge.className = `exec-source-badge ${info.css}`;
+    badge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${info.label}</span><span class="esb-detail">${parts.join(" · ")}</span>`;
+    body.appendChild(badge);
+  }
+
+  if (dm.cost_reason) {
+    const tierLabel = {"turbo": "⚡ Turbo", "plus": "➕ Plus", "max": "🔥 Max"}[dm.cost_tier] || dm.cost_tier;
+    const blocked = dm.cost_blocked;
+    const costBadge = document.createElement("div");
+    costBadge.className = `exec-source-badge ${blocked ? "esb-cost-blocked" : "esb-cost-downgrade"}`;
+    const pctText = dm.daily_usage_pct != null ? `${dm.daily_usage_pct.toFixed(0)}%` : "";
+    costBadge.innerHTML = `<span class="esb-dot"></span><span class="esb-label">${blocked ? "预算已满" : tierLabel}</span><span class="esb-detail">${dm.cost_reason}${dm.effective_model ? " · 模型: " + dm.effective_model : ""}${pctText ? " · 用量: " + pctText : ""}</span>`;
+    body.appendChild(costBadge);
+  }
 }
 
 async function handleFeedback(btn) {
@@ -3573,6 +3591,8 @@ let _ieChartGolden = null;
 let _ieChartLlm = null;
 let _ieChartLabelPie = null;
 let _ieChartModePie = null;
+let _ieChartDecisionPie = null;
+let _ieChartRiskPie = null;
 let _ieTimeRange = 7;
 
 async function openIntentEngineDetail() {
@@ -3624,8 +3644,16 @@ async function openIntentEngineDetail() {
           <div class="ie-pie-wrap"><canvas id="ie-chart-labels"></canvas></div>
         </div>
         <div class="ie-dist-chart-col">
-          <h4>${t("ie.decisionModes")}</h4>
+          <h4>${t("ie.routingMethod")}</h4>
           <div class="ie-pie-wrap"><canvas id="ie-chart-modes"></canvas></div>
+        </div>
+        <div class="ie-dist-chart-col">
+          <h4>${t("ie.execPath")}</h4>
+          <div class="ie-pie-wrap"><canvas id="ie-chart-decisions"></canvas></div>
+        </div>
+        <div class="ie-dist-chart-col">
+          <h4>${t("ie.riskDist")}</h4>
+          <div class="ie-pie-wrap"><canvas id="ie-chart-risk"></canvas></div>
         </div>
       </div>
       <div style="margin-top:16px;">
@@ -3758,8 +3786,16 @@ async function _ieLoadMetrics() {
           <div class="ie-metric-label">${t("ie.misrouteRate")}</div>
         </div>
         <div class="ie-metric-card">
-          <div class="ie-metric-value">${m.reuse_count || 0}</div>
+          <div class="ie-metric-value">${m.reuse_count || 0} <small style="font-size:11px;color:var(--subtext0)">(${m.reuse_rate || 0}%)</small></div>
           <div class="ie-metric-label">${t("ie.reuseCount")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.fallback_rate || 0}%</div>
+          <div class="ie-metric-label">${t("ie.fallbackRate")}</div>
+        </div>
+        <div class="ie-metric-card">
+          <div class="ie-metric-value">${m.misroute_count || 0}</div>
+          <div class="ie-metric-label">${t("ie.misrouteCount")}</div>
         </div>
       `;
     }
@@ -3859,7 +3895,21 @@ async function _ieLoadDistribution() {
       });
     }
 
-    const modeData = d.decision_modes || {};
+    const _PIE_OPTS = {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: "right", labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } },
+      cutout: "55%",
+    };
+
+    const _EXEC_PATH_LABELS = {
+      "llm_loop": "LLM 循环", "plan_reuse": "计划复用",
+      "plan_reuse:golden": "Golden 复用", "plan_reuse:candidate": "候选复用",
+      "plan_reuse:cached": "缓存复用", "blocked:cost": "成本阻止",
+      "deterministic": "确定性",
+    };
+    const _RISK_COLORS = {"low": "#10b981", "medium": "#f59e0b", "high": "#ef4444"};
+
+    const modeData = d.routing_methods || d.decision_modes || {};
     const modeNames = Object.keys(modeData);
     const modeCounts = Object.values(modeData);
     const c2 = document.getElementById("ie-chart-modes");
@@ -3871,11 +3921,39 @@ async function _ieLoadDistribution() {
           labels: modeNames,
           datasets: [{ data: modeCounts, backgroundColor: PIE_COLORS.slice(0, modeNames.length), borderWidth: 0 }],
         },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: { legend: { position: "right", labels: { boxWidth: 10, padding: 8, font: { size: 11 } } } },
-          cutout: "55%",
+        options: _PIE_OPTS,
+      });
+    }
+
+    const pathData = d.execution_paths || d.decisions || {};
+    const pathNames = Object.keys(pathData).map(k => _EXEC_PATH_LABELS[k] || k);
+    const pathCounts = Object.values(pathData);
+    const c3 = document.getElementById("ie-chart-decisions");
+    if (c3) {
+      if (_ieChartDecisionPie) _ieChartDecisionPie.destroy();
+      _ieChartDecisionPie = new Chart(c3, {
+        type: "doughnut",
+        data: {
+          labels: pathNames,
+          datasets: [{ data: pathCounts, backgroundColor: PIE_COLORS.slice(0, pathNames.length), borderWidth: 0 }],
         },
+        options: _PIE_OPTS,
+      });
+    }
+
+    const riskData = d.risk_levels || {};
+    const riskNames = Object.keys(riskData);
+    const riskCounts = Object.values(riskData);
+    const c4 = document.getElementById("ie-chart-risk");
+    if (c4) {
+      if (_ieChartRiskPie) _ieChartRiskPie.destroy();
+      _ieChartRiskPie = new Chart(c4, {
+        type: "doughnut",
+        data: {
+          labels: riskNames,
+          datasets: [{ data: riskCounts, backgroundColor: riskNames.map(r => _RISK_COLORS[r] || "#64748b"), borderWidth: 0 }],
+        },
+        options: _PIE_OPTS,
       });
     }
 
@@ -3950,7 +4028,7 @@ async function _ieLoadRuns() {
           const confidence = r.route_conf != null ? (r.route_conf * 100).toFixed(0) + '%' : '-';
           const effectiveSteps = r.effective_steps ?? '-';
           const totalTokens = r.total_tokens || 0;
-          const planSource = r.plan_source || (r.llm_attempts > 0 ? 'llm' : (r.decision_mode || '-'));
+          const planSource = r.plan_source || (r.decision === 'reuse_plan' ? 'reuse_plan' : (r.llm_attempts > 0 ? 'llm' : (r.decision_mode || '-')));
           return `
             <tr class="ie-run-row" onclick="ieToggleDetail(${i})">
               <td><span class="ie-expand-icon" id="ie-expand-${i}">▶</span></td>
@@ -3971,10 +4049,28 @@ async function _ieLoadRuns() {
                 <div class="ie-detail-content">
                   <div class="ie-detail-row-main">
                     <div><strong>${t("ie.caseKey")}:</strong> ${r.case_key || "-"}</div>
-                    <div><strong>${t("ie.latency")}:</strong> ${r.latency_ms ? r.latency_ms.toFixed(1) + 'ms' : '-'} | <strong>Attempts:</strong> ${r.attempts_count || 0} | <strong>Mode:</strong> ${r.decision_mode || "rule"}</div>
+                    <div><strong>${t("ie.latency")}:</strong> ${r.latency_ms ? r.latency_ms.toFixed(1) + 'ms' : '-'} | <strong>${t("ie.routingMethod")}:</strong> ${r.routing_method || r.decision_mode || "rule"} | <strong>${t("ie.execPath")}:</strong> ${r.execution_path || r.decision || "llm_loop"} | <strong>Risk:</strong> <span class="ie-risk-${r.risk_level || 'low'}">${r.risk_level || "low"}</span>${r.misroute_suspect ? ' ⚠️' : ''}</div>
                     <div><strong>${t("ie.allowedTools")}:</strong>
                       <span class="ie-tool-chips">${toolGroup.length ? toolGroup.map(t => `<code class="ie-tool-chip">${t}</code>`).join("") : "-"}</span>
                     </div>
+                  </div>
+                  <div class="ie-detail-row-correct" style="margin-top:8px;display:flex;align-items:center;gap:8px;">
+                    <strong style="font-size:11px;">${t("ie.correctCategory")}:</strong>
+                    <select id="ie-correct-sel-${i}" style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-base);">
+                      <option value="">--</option>
+                      ${["search","fs","browser","net","system","schedule","comm","general","chat"].map(c =>
+                        `<option value="${c}" ${(r.route_label||"").startsWith(c) ? 'selected' : ''}>${c}</option>`
+                      ).join("")}
+                    </select>
+                    <button onclick="ieCorrectCategory('${r.id}', ${i})" style="font-size:11px;padding:2px 10px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none;">${t("ie.submitCorrection")}</button>
+                    ${r.user_corrected ? `<span style="color:var(--accent);font-size:10px;">✓ ${t("ie.alreadyCorrected")}</span>` : ''}
+                  </div>
+                  <div style="margin-top:6px;display:flex;gap:12px;font-size:10px;color:var(--subtext0);">
+                    <span><strong>rule_conf:</strong> ${r.rule_conf != null ? r.rule_conf.toFixed(3) : '-'}</span>
+                    <span><strong>case_conf:</strong> ${r.case_conf != null ? r.case_conf.toFixed(3) : '-'}</span>
+                    <span><strong>llm_conf:</strong> ${r.llm_conf != null ? r.llm_conf.toFixed(3) : '-'}</span>
+                    <span><strong>source:</strong> ${r.confidence_source || '-'}</span>
+                    <span><strong>arbiter:</strong> ${r.arbiter_reason || '-'}</span>
                   </div>
                   <details class="ie-raw-data" style="margin-top:8px;">
                     <summary style="cursor:pointer;font-size:10px;color:var(--subtext0)">🔍 原始数据</summary>
@@ -3996,6 +4092,23 @@ function ieToggleDetail(idx) {
   const show = row.style.display === "none";
   row.style.display = show ? "table-row" : "none";
   if (icon) icon.textContent = show ? "▼" : "▶";
+}
+
+async function ieCorrectCategory(runId, rowIdx) {
+  const sel = document.getElementById(`ie-correct-sel-${rowIdx}`);
+  if (!sel || !sel.value) { toast("请选择类别", "warning"); return; }
+  try {
+    const res = await api("/api/apps/intent_engine/correct", "POST", {
+      run_id: runId,
+      corrected_category: sel.value,
+    });
+    if (res.status === "ok") {
+      toast(t("ie.correctionSaved"), "success");
+      _ieLoadRuns();
+    } else {
+      toast(res.error || "correction failed", "error");
+    }
+  } catch(e) { toast("Correction failed: " + e.message, "error"); }
 }
 
 function _ieOutcomeBadge(outcome) {
@@ -4405,6 +4518,7 @@ async function openCapForestDetail() {
         <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiDormant")}</div><div class="er-card-value">${kpi.dormant_count || 0}</div></div>
         <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiUse30d")}</div><div class="er-card-value">${kpi.total_use_30d || 0}</div></div>
         <div class="er-golden-card"><div class="er-card-label">${t("cf.kpiSuccess30d")}</div><div class="er-card-value">${kpi.success_rate_30d || 0}%</div></div>
+        <div class="er-golden-card" style="border-left:3px solid #6366f1"><div class="er-card-label">${t("cf.mode") || "模式"}</div><div class="er-card-value" style="font-size:13px">${t("cf.advisory") || "建议"}</div></div>
       </div>
     </div>
 
@@ -6376,9 +6490,10 @@ async function updateSidebarStats() {
   const alertInd = document.getElementById("token-alert-ind");
   if (!tokEl || !searchEl) return;
   try {
-    const [tok, search] = await Promise.all([
+    const [tok, search, costDec] = await Promise.all([
       api("/api/token/usage").catch(() => null),
       api("/api/search/usage").catch(() => null),
+      api("/api/cost/decision").catch(() => null),
     ]);
     if (tok) {
       const inp = tok.input_tokens || 0;
@@ -6395,6 +6510,12 @@ async function updateSidebarStats() {
       let displayText = `${t("stats.todayPrefix")} ↓${_fmtNum(inp)} ↑${_fmtNum(out)}`;
       if (cost > 0) {
         displayText += ` ¥${cost.toFixed(2)}`;
+      }
+      if (costDec && costDec.model_tier && costDec.model_tier !== "max") {
+        displayText += ` [${costDec.model_tier}]`;
+      }
+      if (costDec && !costDec.allow_llm) {
+        displayText += " ⛔";
       }
       
       // Update text (keep indicator at front)
@@ -6413,6 +6534,9 @@ async function updateSidebarStats() {
       }
       if (tok.monthly_limit > 0 && tok.monthly_cost !== undefined) {
         tooltip += `\n月预警: ${tok.monthly_usage_pct.toFixed(1)}%`;
+      }
+      if (costDec && costDec.reason) {
+        tooltip += `\n成本控制: ${costDec.reason}`;
       }
       tokEl.title = tooltip;
     }

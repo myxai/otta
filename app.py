@@ -774,11 +774,12 @@ def _patch_agent_tool_history(agent):
         except Exception:
             tool_defs = _filter_tool_defs_for_message(msg.content, all_tool_defs)
 
-        # ── Capability Forest: override tool routing if enabled ──
+        # ── Capability Forest: advisory mode (no longer overrides tool_defs) ──
+        _cap_advice = None
         try:
-            from myxai_desk.apps.cap_forest.router import cap_forest_enabled, capability_router, clear_wake_once
+            from myxai_desk.apps.cap_forest.router import cap_forest_enabled, capability_advise, clear_wake_once
             if cap_forest_enabled():
-                tool_defs = capability_router(msg.content, _ie_result, all_tool_defs)
+                _cap_advice = capability_advise(msg.content, _ie_result, all_tool_defs)
                 clear_wake_once()
         except Exception:
             pass
@@ -808,7 +809,7 @@ def _patch_agent_tool_history(agent):
 
             _cap_guard = CapabilityGuard(self._cap_manager)
 
-        # ── Golden 2.0 + PR-2: deterministic replay (no LLM) ──
+        # ── Golden replay: deterministic plan execution (no LLM) ──
         _skip_llm_loop = False
         _plan_source: str | None = None
         _case_key: str | None = None
@@ -818,156 +819,27 @@ def _patch_agent_tool_history(agent):
         _llm_attempts = 0
         _golden_version: int | None = None
 
-        # ── Priority 1 & 2: Golden 2.0 (Instance / Template) ──
         if _ie_result:
             try:
-                from myxai_desk.core.intent_engine.config import golden_v2_enabled as _gv2_on
-                if _gv2_on():
-                    from myxai_desk.core.golden.slot_extractor import extract_slots as _extract_slots
-                    from myxai_desk.core.golden.store import GoldenV2Store as _GV2Store, compute_instance_key as _compute_ikey
-                    from myxai_desk.core.golden.template_matcher import match as _template_match
-                    from myxai_desk.core.golden.replay_validator import validate as _replay_validate
-                    from myxai_desk.core.golden.models import GoldenInstance as _GI
-                    from myxai_desk.core.intent_engine.plan_runner import run_plan as _run_plan
-                    from myxai_desk.core.golden_store import parse_candidate_plan as _parse_candidate_plan
-
-                    _slot_result = _extract_slots(msg.content)
-                    _gv2_store = _GV2Store()
-
-                    if _slot_result.intent_label and _slot_result.confidence >= 0.3:
-                        _instance_key = _compute_ikey(
-                            _slot_result.intent_label,
-                            _slot_result.slots,
-                        )
-
-                        # Priority 1: Instance hit (exact match, fastest)
-                        _inst = _gv2_store.get_instance(_instance_key)
-                        if _inst and _inst.resolved_plan:
-                            _v = _replay_validate(_inst.resolved_plan, _slot_result.slots)
-                            if _v.ok:
-                                _inst_steps = _parse_candidate_plan(
-                                    _inst.resolved_plan_json
-                                    if isinstance(_inst.resolved_plan_json, str)
-                                    else json.dumps(_inst.resolved_plan)
-                                )
-                                if _inst_steps:
-                                    _inst_result = await _run_plan(_inst_steps, self.tools, key, progress)
-                                    _attempts_count += _inst_result.steps_executed
-                                    if _inst_result.success:
-                                        _gv2_store.record_instance_use(
-                                            _instance_key, ok=True,
-                                            duration_ms=_inst_result.total_duration_ms,
-                                            run_id=getattr(_ie_result, "run_id", None),
-                                        )
-                                        tools_used = [s["tool_name"] for s in _inst_result.results if s.get("tool_name")]
-                                        final_content = _inst_result.final_summary
-                                        _plan_source = "golden_v2_instance"
-                                        _case_key = _instance_key
-                                        _skip_llm_loop = True
-                                        print(f"[agent] golden_v2 instance hit: key={_instance_key[:12]}, steps={_inst_result.steps_executed}")
-                                    else:
-                                        _gv2_store.record_instance_use(_instance_key, ok=False)
-                                        print(f"[agent] golden_v2 instance FAILED at step {_inst_result.failed_at}, falling through")
-
-                        # Priority 2: Template hit (slot filling)
-                        if not _skip_llm_loop:
-                            _tmatch = _template_match(_slot_result.intent_label, _slot_result.slots)
-                            if _tmatch and _tmatch.filled_plan:
-                                _v = _replay_validate(_tmatch.filled_plan, _slot_result.slots, _tmatch.constraints)
-                                if _v.ok:
-                                    _tpl_steps = _parse_candidate_plan(json.dumps(_tmatch.filled_plan, ensure_ascii=False))
-                                    if _tpl_steps:
-                                        _tpl_result = await _run_plan(_tpl_steps, self.tools, key, progress)
-                                        _attempts_count += _tpl_result.steps_executed
-                                        if _tpl_result.success:
-                                            _gv2_store.save_instance(
-                                                case_key=_instance_key,
-                                                template_id=_tmatch.template_id,
-                                                intent_label=_slot_result.intent_label,
-                                                slot_values=_slot_result.slots,
-                                                resolved_plan=_tmatch.filled_plan,
-                                            )
-                                            _gv2_store.record_template_use(_tmatch.template_id, ok=True)
-                                            tools_used = [s["tool_name"] for s in _tpl_result.results if s.get("tool_name")]
-                                            final_content = _tpl_result.final_summary
-                                            _plan_source = "golden_v2_template"
-                                            _case_key = _instance_key
-                                            _skip_llm_loop = True
-                                            print(f"[agent] golden_v2 template hit: tpl={_tmatch.template_id[:16]}, steps={_tpl_result.steps_executed}")
-                                        else:
-                                            _gv2_store.record_template_use(_tmatch.template_id, ok=False)
-                                            print(f"[agent] golden_v2 template FAILED, falling through")
+                from myxai_desk.core.golden.replay import try_replay as _try_replay
+                _replay = await _try_replay(msg.content, _ie_result, self.tools, key, progress)
+                if _replay.skip_llm:
+                    _skip_llm_loop = True
+                    _plan_source = _replay.plan_source
+                    _case_key = _replay.case_key
+                    _candidate_id = _replay.candidate_id
+                    _removed_steps = _replay.removed_steps
+                    _golden_version = _replay.golden_version
+                    _attempts_count = _replay.attempts_count
+                    tools_used = _replay.tools_used
+                    final_content = _replay.final_content
+                else:
+                    _attempts_count = _replay.attempts_count
+                    _case_key = _replay.case_key or _case_key
+                    _candidate_id = _replay.candidate_id or _candidate_id
+                    _removed_steps = _replay.removed_steps or _removed_steps
             except Exception:
-                log.warning("[agent] golden_v2 replay skipped", exc_info=True)
-
-        # ── Priority 3: Candidate replay → promote to v2 Instance ──
-        if not _skip_llm_loop and _ie_result:
-            try:
-                from myxai_desk.core.intent_engine.config import golden_enabled as _golden_on
-                if not _golden_on():
-                    raise RuntimeError("golden replay disabled by config")
-
-                from myxai_desk.core.golden_store import (
-                    GoldenStore as _GoldenStore,
-                    compute_case_key as _compute_case_key,
-                    parse_candidate_plan as _parse_candidate_plan,
-                )
-                from myxai_desk.core.intent_engine.dao import update_ie_run as _update_ie_run
-                from myxai_desk.core.intent_engine.plan_runner import run_plan as _run_plan
-
-                _sec_mode = ""
-                try:
-                    _sec_mode = _gcm().value
-                except Exception:
-                    pass
-                _case_key = _compute_case_key(
-                    msg.content,
-                    route_labels=_ie_result.route_labels,
-                    security_mode=_sec_mode,
-                )
-
-                if _ie_result.run_id:
-                    _update_ie_run(_ie_result.run_id, case_key=_case_key)
-
-                _store = _GoldenStore()
-                _cand = _store.get_best_candidate(_case_key)
-                if _cand:
-                    _candidate_id = _cand.candidate_id
-                    _removed_steps = _cand.removed_steps
-                    if _ie_result.run_id:
-                        _update_ie_run(
-                            _ie_result.run_id,
-                            candidate_id=_candidate_id,
-                            removed_steps=_removed_steps,
-                        )
-                    _cand_steps = _parse_candidate_plan(_cand.candidate_plan_json)
-                    if _cand_steps:
-                        _cand_result = await _run_plan(_cand_steps, self.tools, key, progress)
-                        _attempts_count += _cand_result.steps_executed
-                        _store.mark_candidate_used(_cand.candidate_id, ok=_cand_result.success)
-
-                        if _cand_result.success:
-                            # Save as v2 Instance instead of legacy golden_plan
-                            try:
-                                from myxai_desk.core.golden.store import GoldenV2Store as _GV2Promote
-                                _GV2Promote().save_instance(
-                                    case_key=_case_key,
-                                    template_id=None,
-                                    intent_label=",".join(_ie_result.route_labels) if _ie_result.route_labels else "",
-                                    slot_values={},
-                                    resolved_plan=_cand_steps,
-                                )
-                            except Exception:
-                                log.debug("[agent] candidate→v2 instance save failed", exc_info=True)
-                            tools_used = [s["tool_name"] for s in _cand_result.results if s.get("tool_name")]
-                            final_content = _cand_result.final_summary
-                            _plan_source = "golden_candidate"
-                            _skip_llm_loop = True
-                            print(f"[agent] golden_candidate: promoted to v2 instance, steps={_cand_result.steps_executed}")
-                        else:
-                            print(f"[agent] candidate {_cand.candidate_id[:8]} FAILED, falling through")
-            except Exception:
-                log.warning("[agent] candidate replay skipped", exc_info=True)
+                log.warning("[agent] golden replay skipped", exc_info=True)
 
         # ── PlanRunner — reuse cached plan from ie_cases, skip LLM ──
         if not _skip_llm_loop and _ie_result and _ie_result.decision == "reuse_plan" and _ie_result.plan_steps:
@@ -987,6 +859,30 @@ def _patch_agent_tool_history(agent):
             except Exception:
                 log.warning("[agent] plan_runner failed, falling through to LLM", exc_info=True)
 
+        # ── Cost controller: decide model tier / allow LLM ──
+        _cost_decision = None
+        _effective_model = self.model
+        try:
+            from myxai_desk.core.cost_controller import evaluate as _cost_eval, select_model as _cost_select
+            _cost_decision = _cost_eval(
+                route_label=",".join(_ie_result.route_labels) if _ie_result else "",
+                ie_result=_ie_result,
+            )
+            if _cost_decision.reason:
+                print(f"[agent] cost_controller: {_cost_decision.reason}")
+            if not _cost_decision.allow_llm and not _skip_llm_loop:
+                if _cost_decision.fallback == "reject":
+                    _skip_llm_loop = True
+                    final_content = f"[成本控制] 已达预算上限，本次请求暂停LLM调用。原因: {_cost_decision.reason}"
+                elif _cost_decision.fallback in ("reuse", "deterministic"):
+                    _skip_llm_loop = True
+                    _plan_source = _plan_source or "cost_blocked"
+                    final_content = final_content or f"[成本控制] 预算已用尽，降级为确定性路径。原因: {_cost_decision.reason}"
+            else:
+                _effective_model = _cost_select(self.model, _cost_decision.model_tier)
+        except Exception:
+            log.debug("[agent] cost_controller skipped", exc_info=True)
+
         try:
             while not _skip_llm_loop and iteration < self.max_iterations:
                 iteration += 1
@@ -994,7 +890,7 @@ def _patch_agent_tool_history(agent):
                 response = await self.provider.chat(
                     messages=messages,
                     tools=tool_defs,
-                    model=self.model,
+                    model=_effective_model,
                     temperature=self.temperature,
                     max_tokens=self.max_tokens,
                 )
@@ -1370,47 +1266,56 @@ def _patch_agent_tool_history(agent):
                             "golden_candidate",
                         ) else 0
                         
-                        # Calculate effective_steps (last occurrence of each tool in successful runs)
-                        if _ie_outcome == "success" and tools_used:
-                            last_idx_by_tool: dict[str, int] = {}
-                            for i, tool in enumerate(tools_used):
-                                if tool:
-                                    last_idx_by_tool[tool] = i
-                            _run_fields["effective_steps"] = len(set(last_idx_by_tool.values()))
-                        else:
-                            _run_fields["effective_steps"] = 0
-                        
-                        # Calculate total_tokens
+                        # IE 2.0: write back execution_path
+                        _exec_path = "llm_loop"
+                        if _plan_source in ("golden_v2_instance", "golden_v2_template"):
+                            _exec_path = "plan_reuse:golden"
+                        elif _plan_source == "golden_candidate":
+                            _exec_path = "plan_reuse:candidate"
+                        elif _plan_source == "reuse_plan":
+                            _exec_path = "plan_reuse:cached"
+                        elif _plan_source == "cost_blocked":
+                            _exec_path = "blocked:cost"
+                        elif _llm_attempts == 0 and tools_used:
+                            _exec_path = "deterministic"
+                        _run_fields["execution_path"] = _exec_path
+
                         _run_fields["total_tokens"] = _turn_input + _turn_output
-                        
+
                         _update_ie_run(_ie_result.run_id, **_run_fields)
                     except Exception:
                         log.debug("[agent] ie_run field writeback failed", exc_info=True)
 
-                # Golden 2.0: save successful LLM runs as instances
+                # Golden 2.0: save successful LLM runs as new golden instances
                 if _ie_outcome == "success" and tools_used and _plan_source is None:
                     try:
-                        from myxai_desk.core.intent_engine.config import golden_v2_enabled as _gv2_chk
-                        if _gv2_chk():
-                            from myxai_desk.core.golden.slot_extractor import extract_slots as _ext2
-                            from myxai_desk.core.golden.store import GoldenV2Store as _GV2S2, compute_instance_key as _cik2
-                            _sr2 = _ext2(msg.content)
-                            if _sr2.intent_label and _sr2.confidence >= 0.3:
-                                _ik2 = _cik2(_sr2.intent_label, _sr2.slots)
-                                _plan2 = [
-                                    {"tool_name": e.get("tool", ""), "args": e.get("args", {})}
-                                    for e in _turn_events if e.get("tool")
-                                ]
-                                if _plan2:
-                                    _GV2S2().save_instance(
-                                        case_key=_ik2,
-                                        template_id=None,
-                                        intent_label=_sr2.intent_label,
-                                        slot_values=_sr2.slots,
-                                        resolved_plan=_plan2,
-                                    )
+                        from myxai_desk.core.golden.replay import save_new_golden as _save_golden
+                        await _save_golden(msg.content, _ie_result, _turn_events)
                     except Exception:
                         log.debug("[agent] golden_v2 instance save failed", exc_info=True)
+
+                # IE Feedback: write back execution result to ie_runs + ie_cases
+                try:
+                    from myxai_desk.core.intent_engine.feedback import write_back as _fb_write_back
+                    _cs_plan = [
+                        {"tool_name": e.get("tool", ""), "args": e.get("args", {})}
+                        for e in _turn_events if e.get("tool")
+                    ] if tools_used else None
+                    _cs_route = ",".join(_ie_result.route_labels) if _ie_result else ""
+                    _fb_write_back(
+                        run_id=_ie_result.run_id or "",
+                        case_key=getattr(_ie_result, "case_key", ""),
+                        text_norm=getattr(_ie_result, "text_norm", ""),
+                        user_text=msg.content,
+                        final_category=_cs_route,
+                        route_label=_cs_route,
+                        execution_path=locals().get("_exec_path", ""),
+                        plan_kind=_plan_source or "",
+                        success=(_ie_outcome == "success"),
+                        plan_steps=_cs_plan,
+                    )
+                except Exception:
+                    log.debug("[agent] ie feedback write_back failed", exc_info=True)
             except Exception:
                 pass
 
@@ -1432,8 +1337,8 @@ def _patch_agent_tool_history(agent):
                 "search": _turn_search,
             }
 
-        # PR-2: decision_meta for frontend badge
-        if _plan_source or _case_key:
+        # decision_meta for frontend badge
+        if _plan_source or _case_key or _cost_decision:
             _dm: dict = {}
             if _plan_source:
                 _dm["plan_source"] = _plan_source
@@ -1448,6 +1353,27 @@ def _patch_agent_tool_history(agent):
             _dm["attempts_count"] = _attempts_count
             _dm["llm_attempts"] = _llm_attempts
             _dm["promoted"] = bool(_plan_source == "golden_candidate")
+            if _cost_decision and _cost_decision.reason:
+                _dm["cost_tier"] = _cost_decision.model_tier
+                _dm["cost_reason"] = _cost_decision.reason
+                _dm["cost_blocked"] = not _cost_decision.allow_llm
+                _dm["daily_usage_pct"] = _cost_decision.daily_usage_pct
+            if _effective_model != self.model:
+                _dm["effective_model"] = _effective_model
+            if _cap_advice and _cap_advice.has_suggestions:
+                _used_set = set(tools_used) if tools_used else set()
+                _suggested = _cap_advice.suggested_tools
+                _hit = _used_set & _suggested
+                _dm["cap_advice"] = {
+                    "suggested_count": len(_suggested),
+                    "hit_count": len(_hit),
+                    "hit_rate": round(len(_hit) / len(_suggested) * 100, 1) if _suggested else 0,
+                    "caps": [c["cap_id"] for c in _cap_advice.recommended_caps[:5]],
+                }
+                if _cap_advice.wake_suggestions:
+                    _dm["cap_wake_suggestions"] = [
+                        s["cap_id"] for s in _cap_advice.wake_suggestions
+                    ]
             with _last_decision_meta_lock:
                 _last_decision_meta[key] = _dm
 
@@ -2312,6 +2238,25 @@ def api_token_usage():
     config_wrapper = {"tokenCost": cost_config}
     
     return jsonify(get_token_usage_with_cost(config_wrapper))
+
+
+@flask_app.route("/api/cost/decision")
+def api_cost_decision():
+    """Return the current cost controller decision (for dashboard display)."""
+    try:
+        from myxai_desk.core.cost_controller import evaluate as _cost_eval
+        d = _cost_eval()
+        return jsonify({
+            "allow_llm": d.allow_llm,
+            "model_tier": d.model_tier,
+            "fallback": d.fallback,
+            "reason": d.reason,
+            "daily_usage_pct": d.daily_usage_pct,
+            "monthly_usage_pct": d.monthly_usage_pct,
+            "budget_remaining_tokens": d.budget_remaining_tokens,
+        })
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
 
 
 @flask_app.route("/api/token/history")

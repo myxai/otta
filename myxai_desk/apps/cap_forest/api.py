@@ -215,3 +215,20 @@ def forest_events():
     limit = request.args.get("limit", 100, type=int)
     event_type = request.args.get("type")
     return jsonify({"events": list_events(limit=limit, event_type=event_type)})
+
+
+# ── Advisory ──────────────────────────────────────────────────────
+
+
+@bp.route("/advise")
+def forest_advise():
+    """Return the current advisory recommendation for a given text/intent."""
+    user_text = request.args.get("text", "")
+    from myxai_desk.apps.cap_forest.router import capability_advise
+    advice = capability_advise(user_text, intent_result=None)
+    return jsonify({
+        "advisory_only": advice.advisory_only,
+        "recommended_caps": advice.recommended_caps,
+        "suggested_tools": sorted(advice.suggested_tools),
+        "wake_suggestions": advice.wake_suggestions,
+    })

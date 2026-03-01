@@ -43,7 +43,18 @@ def _stats_fields(stats: dict) -> dict:
         "success_rate": round(sc / total * 100, 1) if total else 0,
         "avg_duration_ms": stats.get("avg_duration_ms"),
         "last_outcome": stats.get("last_outcome"),
+        "disabled": bool(stats.get("disabled")),
+        "disabled_reason": stats.get("disabled_reason", ""),
     }
+
+
+def _asset_status(sf: dict) -> str:
+    """Derive display status from stats fields."""
+    if sf.get("disabled"):
+        return "disabled"
+    if sf["fail_count"] >= 3 or (sf["use_count"] >= 3 and sf["success_rate"] < 60):
+        return "stale"
+    return "active"
 
 
 # ── Aggregate metrics ────────────────────────────────────────────────
@@ -156,39 +167,33 @@ def _aggregate_stats(table: str) -> dict:
     }
 
 
-def _count_stale_instances() -> int:
-    """Instances with fail_count >= 3 or success_rate < 60%."""
+def _count_unhealthy(table: str) -> int:
+    """Count stale or disabled assets in a golden table."""
     try:
-        rows = execute("SELECT stats_json FROM golden_instances", readonly=True)
+        rows = execute(f"SELECT stats_json FROM {table}", readonly=True)
     except Exception:
         return 0
 
     count = 0
     for r in rows:
         stats = _safe_json(r.get("stats_json", "{}"))
+        if stats.get("disabled"):
+            count += 1
+            continue
         sc = stats.get("success_count", 0)
         fc = stats.get("fail_count", 0)
         total = sc + fc
         if fc >= 3 or (total >= 3 and sc / total < 0.6):
             count += 1
     return count
+
+
+def _count_stale_instances() -> int:
+    return _count_unhealthy("golden_instances")
 
 
 def _count_stale_templates() -> int:
-    try:
-        rows = execute("SELECT stats_json FROM golden_templates", readonly=True)
-    except Exception:
-        return 0
-
-    count = 0
-    for r in rows:
-        stats = _safe_json(r.get("stats_json", "{}"))
-        sc = stats.get("success_count", 0)
-        fc = stats.get("fail_count", 0)
-        total = sc + fc
-        if fc >= 3 or (total >= 3 and sc / total < 0.6):
-            count += 1
-    return count
+    return _count_unhealthy("golden_templates")
 
 
 # ── Templates CRUD ───────────────────────────────────────────────────
@@ -220,9 +225,6 @@ def list_templates(
     for r in rows:
         stats = _safe_json(r.get("stats_json", "{}"))
         sf = _stats_fields(stats)
-        status = "active"
-        if sf["fail_count"] >= 3 or (sf["use_count"] >= 3 and sf["success_rate"] < 60):
-            status = "stale"
 
         result.append({
             "template_id": r["template_id"],
@@ -232,7 +234,7 @@ def list_templates(
             "success_rate": sf["success_rate"],
             "last_used_at": r.get("last_used_at"),
             "created_at": r.get("created_at", ""),
-            "status": status,
+            "status": _asset_status(sf),
         })
     return result
 
@@ -276,10 +278,6 @@ def get_template_detail(template_id: str) -> Optional[dict]:
             "last_used_at": ir.get("last_used_at"),
         })
 
-    status = "active"
-    if sf["fail_count"] >= 3 or (sf["use_count"] >= 3 and sf["success_rate"] < 60):
-        status = "stale"
-
     return {
         "template_id": r["template_id"],
         "intent_label": r["intent_label"],
@@ -290,7 +288,7 @@ def get_template_detail(template_id: str) -> Optional[dict]:
         "stats": sf,
         "created_at": r.get("created_at", ""),
         "last_used_at": r.get("last_used_at"),
-        "status": status,
+        "status": _asset_status(sf),
         "instances": instances,
     }
 
@@ -344,9 +342,6 @@ def list_instances(
     for r in rows:
         stats = _safe_json(r.get("stats_json", "{}"))
         sf = _stats_fields(stats)
-        status = "active"
-        if sf["fail_count"] >= 3 or (sf["use_count"] >= 3 and sf["success_rate"] < 60):
-            status = "stale"
 
         result.append({
             "case_key": r["case_key"],
@@ -356,7 +351,7 @@ def list_instances(
             "success_rate": sf["success_rate"],
             "last_used_at": r.get("last_used_at"),
             "created_at": r.get("created_at", ""),
-            "status": status,
+            "status": _asset_status(sf),
         })
     return result
 
@@ -377,9 +372,6 @@ def get_instance_detail(case_key: str) -> Optional[dict]:
     r = rows[0]
     stats = _safe_json(r.get("stats_json", "{}"))
     sf = _stats_fields(stats)
-    status = "active"
-    if sf["fail_count"] >= 3 or (sf["use_count"] >= 3 and sf["success_rate"] < 60):
-        status = "stale"
 
     return {
         "case_key": r["case_key"],
@@ -390,12 +382,12 @@ def get_instance_detail(case_key: str) -> Optional[dict]:
         "stats": sf,
         "created_at": r.get("created_at", ""),
         "last_used_at": r.get("last_used_at"),
-        "status": status,
+        "status": _asset_status(sf),
     }
 
 
 def invalidate_instance(case_key: str) -> bool:
-    """Mark an instance as stale by injecting fail_count >= 3."""
+    """Disable an instance — replay will skip it immediately."""
     try:
         rows = execute(
             "SELECT stats_json FROM golden_instances WHERE case_key = ?",
@@ -408,6 +400,8 @@ def invalidate_instance(case_key: str) -> bool:
         stats = _safe_json(rows[0].get("stats_json", "{}"))
         stats["fail_count"] = max(stats.get("fail_count", 0), 3)
         stats["last_outcome"] = "invalidated"
+        stats["disabled"] = True
+        stats["disabled_reason"] = "manual invalidation"
 
         execute(
             "UPDATE golden_instances SET stats_json = ? WHERE case_key = ?",

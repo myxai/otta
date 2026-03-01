@@ -45,6 +45,7 @@ def run_daily_radar(run_date: str | None = None, *, skip_report: bool = False) -
 
     raw = extract(date_str)
     tasks = normalize(raw, date_str)
+    _enrich_steps_with_progress(tasks, date_str)
     tasks = verify(tasks)
 
     candidates = generate_candidates(tasks, date_str)
@@ -68,6 +69,9 @@ def run_daily_radar(run_date: str | None = None, *, skip_report: bool = False) -
 
     if candidates:
         upsert_candidates(candidates)
+
+    # Writeback: sync effective_count → ie_runs.effective_steps
+    _sync_effective_steps_to_ie_runs(tasks)
 
     # Golden 2.0: attempt auto template generation after new data
     _templates_created = 0
@@ -310,6 +314,61 @@ def _classify_action_error(action: str, tool_name: str) -> str:
     if "FETCH" in action_upper or "NET" in action_upper:
         return "E_NETWORK"
     return "E_EXEC"
+
+
+# ── Pre-verify: enrich with exec_steps progress ───────────────────
+
+
+def _enrich_steps_with_progress(tasks: list[dict], date_str: str) -> None:
+    """Merge ``progress`` from exec_steps into pipeline task steps.
+
+    exec_steps carries per-step progress (0/1) from the progress detector,
+    but pipeline steps (extracted from sessions.json) lack this field.
+    Without it, verify() always falls back to the legacy distinct-tool
+    heuristic — which undercounts effective steps for single-tool-type
+    tasks and makes multi_task ratio stay at 0.
+    """
+    try:
+        from myxai_desk.apps.execution_radar.dao import get_exec_steps_for_date
+        exec_rows = get_exec_steps_for_date(date_str)
+    except Exception:
+        return
+    if not exec_rows:
+        return
+
+    by_session: dict[str, list[dict]] = {}
+    for row in exec_rows:
+        sid = row.get("session_id", "")
+        if sid:
+            by_session.setdefault(sid, []).append(row)
+
+    enriched = 0
+    for task in tasks:
+        sid = task.get("session_id", "")
+        es_list = by_session.get(sid)
+        if not es_list:
+            continue
+
+        task_steps = task.get("steps", [])
+        if not task_steps:
+            continue
+
+        es_idx = 0
+        for ts in task_steps:
+            tool = ts.get("tool_name", "")
+            while es_idx < len(es_list):
+                es = es_list[es_idx]
+                if es.get("tool_name") == tool:
+                    prog = es.get("progress", -1)
+                    if prog >= 0:
+                        ts["progress"] = prog
+                        enriched += 1
+                    es_idx += 1
+                    break
+                es_idx += 1
+
+    if enriched:
+        log.info("[execution_radar] enriched %d steps with progress data", enriched)
 
 
 # ── Stage 3: Verify ────────────────────────────────────────────────
@@ -736,3 +795,45 @@ def _get_model_config_safe() -> dict | None:
         }
     except Exception:
         return None
+
+
+# ── ie_runs writeback ──────────────────────────────────────────────
+
+
+def _sync_effective_steps_to_ie_runs(tasks: list[dict]) -> None:
+    """Write pipeline-computed effective_count back to ie_runs.effective_steps.
+
+    This makes the pipeline the single source of truth for effective_steps.
+    Matching strategy: session_id + user_text prefix (ie_runs truncates at 2000).
+    """
+    writeback = [
+        (t["session_id"], (t.get("user_text") or "")[:2000], t.get("effective_count", 0))
+        for t in tasks
+        if t.get("session_id") and t.get("effective_count") is not None
+    ]
+    if not writeback:
+        return
+
+    updated = 0
+    try:
+        from myxai_desk.core.intent_engine.dao import init_ie_tables
+        from myxai_desk.core.storage.sqlite import execute as sql
+
+        init_ie_tables()
+        for session_id, user_text, eff_count in writeback:
+            try:
+                result = sql(
+                    """UPDATE ie_runs
+                       SET effective_steps = ?
+                       WHERE session_id = ?
+                         AND SUBSTR(user_text, 1, 200) = SUBSTR(?, 1, 200)""",
+                    (eff_count, session_id, user_text),
+                )
+                if result is not None:
+                    updated += 1
+            except Exception:
+                pass
+        if updated:
+            log.info("[execution_radar] synced effective_steps to %d ie_runs rows", updated)
+    except Exception:
+        log.debug("[execution_radar] ie_runs effective_steps writeback failed", exc_info=True)

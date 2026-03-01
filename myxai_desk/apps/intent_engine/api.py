@@ -93,6 +93,55 @@ def get_cases():
     return jsonify(rows)
 
 
+# ── Corrections ────────────────────────────────────────────────────
+
+@bp.route("/correct", methods=["POST"])
+def correct_category():
+    """Record a user category correction for a specific run."""
+    data = request.get_json(force=True) or {}
+    run_id = data.get("run_id", "")
+    corrected = data.get("corrected_category", "")
+    if not run_id or not corrected:
+        return jsonify({"error": "run_id and corrected_category required"}), 400
+
+    from myxai_desk.core.intent_engine.dao import get_runs as dao_get_runs
+    rows = dao_get_runs(limit=1, offset=0)
+    run = None
+    for r in rows:
+        if r.get("id") == run_id:
+            run = r
+            break
+
+    if run is None:
+        from myxai_desk.core.storage.sqlite import execute
+        found = execute(
+            "SELECT route_label FROM ie_runs WHERE id = ?",
+            (run_id,), readonly=True,
+        )
+        original = found[0]["route_label"] if found else ""
+    else:
+        original = run.get("route_label", "")
+
+    from myxai_desk.core.intent_engine.dao import insert_correction
+    fb_id = insert_correction(
+        run_id=run_id,
+        original_category=original,
+        corrected_category=corrected,
+    )
+    if fb_id:
+        return jsonify({"status": "ok", "feedback_id": fb_id})
+    return jsonify({"error": "correction failed"}), 500
+
+
+@bp.route("/corrections", methods=["GET"])
+def get_corrections():
+    """List recent user corrections."""
+    limit = request.args.get("limit", 50, type=int)
+    offset = request.args.get("offset", 0, type=int)
+    from myxai_desk.core.intent_engine.dao import get_corrections as dao_get_corrections
+    return jsonify(dao_get_corrections(limit=limit, offset=offset))
+
+
 # ── Data Repair ────────────────────────────────────────────────────
 
 @bp.route("/repair/llm_free", methods=["POST"])
