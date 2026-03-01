@@ -13,13 +13,12 @@ from typing import Any
 
 from myxai_desk.core.intent_engine import config as ie_config
 from myxai_desk.core.intent_engine.dao import get_cases, increment_case_usage, insert_case
-from myxai_desk.core.intent_engine.embedder import embed_text, get_dim
+from myxai_desk.core.intent_engine.embedder import embed_text, get_dim, warmup as embedder_warmup
 from myxai_desk.core.intent_engine.hnsw_index import add as hnsw_add
 from myxai_desk.core.intent_engine.hnsw_index import count as hnsw_count
 from myxai_desk.core.intent_engine.hnsw_index import init as hnsw_init
 from myxai_desk.core.intent_engine.hnsw_index import search as hnsw_search
-
-_EMBEDDING_MODEL = "text-embedding-3-small"
+from myxai_desk.core.intent_engine.hnsw_index import was_rebuilt as hnsw_was_rebuilt
 
 log = logging.getLogger("myxai")
 
@@ -30,8 +29,49 @@ def _ensure_init() -> None:
     global _initialised
     if _initialised:
         return
-    hnsw_init(dim=get_dim())
+
+    embedder_warmup()
+
+    dim = get_dim()
+    hnsw_init(dim=dim)
+
+    if hnsw_was_rebuilt():
+        _rebuild_index_from_db(dim)
+
     _initialised = True
+
+
+def _rebuild_index_from_db(dim: int) -> None:
+    """Re-embed all successful cases and repopulate the HNSW index.
+
+    Called once after an embedding dimension change. Runs at init time,
+    NOT on the request path.
+    """
+    log.info("[case_store] rebuilding HNSW index from ie_cases (dim=%d)...", dim)
+    try:
+        cases = get_cases(outcome="success", limit=50000)
+    except Exception:
+        log.warning("[case_store] failed to load cases for rebuild", exc_info=True)
+        return
+
+    rebuilt = 0
+    for case in cases:
+        text_norm = case.get("text_norm", "") or ""
+        if not text_norm:
+            text_norm = case.get("task_text", "")
+        if not text_norm:
+            continue
+
+        vec = embed_text(text_norm)
+        if vec is None or len(vec) != dim:
+            continue
+
+        case_id = case.get("id", "")
+        if case_id:
+            hnsw_add(case_id, vec)
+            rebuilt += 1
+
+    log.info("[case_store] rebuild complete: %d / %d cases indexed", rebuilt, len(cases))
 
 
 # ── Case collection ───────────────────────────────────────────────

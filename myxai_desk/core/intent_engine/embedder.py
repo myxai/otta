@@ -1,147 +1,197 @@
-"""Text embedding for case retrieval.
+"""Local-first text embedding for Intent Engine case retrieval.
 
-Uses LiteLLM embedding API when available.  Falls back to a deterministic
-hash-based fingerprint **only for exact-match cache keys** — it is NOT
-suitable for semantic similarity search and callers can detect this via
+Uses a local sentence-transformers model (zero network dependency).
+Falls back to a deterministic hash-based fingerprint when the local model
+is unavailable (e.g. dependency not installed). Callers detect this via
 ``is_semantic()``.
 
-The embedding dimension is auto-detected on first successful LiteLLM call
-and cached so that the HNSW index always uses a consistent dim.
+No LiteLLM / OpenAI calls. No network side effects. Deterministic.
+
+Model: ``intfloat/multilingual-e5-small`` (384 dim, ~120-200MB, multilingual).
+Override via IE config key ``embedding_model``.
 """
 
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import math
 import re
 from collections import Counter
+from functools import lru_cache
 from pathlib import Path
 from threading import Lock
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    pass
 
 log = logging.getLogger("myxai")
 
+_MODEL_DIR = Path.home() / ".nanobot" / "models" / "intent_engine"
+_DEFAULT_MODEL = "intfloat/multilingual-e5-small"
+_DEFAULT_DIM = 384
 _HASH_DIM = 128
-_DIM_CACHE_FILE = Path.home() / ".nanobot" / "models" / "intent_engine" / "embed_dim.json"
 _lock = Lock()
 
-_resolved_dim: int | None = None
-_provider_available: bool | None = None
+_model = None
+_model_name: str = ""
+_model_dim: int = 0
+_provider_available: bool = False
+_init_attempted: bool = False
 
 
-def _load_dim_cache() -> int | None:
-    try:
-        if _DIM_CACHE_FILE.exists():
-            data = json.loads(_DIM_CACHE_FILE.read_text(encoding="utf-8"))
-            return int(data["dim"])
-    except Exception:
-        pass
-    return None
-
-
-def _save_dim_cache(dim: int) -> None:
-    try:
-        _DIM_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
-        _DIM_CACHE_FILE.write_text(json.dumps({"dim": dim}), encoding="utf-8")
-    except Exception:
-        pass
-
+# ── Public API ────────────────────────────────────────────────────
 
 def get_dim() -> int:
-    """Return the expected embedding dimension.
-
-    Tries cached LiteLLM dim first, then falls back to hash dim.
-    """
-    global _resolved_dim
-    if _resolved_dim is not None:
-        return _resolved_dim
-    cached = _load_dim_cache()
-    if cached:
-        _resolved_dim = cached
-        return cached
+    """Return the embedding dimension (model dim when loaded, hash dim otherwise)."""
+    if _model_dim > 0:
+        return _model_dim
     return _HASH_DIM
 
 
 def is_semantic() -> bool:
     """True when the embedding provider produces real semantic vectors."""
-    return _provider_available is True
+    return _provider_available
+
+
+def get_provider_name() -> str:
+    """Return the active provider name for observability."""
+    if _provider_available:
+        return "local"
+    return "hash"
 
 
 def embed_text(text: str) -> list[float] | None:
     """Return an embedding vector for *text*.
 
-    Tries LiteLLM first.  On failure, returns a hash-based vector of
-    ``_HASH_DIM`` dimensions, but marks the provider as unavailable so
-    callers can choose to ignore low-quality results.
+    Tries local model first. Falls back to hash-based vector, but marks
+    the provider as non-semantic so callers can choose to skip similarity
+    search.
     """
-    vec = _embed_litellm(text)
+    vec = _embed_local_cached(text)
     if vec is not None:
         return vec
     return _embed_hash(text)
 
 
-# ── LiteLLM embedding ─────────────────────────────────────────────
+def warmup() -> None:
+    """Eagerly load the model and run a throwaway encode.
 
-def _get_embedding_config() -> dict | None:
+    Call during application init (NOT on the request path) to eliminate
+    cold-start latency from the first real predict() call.
+    """
+    _ensure_model()
+    if _model is not None:
+        try:
+            _model.encode("warmup", show_progress_bar=False)
+            log.info("[ie_embed] warmup complete, model=%s dim=%d", _model_name, _model_dim)
+        except Exception:
+            log.debug("[ie_embed] warmup encode failed", exc_info=True)
+
+
+# ── Local model ───────────────────────────────────────────────────
+
+def _get_model_name() -> str:
+    """Resolve model name from IE config or use default."""
     try:
-        from nanobot.config.loader import load_config
-        config = load_config()
-        model = config.agents.defaults.model
-        p = config.get_provider(model)
-        if not p.api_key:
-            return None
-        return {
-            "api_key": p.api_key,
-            "api_base": getattr(p, "api_base", None),
-        }
+        from myxai_desk.core.intent_engine import config as ie_config
+        return ie_config.get("embedding_model") or _DEFAULT_MODEL
     except Exception:
-        return None
+        return _DEFAULT_MODEL
 
 
-def _embed_litellm(text: str) -> list[float] | None:
-    global _resolved_dim, _provider_available
-    cfg = _get_embedding_config()
-    if not cfg:
-        _provider_available = False
+def _configure_hf_mirror() -> None:
+    """Set HuggingFace mirror for regions where huggingface.co is unreachable."""
+    import os
+    if not os.environ.get("HF_ENDPOINT"):
+        try:
+            from myxai_desk.core.intent_engine import config as ie_config
+            mirror = ie_config.get("hf_mirror")
+            if mirror:
+                os.environ["HF_ENDPOINT"] = mirror
+                return
+        except Exception:
+            pass
+        os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
+
+
+def _ensure_model() -> None:
+    """Load the sentence-transformers model (once)."""
+    global _model, _model_name, _model_dim, _provider_available, _init_attempted
+
+    if _init_attempted:
+        return
+    with _lock:
+        if _init_attempted:
+            return
+        _init_attempted = True
+
+        _configure_hf_mirror()
+        model_name = _get_model_name()
+        cache_dir = str(_MODEL_DIR / "st_cache")
+
+        try:
+            from sentence_transformers import SentenceTransformer
+            _model = SentenceTransformer(
+                model_name,
+                cache_folder=cache_dir,
+            )
+            _model_dim = _model.get_sentence_embedding_dimension()
+            _model_name = model_name
+            _provider_available = True
+            log.info("[ie_embed] local model loaded: %s (dim=%d)", model_name, _model_dim)
+        except ImportError:
+            log.warning(
+                "[ie_embed] sentence-transformers not installed — "
+                "case retrieval degraded to hash-only. "
+                "Install: pip install sentence-transformers"
+            )
+            _provider_available = False
+        except Exception:
+            log.warning("[ie_embed] failed to load model %s", model_name, exc_info=True)
+            _provider_available = False
+
+
+def _embed_local(text: str) -> list[float] | None:
+    """Encode text with the local model. Returns None if model unavailable."""
+    _ensure_model()
+    if _model is None:
         return None
     try:
-        import os
-        os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
-        import litellm
-        resp = litellm.embedding(
-            model="text-embedding-3-small",
-            input=[text[:8000]],
-            api_key=cfg["api_key"],
-            api_base=cfg.get("api_base"),
-        )
-        vec = resp.data[0]["embedding"]
-
-        with _lock:
-            if _resolved_dim is None:
-                _resolved_dim = len(vec)
-                _save_dim_cache(_resolved_dim)
-                log.info("[ie_embed] auto-detected embedding dim=%d", _resolved_dim)
-            elif len(vec) != _resolved_dim:
-                log.error(
-                    "[ie_embed] dim mismatch: got %d, expected %d — dropping vector",
-                    len(vec), _resolved_dim,
-                )
-                return None
-
-        _provider_available = True
-        return vec
+        vec = _model.encode(text, show_progress_bar=False, normalize_embeddings=True)
+        return vec.tolist()
     except Exception:
-        log.debug("[ie_embed] litellm embedding failed", exc_info=True)
-        _provider_available = False
+        log.debug("[ie_embed] local encode failed", exc_info=True)
         return None
 
 
-# ── Hash-based fallback embedding ──────────────────────────────────
+# ── Cache layer ───────────────────────────────────────────────────
+
+@lru_cache(maxsize=2048)
+def _cache_key_embed(cache_key: str) -> tuple[float, ...] | None:
+    """Cache wrapper keyed by hash(model + text). Returns tuple for hashability."""
+    vec = _embed_local(cache_key)
+    if vec is None:
+        return None
+    return tuple(vec)
+
+
+def _embed_local_cached(text: str) -> list[float] | None:
+    """Embed with LRU cache. Key = model_name + normalized text."""
+    _ensure_model()
+    if _model is None:
+        return None
+
+    cache_key = text[:8000]
+    result = _cache_key_embed(cache_key)
+    if result is None:
+        return None
+    return list(result)
+
+
+def get_cache_info():
+    """Return LRU cache hit/miss stats for monitoring."""
+    return _cache_key_embed.cache_info()
+
+
+# ── Hash-based fallback embedding ─────────────────────────────────
 
 _STOP_WORDS = {"的", "了", "是", "在", "我", "有", "和", "就", "不", "人",
                "都", "一", "一个", "上", "也", "很", "到", "说", "要", "去",

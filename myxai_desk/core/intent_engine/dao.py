@@ -68,10 +68,55 @@ def init_ie_tables() -> None:
         created_at TEXT NOT NULL
         """,
     )
+    
+    # Semantic assets tables (for nightly learning)
+    ensure_table(
+        "semantic_runs",
+        """
+        id TEXT PRIMARY KEY,
+        run_date TEXT NOT NULL,
+        status TEXT DEFAULT 'pending',
+        input_stats_json TEXT DEFAULT '{}',
+        output_artifacts_json TEXT DEFAULT '{}',
+        model_used TEXT DEFAULT '',
+        token_cost INTEGER DEFAULT 0,
+        error_log TEXT DEFAULT '',
+        created_at TEXT NOT NULL,
+        completed_at TEXT
+        """,
+    )
+    
+    ensure_table(
+        "user_lexicon",
+        """
+        id TEXT PRIMARY KEY,
+        version INTEGER NOT NULL,
+        synonyms_json TEXT DEFAULT '{}',
+        verb_map_json TEXT DEFAULT '{}',
+        stop_phrases_json TEXT DEFAULT '[]',
+        source TEXT DEFAULT 'manual',
+        active INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL
+        """,
+    )
+    
+    ensure_table(
+        "case_key_alias",
+        """
+        id TEXT PRIMARY KEY,
+        alias TEXT NOT NULL UNIQUE,
+        canonical TEXT NOT NULL,
+        confidence REAL DEFAULT 1.0,
+        source TEXT DEFAULT 'manual',
+        active INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL
+        """,
+    )
 
     _backfill_ie_runs_columns()
     _backfill_ie_cases_columns()
     _backfill_golden_hit_from_plan_source()
+    _ensure_fts5_index()
     _TABLES_READY = True
 
 
@@ -167,6 +212,72 @@ def _backfill_golden_hit_from_plan_source() -> None:
         )
     except Exception:
         pass
+
+
+def _ensure_fts5_index() -> None:
+    """Create FTS5 virtual table for ie_cases full-text search (BM25).
+    
+    This enables lexical fallback when semantic embedding is unavailable,
+    ensuring case retrieval remains functional even without vector models.
+    Uses BM25 ranking for relevance scoring.
+    """
+    try:
+        from myxai_desk.core.storage.sqlite import connect
+        with connect() as conn:
+            conn.execute("""
+                CREATE VIRTUAL TABLE IF NOT EXISTS ie_cases_fts
+                USING fts5(
+                    task_text,
+                    route_label,
+                    case_key,
+                    content='ie_cases',
+                    content_rowid='rowid',
+                    tokenize='unicode61 remove_diacritics 2'
+                )
+            """)
+            
+            # Populate FTS5 index from existing cases (simplified)
+            result = conn.execute("SELECT COUNT(*) as cnt FROM ie_cases_fts").fetchone()
+            fts_count = result[0] if result else 0
+            result = conn.execute("SELECT COUNT(*) as cnt FROM ie_cases").fetchone()
+            cases_count = result[0] if result else 0
+            
+            if fts_count < cases_count:
+                # Rebuild FTS5 index
+                conn.execute("DELETE FROM ie_cases_fts")
+                conn.execute("""
+                    INSERT INTO ie_cases_fts(rowid, task_text, route_label, case_key)
+                    SELECT rowid, task_text, route_label, COALESCE(case_key, '') 
+                    FROM ie_cases
+                """)
+            
+            # Create triggers to keep FTS5 in sync
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS ie_cases_fts_insert AFTER INSERT ON ie_cases BEGIN
+                    INSERT INTO ie_cases_fts(rowid, task_text, route_label, case_key)
+                    VALUES (new.rowid, new.task_text, new.route_label, COALESCE(new.case_key, ''));
+                END
+            """)
+            
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS ie_cases_fts_update AFTER UPDATE ON ie_cases BEGIN
+                    UPDATE ie_cases_fts SET 
+                        task_text = new.task_text,
+                        route_label = new.route_label,
+                        case_key = COALESCE(new.case_key, '')
+                    WHERE rowid = new.rowid;
+                END
+            """)
+            
+            conn.execute("""
+                CREATE TRIGGER IF NOT EXISTS ie_cases_fts_delete AFTER DELETE ON ie_cases BEGIN
+                    DELETE FROM ie_cases_fts WHERE rowid = old.rowid;
+                END
+            """)
+            
+        log.debug("[ie_dao] FTS5 index ready for ie_cases")
+    except Exception:
+        log.warning("[ie_dao] FTS5 index setup failed (may not be critical)", exc_info=True)
 
 
 # ── ie_runs operations ────────────────────────────────────────────
@@ -632,6 +743,8 @@ def insert_case(
     outcome: str = "success",
     embedding_id: str = "",
     sim_hash: str = "",
+    case_key: str = "",
+    best_plan_kind: str = "",
 ) -> str | None:
     try:
         init_ie_tables()
@@ -641,8 +754,8 @@ def insert_case(
             """INSERT INTO ie_cases
                (id, task_text, context_fp, route_label, plan_json,
                 pitfalls, fail_reason, outcome, embedding_id, sim_hash,
-                created_at, usage_count)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+                created_at, usage_count, case_key, best_plan_kind)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
             (
                 case_id,
                 (task_text or "")[:2000],
@@ -655,6 +768,8 @@ def insert_case(
                 embedding_id,
                 sim_hash,
                 now,
+                case_key,
+                best_plan_kind,
             ),
         )
         return case_id

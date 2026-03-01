@@ -9,6 +9,9 @@ docs/
 tests/
 .github/
 
+tools/
+examples/
+
 # Testing
 .pytest_cache/
 .coverage

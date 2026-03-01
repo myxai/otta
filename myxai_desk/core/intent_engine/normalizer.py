@@ -23,7 +23,10 @@ _PROTECTED_RE = re.compile(
     "|".join(re.escape(w) for w in sorted(_PROTECTED_WORDS, key=len, reverse=True)),
 )
 
-_PUNCT = re.compile(r"[，。！？、；：""''（）【】《》\s,.!?;:\"'()\[\]{}<>]+")
+_PUNCT = re.compile(r'[，。！？、；：\u201c\u201d\u2018\u2019（）【】《》\s,.!?;:"\'\(\)\[\]{}<>]+')
+_PUNCT_PRESERVE = re.compile(r'[，。！；：\u201c\u201d\u2018\u2019（）【】《》\s,.!;:"\'\(\)\[\]{}<>]+')
+_SIGNAL_CHARS = frozenset("+-*/÷×^%=?？")
+_SHORT_TEXT_LEN = 6
 _FILLER = re.compile(
     r"帮我|请|麻烦|一下|吧|呢|啊|哦|嗯|了|的|把|给我|帮忙|可以|能不能|能否",
 )
@@ -81,8 +84,14 @@ def normalize_text(text: str) -> str:
 
     Negation and scope modifiers are protected from removal via placeholder
     swap so that "不要删除" keeps "不要" intact.
+
+    Short text (<=12 chars) uses a conservative strategy that preserves
+    signal characters like ``+ - * / = ?`` which are critical for routing.
+    
+    User-specific lexicon (from nightly learning) is applied after built-in rules.
     """
     t = text.strip()
+    is_short = len(t) <= _SHORT_TEXT_LEN
 
     # 1. Shield protected words with placeholders
     shields: list[str] = []
@@ -93,15 +102,42 @@ def normalize_text(text: str) -> str:
     t = _PROTECTED_RE.sub(_shield, t)
 
     # 2. Remove fillers, normalise punctuation/whitespace
-    t = _FILLER.sub("", t)
-    t = _PUNCT.sub(" ", t)
+    if not is_short:
+        t = _FILLER.sub("", t)
+    t = (_PUNCT_PRESERVE if is_short else _PUNCT).sub(" ", t)
     t = _WHITESPACE.sub(" ", t).strip().lower()
 
-    # 3. Low-risk synonym replacement
+    # 2.5 For short text, restore signal characters that were stripped
+    if is_short:
+        for ch in text:
+            if ch in _SIGNAL_CHARS and ch not in t:
+                t = t + ch
+
+    # 3. Low-risk synonym replacement (built-in rules)
     for pat, repl in _SYNONYM_PAIRS:
         t = pat.sub(repl, t)
+    
+    # 4. Apply user-specific lexicon (learned patterns)
+    try:
+        from myxai_desk.core.intent_engine.user_lexicon import load_user_lexicon
+        synonyms, verb_map, stop_phrases = load_user_lexicon()
+        
+        # Apply synonyms (word-level replacement)
+        if synonyms:
+            words = t.split()
+            words = [synonyms.get(w, w) for w in words]
+            t = " ".join(words)
+        
+        # Remove user-specific stop phrases
+        if stop_phrases:
+            for phrase in stop_phrases:
+                t = t.replace(phrase, " ")
+            t = _WHITESPACE.sub(" ", t).strip()
+    except Exception:
+        # Fail gracefully if lexicon can't be loaded
+        pass
 
-    # 4. Restore protected words
+    # 5. Restore protected words
     for idx, word in enumerate(shields):
         t = t.replace(f"\x00p{idx}\x00", word.lower())
 
@@ -113,6 +149,8 @@ def build_case_key(text_norm: str) -> str:
 
     Format: ``<verb>_<noun_hash6>``  e.g. ``search_a3f2b1``
     Falls back to a pure hash when no verb is detected.
+    
+    User-specific verb mappings (from nightly learning) are applied.
     """
     verb = "task"
     m = _ZH_VERB_RE.search(text_norm)
@@ -127,6 +165,13 @@ def build_case_key(text_norm: str) -> str:
         )
         if en:
             verb = en.group().lower()
+    
+    # Apply user-specific verb mapping
+    try:
+        from myxai_desk.core.intent_engine.user_lexicon import get_verb_mapping
+        verb = get_verb_mapping(verb)
+    except Exception:
+        pass
 
     nouns = _NOUN_EXTRACT.findall(text_norm)
     noun_part = "_".join(nouns[:3]).lower() if nouns else ""

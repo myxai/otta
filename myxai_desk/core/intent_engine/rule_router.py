@@ -24,6 +24,13 @@ _STRONG_VERB_PATTERN = re.compile(
     r"复制|写入|创建|编辑|构建|编译",
     re.IGNORECASE,
 )
+_MATH_EXPR_PATTERN = re.compile(
+    r"\d+\s*[+\-*/÷×^%]\s*\d|=\s*\?",
+)
+_CREATIVE_VERB_PATTERN = re.compile(
+    r"写|生成|创作|编写|改写|润色|续写|仿写|翻译|来一首|来一篇|来一段",
+    re.IGNORECASE,
+)
 
 _PATH_BOOST = 0.12
 _STRONG_VERB_BOOST = 0.12
@@ -50,6 +57,10 @@ def score_rule(rule: Rule, text: str) -> float:
         conf += _PATH_BOOST
     if _STRONG_VERB_PATTERN.search(text):
         conf += _STRONG_VERB_BOOST
+    if rule.category == "math" and _MATH_EXPR_PATTERN.search(text):
+        conf += _STRONG_FEATURE_BOOST
+    if rule.category == "creative" and _CREATIVE_VERB_PATTERN.search(text):
+        conf += _STRONG_FEATURE_BOOST
     if rule.strong_features and rule.strong_features.search(text):
         conf += _STRONG_FEATURE_BOOST
     if rule.weak_features and rule.weak_features.search(text):

@@ -31,7 +31,22 @@ CATEGORIES: dict[str, Category] = {
     "search": Category(
         "search", "low",
         frozenset({"web_search", "web_fetch", "smart_fetch"}),
-        "信息检索 / 监控 / 报告 / 趋势 / 对比",
+        "联网检索 / 监控 / 报告 / 趋势 / 对比（明确需要上网）",
+    ),
+    "ask": Category(
+        "ask", "low",
+        frozenset(),
+        "知识问答 / 概念解释 / 不需要联网的信息类问题",
+    ),
+    "math": Category(
+        "math", "low",
+        frozenset(),
+        "数学计算 / 表达式求值 / 数值推理",
+    ),
+    "creative": Category(
+        "creative", "low",
+        frozenset(),
+        "文本生成 / 写作 / 翻译 / 润色 / 诗歌 / 故事 / 文案",
     ),
     "fs": Category(
         "fs", "high",
@@ -71,7 +86,7 @@ CATEGORIES: dict[str, Category] = {
     "chat": Category(
         "chat", "low",
         frozenset(),
-        "纯对话/解释（不启用工具）",
+        "纯对话（寒暄/闲聊，不启用工具）",
     ),
 }
 

@@ -414,8 +414,30 @@ def invalidate_instance(case_key: str) -> bool:
 
 
 def delete_instance(case_key: str) -> bool:
+    """Delete a golden instance and restore related candidate status if exists."""
     try:
+        # Check if there's a related candidate that was promoted
+        candidate_rows = execute(
+            "SELECT candidate_id FROM golden_candidates WHERE case_key = ? AND status = 'promoted'",
+            (case_key,),
+            readonly=True,
+        )
+        
+        # Delete the instance
         execute("DELETE FROM golden_instances WHERE case_key = ?", (case_key,))
+        
+        # Restore candidate status to 'new' if it was promoted
+        if candidate_rows:
+            for row in candidate_rows:
+                execute(
+                    "UPDATE golden_candidates SET status = 'new' WHERE candidate_id = ?",
+                    (row["candidate_id"],),
+                )
+                log.info(
+                    "[strategy_hub] restored candidate %s status to 'new' after instance deletion",
+                    row["candidate_id"][:16],
+                )
+        
         return True
     except Exception:
         log.warning("Failed to delete instance %s", case_key, exc_info=True)
@@ -472,6 +494,62 @@ def list_candidates(
     return result
 
 
+def _infer_intent_label(candidate: dict) -> str:
+    """Infer intent_label for a candidate via multiple strategies.
+
+    Priority:
+      1. ie_runs lookup by case_key (ie_runs.case_key = candidate.case_key)
+      2. ie_runs lookup by candidate_id
+      3. Real-time rule-router classification from user_text
+    """
+    case_key = candidate.get("case_key", "")
+    cand_id = candidate.get("candidate_id", "")
+    user_text = candidate.get("user_text", "")
+
+    # Strategy 1: ie_runs by case_key
+    if case_key:
+        try:
+            rows = execute(
+                "SELECT route_label FROM ie_runs WHERE case_key = ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (case_key,), readonly=True,
+            )
+            if rows and rows[0].get("route_label"):
+                label = rows[0]["route_label"]
+                log.info("[strategy_hub] intent from ie_runs.case_key: %s", label)
+                return label
+        except Exception:
+            pass
+
+    # Strategy 2: ie_runs by candidate_id
+    if cand_id:
+        try:
+            rows = execute(
+                "SELECT route_label FROM ie_runs WHERE candidate_id = ? "
+                "ORDER BY created_at DESC LIMIT 1",
+                (cand_id,), readonly=True,
+            )
+            if rows and rows[0].get("route_label"):
+                label = rows[0]["route_label"]
+                log.info("[strategy_hub] intent from ie_runs.candidate_id: %s", label)
+                return label
+        except Exception:
+            pass
+
+    # Strategy 3: real-time rule classification from user_text
+    if user_text:
+        try:
+            from myxai_desk.core.intent_engine.rule_router import route
+            hit = route(user_text)
+            if hit:
+                log.info("[strategy_hub] intent from rule_router: %s", hit.category)
+                return hit.category
+        except Exception:
+            log.debug("[strategy_hub] rule_router classify failed", exc_info=True)
+
+    return ""
+
+
 def promote_candidate_to_instance(candidate_id: str) -> dict:
     """Promote a candidate to a golden v2 instance."""
     try:
@@ -486,6 +564,8 @@ def promote_candidate_to_instance(candidate_id: str) -> dict:
         c = rows[0]
         plan_json = c.get("candidate_plan_json", "[]")
 
+        intent_label = _infer_intent_label(c)
+
         from myxai_desk.core.golden.store import GoldenV2Store
         from myxai_desk.core.golden_store import parse_candidate_plan
 
@@ -494,7 +574,7 @@ def promote_candidate_to_instance(candidate_id: str) -> dict:
         v2.save_instance(
             case_key=c["case_key"],
             template_id=None,
-            intent_label="",
+            intent_label=intent_label,
             slot_values={},
             resolved_plan=resolved,
         )
@@ -508,7 +588,11 @@ def promote_candidate_to_instance(candidate_id: str) -> dict:
         except Exception:
             pass
 
-        return {"ok": True, "case_key": c["case_key"]}
+        result = {"ok": True, "case_key": c["case_key"]}
+        if intent_label:
+            result["intent_label"] = intent_label
+        return result
+
     except Exception as e:
         log.warning("Failed to promote candidate %s", candidate_id, exc_info=True)
         return {"ok": False, "error": str(e)}
@@ -570,3 +654,74 @@ def get_intent_labels() -> list[str]:
     except Exception:
         pass
     return sorted(labels)
+
+
+# ── Template Generation ──────────────────────────────────────────────
+
+
+def generate_templates_for_intent(
+    intent_label: Optional[str] = None,
+    force: bool = False,
+) -> dict:
+    """Manually trigger template generation.
+    
+    Args:
+        intent_label: If provided, only generate for this intent.
+                     Otherwise, scan all intents.
+        force: If True, regenerate even if template already exists.
+    
+    Returns:
+        {
+            "ok": bool,
+            "templates_created": int,
+            "templates": list of template details,
+            "error": str (if failed),
+        }
+    """
+    try:
+        from myxai_desk.core.golden.store import GoldenV2Store
+        from myxai_desk.core.golden.template_generator import maybe_generate_templates
+        
+        store = GoldenV2Store()
+        
+        # If force=True and intent_label provided, delete existing templates first
+        if force and intent_label:
+            try:
+                execute(
+                    "DELETE FROM golden_templates WHERE intent_label = ?",
+                    (intent_label,),
+                )
+                log.info("[strategy_hub] force regenerate: deleted existing templates for %s", intent_label)
+            except Exception as e:
+                log.warning("[strategy_hub] failed to delete existing templates: %s", e)
+        
+        # Generate templates
+        created = maybe_generate_templates(store, intent_label=intent_label)
+        
+        # Format response
+        templates = []
+        for tpl in created:
+            templates.append({
+                "template_id": tpl.template_id,
+                "intent_label": tpl.intent_label,
+                "version": tpl.version,
+                "slot_count": len(tpl.slot_schemas),
+                "step_count": len(tpl.plan_template),
+                "created_at": tpl.created_at,
+            })
+        
+        return {
+            "ok": True,
+            "templates_created": len(created),
+            "templates": templates,
+            "message": f"成功生成 {len(created)} 个模板" if created else "没有符合条件的实例可以生成模板",
+        }
+        
+    except Exception as e:
+        log.error("[strategy_hub] template generation failed", exc_info=True)
+        return {
+            "ok": False,
+            "templates_created": 0,
+            "templates": [],
+            "error": str(e),
+        }

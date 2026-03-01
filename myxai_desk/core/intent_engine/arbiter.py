@@ -2,15 +2,17 @@
 
 Responsibilities:
   1. Fuse rule_hit + case_hit into a single confidence / category.
-  2. Decide whether to invoke the LLM router (``should_call_llm``).
-  3. Incorporate LLM result into the fused decision (``fuse_with_llm``).
-  4. Decide whether to reuse a cached plan (``maybe_reuse`` — legacy, kept).
+  2. Apply strong-signal override when case_only (prevent case label pollution).
+  3. Decide whether to invoke the LLM router (``should_call_llm``).
+  4. Incorporate LLM result into the fused decision (``fuse_with_llm``).
+  5. Decide whether to reuse a cached plan (``maybe_reuse`` — legacy, kept).
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -31,6 +33,47 @@ _CONFLICT_THRESHOLD = 0.08
 _LLM_TRIGGER_CONF = 0.75
 _FALLBACK_CONF = 0.70
 _HIGH_RISK_RULE_MIN = 0.85
+
+# ── Strong-signal patterns for case_only override ────────────────
+# These lightweight regex checks prevent case pollution from forcing
+# obviously wrong categories (e.g. "1+1=?" → search, "写首诗" → search).
+
+_SIGNAL_MATH = re.compile(
+    r"\d+\s*[+\-*/÷×^%]\s*\d|=\s*\?|"
+    r"计算|算一下|求值|求解|方程|等于多少|"
+    r"√|∑|∫|sin\b|cos\b|tan\b|log\b|ln\b|π|"
+    r"平方|立方|阶乘|导数|积分|极限",
+    re.IGNORECASE,
+)
+_SIGNAL_CREATIVE = re.compile(
+    r"写.*(?:诗|文|故事|小说|文案|脚本|歌词|对联|散文|作文|邮件|信)|"
+    r"来一首|来一篇|来一段|来个.*(?:故事|笑话|段子)|"
+    r"生成.*(?:文本|内容|文章)|创作|编写|改写|润色|续写|仿写|"
+    r"翻译|translate",
+    re.IGNORECASE,
+)
+_SIGNAL_OPERATE = re.compile(
+    r"打开|关闭|删除|移动|下载|安装|运行|执行|卸载",
+    re.IGNORECASE,
+)
+
+_STRONG_SIGNALS: list[tuple[re.Pattern[str], str, float]] = [
+    (_SIGNAL_MATH,     "math",     0.90),
+    (_SIGNAL_CREATIVE, "creative", 0.88),
+    (_SIGNAL_OPERATE,  "fs",       0.75),
+]
+
+
+def _strong_signal_override(user_text: str, case_category: str) -> tuple[str, float, str] | None:
+    """Check if *user_text* has a strong signal that contradicts *case_category*.
+
+    Returns ``(correct_category, confidence, reason)`` when an override should
+    be applied, or ``None`` when the case category looks plausible.
+    """
+    for pattern, category, conf in _STRONG_SIGNALS:
+        if pattern.search(user_text) and case_category != category:
+            return category, conf, f"strong_signal_{category}_overrides_{case_category}"
+    return None
 
 
 @dataclass
@@ -82,8 +125,15 @@ class FusedResult:
 def fuse(
     rule_hit: RuleRouteResult | None,
     case_hit: CaseRouteResult | None,
+    *,
+    user_text: str = "",
 ) -> FusedResult:
-    """Merge rule and case evidence into one decision."""
+    """Merge rule and case evidence into one decision.
+
+    When only case evidence exists (``case_only``), a lightweight strong-signal
+    check is applied to catch obvious misclassifications (e.g. "1+1=?" wrongly
+    tagged as *search* by case history).
+    """
     result = FusedResult()
 
     if rule_hit and case_hit:
@@ -128,6 +178,21 @@ def fuse(
         result.arbiter_reason = "case_only"
         result.case_hit = case_hit
         result.route_labels = [case_hit.category]
+
+        # ── Strong-signal override for case_only ──
+        if user_text:
+            override = _strong_signal_override(user_text, case_hit.category)
+            if override:
+                cat, conf, reason = override
+                log.info(
+                    "[arbiter] strong_signal override: %s → %s (was case=%s conf=%.3f)",
+                    reason, cat, case_hit.category, case_hit.case_conf,
+                )
+                result.category = cat
+                result.confidence = conf
+                result.confidence_source = "rule"
+                result.arbiter_reason = reason
+                result.route_labels = [cat]
 
     else:
         result.category = "general"

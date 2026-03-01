@@ -27,6 +27,9 @@ from myxai_desk.core.intent_engine.dao import insert_run, update_outcome
 log = logging.getLogger("myxai")
 
 _FALLBACK_CONF = 0.70
+_SEARCH_DOMINANCE_WINDOW = 200
+_SEARCH_DOMINANCE_THRESHOLD = 0.60
+_SEARCH_DOMINANCE_PENALTY = 0.15
 
 # ── File-verb patterns for misroute guard ────────────────────────
 
@@ -182,17 +185,18 @@ def predict(
     # --- Step 2: case router (historical evidence) ---
     # Uses text_norm so that synonym-normalised text produces stable embeddings.
     case_hit = None
-    try:
-        from myxai_desk.core.intent_engine.case_router import search as case_search
-        case_hit = case_search(text_norm, case_key=case_key)
-        if case_hit:
-            result.case_id = case_hit.case_id
-            result.case_conf = case_hit.case_conf
-            log.debug("[predict] case_hit: cat=%s conf=%.3f sim=%.3f id=%s",
-                      case_hit.category, case_hit.case_conf,
-                      case_hit.similarity, case_hit.case_id)
-    except Exception:
-        log.debug("[predict] case_router failed", exc_info=True)
+    if not ctx.get("skip_case_search", False):
+        try:
+            from myxai_desk.core.intent_engine.case_router import search as case_search
+            case_hit = case_search(text_norm, case_key=case_key)
+            if case_hit:
+                result.case_id = case_hit.case_id
+                result.case_conf = case_hit.case_conf
+                log.debug("[predict] case_hit: cat=%s conf=%.3f sim=%.3f id=%s",
+                          case_hit.category, case_hit.case_conf,
+                          case_hit.similarity, case_hit.case_id)
+        except Exception:
+            log.debug("[predict] case_router failed", exc_info=True)
 
     # --- Step 3: arbiter fusion ---
     from myxai_desk.core.intent_engine.arbiter import (
@@ -200,7 +204,7 @@ def predict(
         should_call_llm,
         fuse_with_llm,
     )
-    fused = arbiter_fuse(rule_hit, case_hit)
+    fused = arbiter_fuse(rule_hit, case_hit, user_text=user_text)
 
     # --- Step 3.5: LLM arbitration (conditional) ---
     if should_call_llm(fused, rule_hit, case_hit, ctx):
@@ -233,6 +237,16 @@ def predict(
             result.routing_method = "rule"
     result.decision_mode = result.routing_method
 
+    # Search dominance guard: penalise case-only search when search is overrepresented
+    if (
+        result.arbiter_reason == "case_only"
+        and result.route_labels == ["search"]
+        and _is_search_dominant()
+    ):
+        result.route_conf = max(0.0, result.route_conf - _SEARCH_DOMINANCE_PENALTY)
+        fused.confidence = result.route_conf
+        log.info("[predict] search_dominance penalty applied (conf now %.3f)", result.route_conf)
+
     # Fallback guard
     if fused.confidence < _FALLBACK_CONF:
         result.route_labels = ["general"]
@@ -258,27 +272,29 @@ def predict(
                  result.route_labels, user_text)
 
     # --- Step 7: case retrieval hints ---
-    try:
-        from myxai_desk.core.intent_engine.case_store import retrieve_hints
-        result.hints = retrieve_hints(
-            text_norm,
-            route_labels=result.route_labels,
-            conf=result.route_conf,
-        )
-    except Exception:
-        log.debug("[predict] retrieve_hints failed", exc_info=True)
+    if not ctx.get("skip_case_search", False):
+        try:
+            from myxai_desk.core.intent_engine.case_store import retrieve_hints
+            result.hints = retrieve_hints(
+                text_norm,
+                route_labels=result.route_labels,
+                conf=result.route_conf,
+            )
+        except Exception:
+            log.debug("[predict] retrieve_hints failed", exc_info=True)
 
     # --- Step 8: plan reuse via arbiter ---
-    try:
-        from myxai_desk.core.intent_engine.arbiter import maybe_reuse
-        decision, steps = maybe_reuse(text_norm, result, ctx)
-        result.decision = decision
-        result.plan_steps = steps
-        if decision == "reuse_plan":
-            result.routing_method = "case_reuse"
-            result.decision_mode = "case_reuse"
-    except Exception:
-        log.debug("[predict] arbiter.maybe_reuse failed", exc_info=True)
+    if not ctx.get("skip_case_search", False):
+        try:
+            from myxai_desk.core.intent_engine.arbiter import maybe_reuse
+            decision, steps = maybe_reuse(text_norm, result, ctx)
+            result.decision = decision
+            result.plan_steps = steps
+            if decision == "reuse_plan":
+                result.routing_method = "case_reuse"
+                result.decision_mode = "case_reuse"
+        except Exception:
+            log.debug("[predict] arbiter.maybe_reuse failed", exc_info=True)
 
     result.latency_ms = round((time.perf_counter() - t0) * 1000, 2)
     return result
@@ -334,3 +350,34 @@ def _max_risk(levels: list[str]) -> str:
     if not levels:
         return "low"
     return max(levels, key=lambda r: _RISK_ORDER.get(r, 0))
+
+
+def _is_search_dominant() -> bool:
+    """Check if 'search' category dominates recent routing decisions.
+
+    When search accounts for > 60% of the last 200 runs, case_reuse results
+    for search become less trustworthy and should be penalised.
+    """
+    try:
+        from myxai_desk.core.storage.sqlite import execute
+        rows = execute(
+            """SELECT route_label FROM ie_runs
+               ORDER BY created_at DESC LIMIT ?""",
+            (_SEARCH_DOMINANCE_WINDOW,),
+            readonly=True,
+        )
+        if not rows or len(rows) < 20:
+            return False
+        search_count = sum(
+            1 for r in rows if (r.get("route_label") or "").startswith("search")
+        )
+        ratio = search_count / len(rows)
+        if ratio > _SEARCH_DOMINANCE_THRESHOLD:
+            log.info(
+                "[predict] search dominance detected: %.1f%% of last %d runs",
+                ratio * 100, len(rows),
+            )
+            return True
+    except Exception:
+        log.debug("[predict] search dominance check failed", exc_info=True)
+    return False

@@ -24,6 +24,13 @@ _DEFAULTS: dict[str, Any] = {
     "hints_max_length": 600,
     "high_risk_tools": ["exec"],
     "router_model": "",  # cheap/fast model for LLM arbitration; empty = use main model
+    # Nightly semantic learning
+    "nightly_learning_enabled": False,
+    "nightly_learning_use_llm": True,
+    "nightly_learning_sanitize_pii": True,
+    "nightly_learning_max_samples": 200,
+    "nightly_learning_min_runs": 20,
+    "nightly_learning_min_misroutes": 5,
 }
 
 

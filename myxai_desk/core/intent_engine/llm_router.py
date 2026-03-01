@@ -105,14 +105,21 @@ def _call_llm(user_text: str) -> dict | None:
         os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
         import litellm
 
+        api_base = getattr(p, "api_base", None)
+        _KNOWN = ("openai/", "anthropic/", "azure/", "deepseek/",
+                   "groq/", "together_ai/", "openrouter/", "gemini/", "mistral/")
+        litellm_model = model
+        if not any(model.startswith(px) for px in _KNOWN) and api_base:
+            litellm_model = f"openai/{model}"
+
         kwargs: dict = {
-            "model": model,
+            "model": litellm_model,
             "messages": [
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": user_text[:2000]},
             ],
             "api_key": p.api_key,
-            "api_base": getattr(p, "api_base", None),
+            "api_base": api_base,
             "temperature": 0.1,
             "max_tokens": 200,
         }

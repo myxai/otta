@@ -15,6 +15,7 @@ from myxai_desk.apps.strategy_hub.dao import (
     delete_candidate,
     delete_instance,
     delete_template,
+    generate_templates_for_intent,
     get_abstraction_suggestions,
     get_golden_metrics,
     get_instance_detail,
@@ -146,3 +147,30 @@ def hub_suggestions():
 def hub_intents():
     """Return all distinct intent labels."""
     return jsonify({"intents": get_intent_labels()})
+
+
+# ── Template Generation ──────────────────────────────────────────────
+
+
+@bp.route("/generate_templates", methods=["POST"])
+def hub_generate_templates():
+    """Manually trigger template generation.
+    
+    Optional JSON body:
+      - intent_label: str (optional) — generate only for this intent
+      - force: bool (default: false) — regenerate even if template exists
+    
+    Returns:
+      - templates_created: int — number of templates created
+      - templates: list — details of created templates
+    """
+    body = request.get_json() or {}
+    intent_label = body.get("intent_label")
+    force = body.get("force", False)
+    
+    result = generate_templates_for_intent(
+        intent_label=intent_label,
+        force=force,
+    )
+    
+    return jsonify(result)

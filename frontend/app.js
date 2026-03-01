@@ -321,6 +321,20 @@ const FALLBACK_I18N = {
     "ie.configAndModels":"配置与模型",
     "ie.intentConfidence":"意图置信度","ie.effectiveSteps":"有效步数","ie.costScore":"Token数",
     "ie.correctCategory":"纠正类别","ie.submitCorrection":"提交纠正","ie.correctionSaved":"纠正已保存","ie.alreadyCorrected":"已纠正",
+    "ie.learning":"空闲学习","ie.learningDesc":"夜间利用LLM学习用户语言习惯，白天全程离线","ie.learningEnabled":"启用空闲学习","ie.learningUseLlm":"允许调用LLM","ie.learningSanitize":"PII脱敏","ie.learningMaxSamples":"最大采样数","ie.learningMinRuns":"最小触发查询数","ie.learningMinMisroutes":"最小误路由数",
+    "ie.learningRun":"手动执行","ie.learningDryRun":"预览(不调LLM)","ie.learningForce":"强制执行","ie.learningRunning":"执行中...","ie.learningDone":"学习完成","ie.learningFailed":"学习失败",
+    "ie.lexicon":"用户词表","ie.lexiconCurrent":"当前词表","ie.lexiconVersions":"历史版本","ie.lexiconRollback":"回滚","ie.lexiconDiff":"对比","ie.lexiconSynonyms":"同义词","ie.lexiconVerbMap":"动词映射","ie.lexiconStopPhrases":"停用短语","ie.lexiconNoData":"暂无词表数据","ie.lexiconSaved":"词表已保存",
+    "ie.aliases":"Case Key 别名","ie.aliasAdd":"添加别名","ie.aliasFrom":"别名","ie.aliasTo":"标准Key","ie.aliasNoData":"暂无别名",
+    "ie.auditTrail":"审计记录","ie.auditPromptSent":"发送给LLM的内容","ie.auditLlmResponse":"LLM返回内容","ie.auditArtifacts":"学习成果","ie.auditNoRuns":"暂无学习记录",
+    "ie.privacy":"隐私说明","ie.privacySentData":"发送的数据","ie.privacyNeverSent":"绝不发送","ie.privacyLearned":"学习的内容","ie.privacyPreview":"预览脱敏效果",
+    "ie.privacySent1":"脱敏后的用户查询（已移除邮箱、路径、电话、IP、URL）","ie.privacySent2":"Case Key（意图标识，不含用户数据）","ie.privacySent3":"路由标签（仅类别名称）","ie.privacySent4":"统计汇总（次数、比率）",
+    "ie.privacyNever1":"原始文件内容或路径","ie.privacyNever2":"邮箱地址、电话号码","ie.privacyNever3":"API Key 或凭证","ie.privacyNever4":"完整对话历史",
+    "ie.privacyLearned1":"同义词映射（用户缩写 → 标准形式）","ie.privacyLearned2":"动词映射（口语动词 → 标准动词）","ie.privacyLearned3":"停用短语（用户特有的填充词）","ie.privacyLearned4":"Case Key 别名（等价意图分组）",
+    "ie.privacyStorage":"所有学习数据仅存储在本地，支持版本控制与回滚。",
+    "ie.auditDate":"日期","ie.auditStatus":"状态","ie.auditTokens":"Tokens","ie.auditArtifactsSummary":"成果","ie.auditDetail":"详情","ie.auditStartTime":"开始时间","ie.auditDuration":"耗时",
+    "ie.auditModel":"模型","ie.selectVersionFirst":"请先选择一个版本","ie.rolledBackTo":"已回滚到","ie.aliasAdded":"别名已添加","ie.aliasRemoved":"别名已移除","ie.fillBothFields":"请填写两个字段",
+    "ie.learnTriggerRuns":"查询数","ie.learnTriggerMisroutes":"误路由",
+    "ie.statusCompleted":"已完成","ie.statusSuccess":"成功","ie.statusRunning":"运行中","ie.statusSkipped":"已跳过","ie.statusError":"错误","ie.statusDryRun":"预览","ie.statusLocalOnly":"仅本地","ie.statusUnknown":"未知",
   },
   en: {
     "nav.newChat":"New Chat","nav.settings":"Settings","nav.status":"Status","nav.gateway":"Gateway",
@@ -582,6 +596,20 @@ const FALLBACK_I18N = {
     "ie.configAndModels":"Config & Models",
     "ie.intentConfidence":"Intent Confidence","ie.effectiveSteps":"Effective Steps","ie.costScore":"Tokens",
     "ie.correctCategory":"Correct Category","ie.submitCorrection":"Submit","ie.correctionSaved":"Correction saved","ie.alreadyCorrected":"Corrected",
+    "ie.learning":"Idle Learning","ie.learningDesc":"Use LLM during idle time to learn language habits, stay fully offline during the day","ie.learningEnabled":"Enable Idle Learning","ie.learningUseLlm":"Allow LLM Calls","ie.learningSanitize":"PII Sanitization","ie.learningMaxSamples":"Max Samples","ie.learningMinRuns":"Min Queries to Trigger","ie.learningMinMisroutes":"Min Misroutes to Trigger",
+    "ie.learningRun":"Run Now","ie.learningDryRun":"Dry Run (no LLM)","ie.learningForce":"Force Run","ie.learningRunning":"Running...","ie.learningDone":"Learning complete","ie.learningFailed":"Learning failed",
+    "ie.lexicon":"User Lexicon","ie.lexiconCurrent":"Current Lexicon","ie.lexiconVersions":"Version History","ie.lexiconRollback":"Rollback","ie.lexiconDiff":"Compare","ie.lexiconSynonyms":"Synonyms","ie.lexiconVerbMap":"Verb Mappings","ie.lexiconStopPhrases":"Stop Phrases","ie.lexiconNoData":"No lexicon data","ie.lexiconSaved":"Lexicon saved",
+    "ie.aliases":"Case Key Aliases","ie.aliasAdd":"Add Alias","ie.aliasFrom":"Alias","ie.aliasTo":"Canonical Key","ie.aliasNoData":"No aliases",
+    "ie.auditTrail":"Audit Trail","ie.auditPromptSent":"Prompt Sent to LLM","ie.auditLlmResponse":"LLM Response","ie.auditArtifacts":"Artifacts Produced","ie.auditNoRuns":"No learning runs yet",
+    "ie.privacy":"Privacy","ie.privacySentData":"Data Sent","ie.privacyNeverSent":"Never Sent","ie.privacyLearned":"What Is Learned","ie.privacyPreview":"Preview Sanitization",
+    "ie.privacySent1":"Sanitized user queries (PII removed: emails, paths, phones, IPs, URLs)","ie.privacySent2":"Case keys (intent identifiers, no user data)","ie.privacySent3":"Route labels (category names only)","ie.privacySent4":"Statistical aggregates (counts, rates)",
+    "ie.privacyNever1":"Raw file contents or paths","ie.privacyNever2":"Email addresses, phone numbers","ie.privacyNever3":"API keys or credentials","ie.privacyNever4":"Full conversation history",
+    "ie.privacyLearned1":"Synonym mappings (user abbreviations → standard forms)","ie.privacyLearned2":"Verb mappings (colloquial verbs → standard verbs)","ie.privacyLearned3":"Stop phrases (user-specific filler words)","ie.privacyLearned4":"Case key aliases (equivalent intent groupings)",
+    "ie.privacyStorage":"All learned data stored locally only. Versioned and rollback-able.",
+    "ie.auditDate":"Date","ie.auditStatus":"Status","ie.auditTokens":"Tokens","ie.auditArtifactsSummary":"Artifacts","ie.auditDetail":"Detail","ie.auditStartTime":"Start Time","ie.auditDuration":"Duration",
+    "ie.auditModel":"Model","ie.selectVersionFirst":"Select a version first","ie.rolledBackTo":"Rolled back to","ie.aliasAdded":"Alias added","ie.aliasRemoved":"Alias removed","ie.fillBothFields":"Fill both fields",
+    "ie.learnTriggerRuns":"runs","ie.learnTriggerMisroutes":"misroutes",
+    "ie.statusCompleted":"Completed","ie.statusSuccess":"Success","ie.statusRunning":"Running","ie.statusSkipped":"Skipped","ie.statusError":"Error","ie.statusDryRun":"Dry Run","ie.statusLocalOnly":"Local Only","ie.statusUnknown":"Unknown",
   },
 };
 
@@ -3685,6 +3713,94 @@ async function openIntentEngineDetail() {
         </div>
       </details>
     </div>
+
+    <!-- 6. Idle Learning -->
+    <div class="app-detail-section">
+      <details id="ie-learning-panel">
+        <summary style="cursor:pointer;font-weight:600;font-size:15px;">
+          ${t("ie.learning")}
+          <span style="font-size:11px;color:var(--subtext0);margin-left:8px;">${t("ie.learningDesc")}</span>
+        </summary>
+        <div style="margin-top:16px;">
+
+          <!-- 6a. Learning Config -->
+          <div style="margin-bottom:20px;">
+            <h4 style="margin-bottom:10px;">⚙️ ${t("ie.learningEnabled")}</h4>
+            <div class="digest-config-grid" style="gap:12px;">
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                <label style="min-width:100px;">${t("ie.learningEnabled")}</label>
+                <input type="checkbox" id="ie-learn-enabled" onchange="ieLearningToggle('nightly_learning_enabled', this.checked)">
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                <label style="min-width:100px;">${t("ie.learningUseLlm")}</label>
+                <input type="checkbox" id="ie-learn-usellm" onchange="ieLearningToggle('nightly_learning_use_llm', this.checked)">
+              </div>
+              <div class="form-group" style="display:flex;align-items:center;gap:8px;">
+                <label style="min-width:100px;">${t("ie.learningSanitize")}</label>
+                <input type="checkbox" id="ie-learn-sanitize" onchange="ieLearningToggle('nightly_learning_sanitize_pii', this.checked)">
+              </div>
+              <div class="form-group">
+                <label>${t("ie.learningMaxSamples")}</label>
+                <input type="number" id="ie-learn-maxsamples" min="10" max="1000" step="10" class="form-input"
+                       onchange="ieLearningToggle('nightly_learning_max_samples', parseInt(this.value))">
+              </div>
+              <div class="form-group">
+                <label>${t("ie.learningMinRuns")}</label>
+                <input type="number" id="ie-learn-minruns" min="1" max="500" step="1" class="form-input"
+                       onchange="ieLearningToggle('nightly_learning_min_runs', parseInt(this.value))">
+              </div>
+              <div class="form-group">
+                <label>${t("ie.learningMinMisroutes")}</label>
+                <input type="number" id="ie-learn-minmis" min="0" max="100" step="1" class="form-input"
+                       onchange="ieLearningToggle('nightly_learning_min_misroutes', parseInt(this.value))">
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-sm btn-primary" onclick="ieLearningRun(false)" id="ie-learn-run-btn">${t("ie.learningRun")}</button>
+              <button class="btn btn-sm" onclick="ieLearningRun(true)">${t("ie.learningDryRun")}</button>
+              <div id="ie-learn-stats" style="font-size:11px;color:var(--subtext0);margin-left:8px;line-height:28px;"></div>
+            </div>
+          </div>
+
+          <!-- 6b. User Lexicon -->
+          <div style="margin-bottom:20px;">
+            <h4 style="margin-bottom:10px;">📖 ${t("ie.lexicon")}</h4>
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+              <select id="ie-lex-version-sel" class="form-input" style="max-width:200px;font-size:12px;" onchange="ieLexiconLoadVersion(this.value)">
+                <option value="current">${t("ie.lexiconCurrent")}</option>
+              </select>
+              <button class="btn btn-sm" onclick="ieLexiconRollback()">${t("ie.lexiconRollback")}</button>
+            </div>
+            <div id="ie-lexicon-content" style="font-size:12px;"></div>
+          </div>
+
+          <!-- 6c. Case Key Aliases -->
+          <div style="margin-bottom:20px;">
+            <h4 style="margin-bottom:10px;">🔗 ${t("ie.aliases")}</h4>
+            <div id="ie-alias-list" style="font-size:12px;margin-bottom:8px;"></div>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+              <input type="text" id="ie-alias-from" placeholder="${t("ie.aliasFrom")}" class="form-input" style="max-width:160px;font-size:12px;">
+              <span style="color:var(--subtext0);">→</span>
+              <input type="text" id="ie-alias-to" placeholder="${t("ie.aliasTo")}" class="form-input" style="max-width:160px;font-size:12px;">
+              <button class="btn btn-sm" onclick="ieAliasAdd()">${t("ie.aliasAdd")}</button>
+            </div>
+          </div>
+
+          <!-- 6d. Privacy -->
+          <div style="margin-bottom:20px;">
+            <h4 style="margin-bottom:10px;">🔒 ${t("ie.privacy")}</h4>
+            <div id="ie-privacy-info" style="font-size:12px;"></div>
+          </div>
+
+          <!-- 6e. Audit Trail -->
+          <div>
+            <h4 style="margin-bottom:10px;">📋 ${t("ie.auditTrail")}</h4>
+            <div id="ie-audit-list" style="font-size:12px;"></div>
+          </div>
+
+        </div>
+      </details>
+    </div>
   `;
 
   await _ieRefreshAll();
@@ -3703,6 +3819,7 @@ async function _ieRefreshAll() {
     _ieLoadTrends(),
     _ieLoadDistribution(),
     _ieLoadRuns(),
+    _ieLoadLearningPanel(),
   ]);
 }
 
@@ -3718,6 +3835,335 @@ async function updateIeConfigAdvanced(key, value) {
     await api("/api/apps/intent_engine/config", "POST", {[key]: value});
     toast(`${key} → ${value}`, "success");
   } catch(e) { toast("Config update failed: " + e.message, "error"); }
+}
+
+// ── 0. Idle Learning Panel ───────────────────────────────────────
+
+async function _ieLoadLearningPanel() {
+  await Promise.all([
+    _ieLoadLearningConfig(),
+    _ieLoadLearningStats(),
+    _ieLoadLexicon("current"),
+    _ieLoadLexiconVersions(),
+    _ieLoadAliases(),
+    _ieLoadPrivacy(),
+    _ieLoadAudit(),
+  ]);
+}
+
+async function _ieLoadLearningConfig() {
+  try {
+    const cfg = await api("/api/apps/intent_engine/learning/config");
+    const el = (id) => document.getElementById(id);
+    if (el("ie-learn-enabled")) el("ie-learn-enabled").checked = !!cfg.enabled;
+    if (el("ie-learn-usellm")) el("ie-learn-usellm").checked = !!cfg.use_llm;
+    if (el("ie-learn-sanitize")) el("ie-learn-sanitize").checked = cfg.sanitize_pii !== false;
+    if (el("ie-learn-maxsamples")) el("ie-learn-maxsamples").value = cfg.max_samples || 200;
+    if (el("ie-learn-minruns")) el("ie-learn-minruns").value = cfg.min_runs || 20;
+    if (el("ie-learn-minmis")) el("ie-learn-minmis").value = cfg.min_misroutes || 5;
+  } catch(_) {}
+}
+
+async function _ieLoadLearningStats() {
+  try {
+    const st = await api("/api/apps/intent_engine/learning/stats");
+    const el = document.getElementById("ie-learn-stats");
+    if (!el) return;
+    const triggerIcon = st.should_trigger ? "🟢" : "🔴";
+    el.innerHTML = `${triggerIcon} ${st.trigger_reason || ""} (${t("ie.learnTriggerRuns")}: ${st.total_runs || 0}, ${t("ie.learnTriggerMisroutes")}: ${st.misroute_count || 0})`;
+  } catch(_) {}
+}
+
+async function ieLearningToggle(key, value) {
+  try {
+    await api("/api/apps/intent_engine/learning/config", "POST", {[key]: value});
+    toast(`${key} → ${value}`, "success");
+  } catch(e) { toast(e.message, "error"); }
+}
+
+async function ieLearningRun(dryRun) {
+  const btn = document.getElementById("ie-learn-run-btn");
+  if (btn) { btn.disabled = true; btn.textContent = t("ie.learningRunning"); }
+  try {
+    const res = await api("/api/apps/intent_engine/learning/run", "POST", {
+      dry_run: !!dryRun, force: !dryRun,
+    });
+    toast(res.status === "skipped" ? res.reason : t("ie.learningDone"), res.status === "skipped" ? "warning" : "success");
+    if (!dryRun) {
+      await _ieLoadLexicon("current");
+      await _ieLoadLexiconVersions();
+      await _ieLoadAliases();
+      await _ieLoadAudit();
+    }
+  } catch(e) { toast(t("ie.learningFailed") + ": " + e.message, "error"); }
+  finally { if (btn) { btn.disabled = false; btn.textContent = t("ie.learningRun"); } }
+}
+
+// ── Lexicon ──────────────────────────────────────────────────────
+
+async function _ieLoadLexicon(version) {
+  const el = document.getElementById("ie-lexicon-content");
+  if (!el) return;
+  try {
+    const url = version === "current"
+      ? "/api/apps/intent_engine/learning/lexicon/current"
+      : `/api/apps/intent_engine/learning/lexicon/${version}`;
+    const lex = await api(url);
+    if (!lex.active && !lex.synonyms && !lex.verb_map) {
+      el.innerHTML = `<span style="color:var(--subtext0)">${t("ie.lexiconNoData")}</span>`;
+      return;
+    }
+    const syn = lex.synonyms || {};
+    const verb = lex.verb_map || {};
+    const stop = lex.stop_phrases || [];
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;">
+        <div>
+          <strong>${t("ie.lexiconSynonyms")}</strong> (${Object.keys(syn).length})
+          <div style="max-height:180px;overflow-y:auto;margin-top:4px;border:1px solid var(--border);border-radius:6px;padding:6px;">
+            ${Object.keys(syn).length ? Object.entries(syn).map(([k,v]) =>
+              `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border);">
+                <code>${_escHtml(k)}</code><span style="color:var(--subtext0)">→</span><code>${_escHtml(v)}</code>
+              </div>`).join("") : `<span style="color:var(--subtext0)">—</span>`}
+          </div>
+        </div>
+        <div>
+          <strong>${t("ie.lexiconVerbMap")}</strong> (${Object.keys(verb).length})
+          <div style="max-height:180px;overflow-y:auto;margin-top:4px;border:1px solid var(--border);border-radius:6px;padding:6px;">
+            ${Object.keys(verb).length ? Object.entries(verb).map(([k,v]) =>
+              `<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border);">
+                <code>${_escHtml(k)}</code><span style="color:var(--subtext0)">→</span><code>${_escHtml(v)}</code>
+              </div>`).join("") : `<span style="color:var(--subtext0)">—</span>`}
+          </div>
+        </div>
+        <div>
+          <strong>${t("ie.lexiconStopPhrases")}</strong> (${stop.length})
+          <div style="max-height:180px;overflow-y:auto;margin-top:4px;border:1px solid var(--border);border-radius:6px;padding:6px;">
+            ${stop.length ? stop.map(s =>
+              `<div style="padding:2px 0;border-bottom:1px solid var(--border);"><code>${_escHtml(s)}</code></div>`).join("") : `<span style="color:var(--subtext0)">—</span>`}
+          </div>
+        </div>
+      </div>
+      ${lex.version != null ? `<div style="margin-top:6px;color:var(--subtext0);font-size:11px;">v${lex.version} · ${lex.source || ""} · ${lex.created_at || ""}</div>` : ""}
+    `;
+  } catch(_) {
+    el.innerHTML = `<span style="color:var(--subtext0)">${t("ie.lexiconNoData")}</span>`;
+  }
+}
+
+async function _ieLoadLexiconVersions() {
+  const sel = document.getElementById("ie-lex-version-sel");
+  if (!sel) return;
+  try {
+    const versions = await api("/api/apps/intent_engine/learning/lexicon/versions");
+    const arr = Array.isArray(versions) ? versions : [];
+    sel.innerHTML = `<option value="current">${t("ie.lexiconCurrent")}</option>` +
+      arr.map(v => `<option value="${v.version}">v${v.version} (${v.source || ""} · ${(v.created_at||"").slice(0,16)})</option>`).join("");
+  } catch(_) {}
+}
+
+function ieLexiconLoadVersion(val) {
+  _ieLoadLexicon(val);
+}
+
+async function ieLexiconRollback() {
+  const sel = document.getElementById("ie-lex-version-sel");
+  if (!sel || sel.value === "current") { toast(t("ie.selectVersionFirst"), "warning"); return; }
+  try {
+    const res = await api("/api/apps/intent_engine/learning/lexicon/rollback", "POST", { version: parseInt(sel.value) });
+    if (res.error) { toast(res.error, "error"); return; }
+    toast(`${t("ie.rolledBackTo")} v${sel.value}`, "success");
+    await _ieLoadLexicon("current");
+    await _ieLoadLexiconVersions();
+  } catch(e) { toast(e.message, "error"); }
+}
+
+// ── Case Key Aliases ─────────────────────────────────────────────
+
+async function _ieLoadAliases() {
+  const el = document.getElementById("ie-alias-list");
+  if (!el) return;
+  try {
+    const aliases = await api("/api/apps/intent_engine/learning/aliases");
+    const arr = Array.isArray(aliases) ? aliases : [];
+    if (!arr.length) { el.innerHTML = `<span style="color:var(--subtext0)">${t("ie.aliasNoData")}</span>`; return; }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+      <tr style="border-bottom:2px solid var(--border);text-align:left;">
+        <th style="padding:4px 8px;">${t("ie.aliasFrom")}</th>
+        <th style="padding:4px 8px;">${t("ie.aliasTo")}</th>
+        <th style="padding:4px 8px;"></th>
+      </tr>
+      ${arr.map(a => `<tr style="border-bottom:1px solid var(--border);">
+        <td style="padding:4px 8px;"><code>${_escHtml(a.alias)}</code></td>
+        <td style="padding:4px 8px;"><code>${_escHtml(a.canonical)}</code></td>
+        <td style="padding:4px 8px;"><button class="btn btn-sm" style="font-size:10px;padding:1px 6px;" onclick="ieAliasDelete('${_escHtml(a.alias)}')">✕</button></td>
+      </tr>`).join("")}
+    </table>`;
+  } catch(_) {
+    el.innerHTML = `<span style="color:var(--subtext0)">${t("ie.aliasNoData")}</span>`;
+  }
+}
+
+async function ieAliasAdd() {
+  const from = document.getElementById("ie-alias-from");
+  const to = document.getElementById("ie-alias-to");
+  if (!from || !to || !from.value.trim() || !to.value.trim()) { toast(t("ie.fillBothFields"), "warning"); return; }
+  try {
+    await api("/api/apps/intent_engine/learning/aliases", "POST", {
+      alias: from.value.trim(), canonical: to.value.trim(),
+    });
+    from.value = ""; to.value = "";
+    toast(t("ie.aliasAdded"), "success");
+    await _ieLoadAliases();
+  } catch(e) { toast(e.message, "error"); }
+}
+
+async function ieAliasDelete(alias) {
+  try {
+    await api(`/api/apps/intent_engine/learning/aliases/${encodeURIComponent(alias)}`, "DELETE");
+    toast(t("ie.aliasRemoved"), "success");
+    await _ieLoadAliases();
+  } catch(e) { toast(e.message, "error"); }
+}
+
+// ── Privacy Info ─────────────────────────────────────────────────
+
+async function _ieLoadPrivacy() {
+  const el = document.getElementById("ie-privacy-info");
+  if (!el) return;
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+      <div>
+        <strong style="color:var(--green);">${t("ie.privacySentData")}</strong>
+        <ul style="margin:4px 0;padding-left:16px;">
+          <li>${t("ie.privacySent1")}</li>
+          <li>${t("ie.privacySent2")}</li>
+          <li>${t("ie.privacySent3")}</li>
+          <li>${t("ie.privacySent4")}</li>
+        </ul>
+      </div>
+      <div>
+        <strong style="color:var(--red);">${t("ie.privacyNeverSent")}</strong>
+        <ul style="margin:4px 0;padding-left:16px;">
+          <li>${t("ie.privacyNever1")}</li>
+          <li>${t("ie.privacyNever2")}</li>
+          <li>${t("ie.privacyNever3")}</li>
+          <li>${t("ie.privacyNever4")}</li>
+        </ul>
+      </div>
+      <div>
+        <strong style="color:var(--blue);">${t("ie.privacyLearned")}</strong>
+        <ul style="margin:4px 0;padding-left:16px;">
+          <li>${t("ie.privacyLearned1")}</li>
+          <li>${t("ie.privacyLearned2")}</li>
+          <li>${t("ie.privacyLearned3")}</li>
+          <li>${t("ie.privacyLearned4")}</li>
+        </ul>
+      </div>
+    </div>
+    <div style="margin-top:8px;color:var(--subtext0);font-size:11px;">${t("ie.privacyStorage")}</div>
+  `;
+}
+
+// ── Audit Trail ──────────────────────────────────────────────────
+
+function _ieStatusText(status) {
+  const map = {
+    completed: "ie.statusCompleted",
+    success: "ie.statusSuccess",
+    running: "ie.statusRunning",
+    skipped: "ie.statusSkipped",
+    error: "ie.statusError",
+    dry_run: "ie.statusDryRun",
+    local_only: "ie.statusLocalOnly",
+  };
+  return t(map[status] || "ie.statusUnknown");
+}
+
+async function _ieLoadAudit() {
+  const el = document.getElementById("ie-audit-list");
+  if (!el) return;
+  try {
+    const runs = await api("/api/apps/intent_engine/learning/runs?limit=10");
+    const arr = Array.isArray(runs) ? runs : [];
+    if (!arr.length) { el.innerHTML = `<span style="color:var(--subtext0)">${t("ie.auditNoRuns")}</span>`; return; }
+    el.innerHTML = `<table style="width:100%;border-collapse:collapse;">
+      <tr style="border-bottom:2px solid var(--border);text-align:left;font-size:11px;">
+        <th style="padding:4px 6px;">${t("ie.auditDate")}</th>
+        <th style="padding:4px 6px;">${t("ie.auditStatus")}</th>
+        <th style="padding:4px 6px;">${t("ie.auditStartTime")}</th>
+        <th style="padding:4px 6px;">${t("ie.auditTokens")}</th>
+        <th style="padding:4px 6px;">${t("ie.auditArtifactsSummary")}</th>
+        <th style="padding:4px 6px;"></th>
+      </tr>
+      ${arr.map(r => {
+        const st = r.status || "unknown";
+        const color = st === "completed" || st === "success" ? "var(--green)" : st === "error" ? "var(--red)" : "var(--subtext0)";
+        let startTime = "—";
+        if (r.created_at) {
+          try {
+            const d = new Date(r.created_at);
+            startTime = d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+          } catch(e) { startTime = "—"; }
+        }
+        return `<tr style="border-bottom:1px solid var(--border);font-size:11px;">
+          <td style="padding:4px 6px;">${_escHtml((r.run_date || r.created_at || "").slice(0,10))}</td>
+          <td style="padding:4px 6px;color:${color};">${_ieStatusText(st)}</td>
+          <td style="padding:4px 6px;">${startTime}</td>
+          <td style="padding:4px 6px;">${r.token_cost || "—"}</td>
+          <td style="padding:4px 6px;">${_escHtml(r.artifacts_summary || "—")}</td>
+          <td style="padding:4px 6px;"><button class="btn btn-sm" style="font-size:10px;padding:1px 6px;" onclick="ieAuditDetail('${_escHtml(r.id || r.run_id || "")}')">${t("ie.auditDetail")}</button></td>
+        </tr>`;
+      }).join("")}
+    </table>`;
+  } catch(_) {
+    el.innerHTML = `<span style="color:var(--subtext0)">${t("ie.auditNoRuns")}</span>`;
+  }
+}
+
+async function ieAuditDetail(runId) {
+  if (!runId) return;
+  try {
+    const d = await api(`/api/apps/intent_engine/learning/runs/${encodeURIComponent(runId)}`);
+    const inputStats = d.input_stats_json || {};
+    const outputArtifacts = d.output_artifacts_json || {};
+    const promptSent = inputStats.prompt_sent || d.prompt_sent || "";
+    const llmRaw = inputStats.llm_response_raw || d.llm_response_raw || "";
+    const preStyle = "max-height:240px;overflow:auto;background:var(--bg-base);padding:10px;border-radius:6px;font-size:11px;white-space:pre-wrap;user-select:text;cursor:text;border:1px solid var(--border);";
+
+    const parts = [];
+    if (promptSent) parts.push(`<div><strong>${t("ie.auditPromptSent")}</strong><pre style="${preStyle}">${_escHtml(typeof promptSent === "string" ? promptSent : JSON.stringify(promptSent, null, 2))}</pre></div>`);
+    if (llmRaw) parts.push(`<div><strong>${t("ie.auditLlmResponse")}</strong><pre style="${preStyle}">${_escHtml(typeof llmRaw === "string" ? llmRaw : JSON.stringify(llmRaw, null, 2))}</pre></div>`);
+    if (outputArtifacts && Object.keys(outputArtifacts).length) parts.push(`<div><strong>${t("ie.auditArtifacts")}</strong><pre style="${preStyle}">${_escHtml(JSON.stringify(outputArtifacts, null, 2))}</pre></div>`);
+    if (!parts.length) parts.push(`<pre style="${preStyle}">${_escHtml(JSON.stringify(d, null, 2))}</pre>`);
+
+    let duration = "—";
+    if (d.created_at && d.completed_at) {
+      const ms = new Date(d.completed_at).getTime() - new Date(d.created_at).getTime();
+      if (ms > 0) duration = ms < 1000 ? ms + "ms" : (ms / 1000).toFixed(1) + "s";
+    }
+
+    const overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;display:flex;align-items:center;justify-content:center;";
+    overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    const statusOk = d.status === "completed" || d.status === "success";
+    const statusText = _ieStatusText(d.status);
+    overlay.innerHTML = `<div style="background:var(--bg-surface);border-radius:12px;padding:24px;max-width:720px;width:92%;max-height:85vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,0.3);border:1px solid var(--border);user-select:text;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <h4 style="margin:0;">${t("ie.auditTrail")} — ${_escHtml((d.run_date || d.target_date || "").slice(0,10))}</h4>
+        <button class="btn btn-sm" onclick="this.closest('div[style*=fixed]').remove()">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--subtext0);margin-bottom:14px;display:flex;flex-wrap:wrap;gap:12px;">
+        <span>${t("ie.auditStatus")}: <strong style="color:${statusOk?'var(--green)':'var(--red)'}">${statusText}</strong></span>
+        <span>${t("ie.auditModel")}: ${_escHtml(d.model_used||"—")}</span>
+        <span>${t("ie.auditTokens")}: ${d.token_cost||"—"}</span>
+        <span>${t("ie.auditDuration")}: ${duration}</span>
+      </div>
+      ${parts.join("<div style='height:14px;'></div>")}
+      ${d.error_log ? `<div style="margin-top:14px;"><strong style="color:var(--red);">Error</strong><pre style="${preStyle};color:var(--red);">${_escHtml(d.error_log)}</pre></div>` : ""}
+    </div>`;
+    document.body.appendChild(overlay);
+  } catch(e) { toast(e.message, "error"); }
 }
 
 // ── 1. Health Metrics ────────────────────────────────────────────
@@ -4034,7 +4480,7 @@ async function _ieLoadRuns() {
               <td><span class="ie-expand-icon" id="ie-expand-${i}">▶</span></td>
               <td style="white-space:nowrap">${(r.created_at || "").slice(5,16).replace("T"," ")}</td>
               <td class="ie-text-cell" title="${(r.user_text||"").replace(/"/g,"&quot;")}">${(r.user_text||"").slice(0,35)}</td>
-              <td><code class="ie-label-tag">${r.route_label || "default"}</code></td>
+              <td><code class="ie-label-tag">${r.final_category || r.route_label || "default"}</code>${r.user_corrected ? '<span style="color:var(--accent);font-size:9px;margin-left:4px;">✓</span>' : ''}</td>
               <td>${confidence}</td>
               <td>${r.tools_before}→${r.tools_after} <span class="ie-pct">(${reduction}%)</span></td>
               <td>${golden ? '<span class="ie-golden-yes">●</span>' : '<span class="ie-golden-no">○</span>'}</td>
@@ -4056,10 +4502,10 @@ async function _ieLoadRuns() {
                   </div>
                   <div class="ie-detail-row-correct" style="margin-top:8px;display:flex;align-items:center;gap:8px;">
                     <strong style="font-size:11px;">${t("ie.correctCategory")}:</strong>
-                    <select id="ie-correct-sel-${i}" style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-base);">
+                    <select id="ie-correct-sel-${i}" style="font-size:11px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);background:var(--bg-base);color:var(--text);">
                       <option value="">--</option>
                       ${["search","fs","browser","net","system","schedule","comm","general","chat"].map(c =>
-                        `<option value="${c}" ${(r.route_label||"").startsWith(c) ? 'selected' : ''}>${c}</option>`
+                        `<option value="${c}" ${((r.final_category || r.route_label)||"").startsWith(c) ? 'selected' : ''}>${c}</option>`
                       ).join("")}
                     </select>
                     <button onclick="ieCorrectCategory('${r.id}', ${i})" style="font-size:11px;padding:2px 10px;border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;border:none;">${t("ie.submitCorrection")}</button>
@@ -4179,6 +4625,13 @@ async function openStrategyHubDetail() {
       </div>
 
       <div class="er-tab-pane" id="sh-tab-templates" style="display:block;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="font-size:0.9rem;color:var(--text-sub);">${t("sh.templatesDesc")}</div>
+          <button class="btn btn-primary btn-sm" onclick="_shGenerateTemplates()" style="white-space:nowrap;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;"><path d="M12 5v14M5 12h14"/></svg>
+            ${t("sh.generateTemplates")}
+          </button>
+        </div>
         <div id="sh-templates-list" class="er-table-placeholder">${t("sh.loading")}</div>
       </div>
       <div class="er-tab-pane" id="sh-tab-instances" style="display:none;">
@@ -4479,6 +4932,36 @@ async function _shDeleteCandidate(candidateId) {
     await _shLoadCandidates();
     await _shLoadMetrics();
   } catch(e) { toast(t("sh.deleteFailed") + ": " + e.message, "error"); }
+}
+
+// ── Generate Templates ────────────────────────────────────────────────
+
+async function _shGenerateTemplates() {
+  const btn = event.target.closest("button");
+  if (btn) btn.disabled = true;
+  
+  try {
+    toast(t("sh.generatingTemplates"), "info");
+    const res = await api("/api/apps/strategy_hub/generate_templates", "POST", {});
+    
+    if (res.ok) {
+      const count = res.templates_created || 0;
+      if (count > 0) {
+        toast(t("sh.templatesGenerated").replace("{count}", count), "success");
+        // 刷新模板列表和指标
+        await _shLoadTemplates();
+        await _shLoadMetrics();
+      } else {
+        toast(res.message || t("sh.noTemplatesGenerated"), "info");
+      }
+    } else {
+      toast(t("sh.generateFailed") + ": " + (res.error || "unknown"), "error");
+    }
+  } catch (e) {
+    toast(t("sh.generateFailed") + ": " + e.message, "error");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 // ── End Strategy Hub ──────────────────────────────────────────────────

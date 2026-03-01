@@ -34,6 +34,16 @@ class Rule:
 
 # ── Rule definitions (ordered by priority DESC) ──────────────────
 
+_STRONG_MATH = re.compile(
+    r"\d+\s*[+\-*/÷×^%]\s*\d|=\s*\?|计算|求解|方程|"
+    r"√|∑|∫|sin|cos|tan|log|ln|π|平方|立方|阶乘|导数|积分|极限",
+    re.IGNORECASE,
+)
+_STRONG_CREATIVE = re.compile(
+    r"写|作文|诗|故事|小说|文案|脚本|歌词|对联|散文|"
+    r"生成|创作|编写|改写|润色|翻译|仿写|续写|摘要|总结",
+    re.IGNORECASE,
+)
 _STRONG_FS = re.compile(
     r"删除|移动|重命名|压缩|解压|复制|覆盖|格式化|清空|"
     r"\.(?:txt|csv|json|xml|py|js|md|zip|tar|pdf|docx?|xlsx?)|"
@@ -70,17 +80,89 @@ RULES: list[Rule] = [
         rule_id="chat_greeting",
         category="chat",
         pattern=re.compile(
-            r"^(?:你好|hi|hello|hey|嗨|早上好|晚上好|谢谢|thanks|再见|bye|"
-            r"你是谁|介绍一下|解释|什么是|为什么|怎么理解|帮我理解)\b",
+            r"^(?:你好|hi|hello|hey|嗨|早上好|晚上好|谢谢|thanks|再见|bye|goodbye)\b",
             re.IGNORECASE,
         ),
         negative=re.compile(
             r"搜索|查找|文件|目录|执行|运行|打开|下载|安装|浏览器|"
-            r"监控|报告|删除|移动|复制|编辑|创建",
+            r"监控|报告|删除|移动|复制|编辑|创建|写|翻译|计算",
             re.IGNORECASE,
         ),
         priority=100,
         base_conf=0.85,
+        weak_features=_WEAK_PHRASES,
+    ),
+
+    # ── math: expressions, computation, numeric reasoning ──
+    Rule(
+        rule_id="math_expr",
+        category="math",
+        pattern=re.compile(
+            r"\d+\s*[+\-*/÷×^%]\s*\d|=\s*\?|"
+            r"计算.*(?:sin|cos|tan|log|平方|立方|阶乘|导数|积分|极限)|"
+            r"算一下|求值|求解|方程|等于多少|"
+            r"√|∑|∫|sin\b|cos\b|tan\b|log\b|ln\b|π|sqrt|"
+            r"平方|立方|阶乘|导数|积分|极限|概率|排列|组合|"
+            r"calculate|compute|solve|factorial|equation|divided\s+by",
+            re.IGNORECASE,
+        ),
+        negative=re.compile(
+            r"搜索|查找|查询|百度|谷歌|google|bing|监控|报告",
+            re.IGNORECASE,
+        ),
+        priority=95,
+        base_conf=0.88,
+        strong_features=_STRONG_MATH,
+    ),
+
+    # ── creative: writing, generation, translation ──
+    Rule(
+        rule_id="creative_write",
+        category="creative",
+        pattern=re.compile(
+            r"写.*(?:诗|文|故事|小说|文案|脚本|歌词|对联|散文|段落|作文|邮件|信)|"
+            r"来一首|来一篇|来一段|来个.*(?:故事|笑话|段子)|"
+            r"生成.*(?:文本|内容|文章|报告)|创作|编写|改写|润色|续写|仿写|"
+            r"翻译|translate|"
+            r"write\s+.*(?:poem|story|article|essay|email|script|lyrics|paragraph|letter)|"
+            r"generate\s+.*(?:text|content|description|report)|"
+            r"create\s+.*(?:story|poem|slogan|content)|"
+            r"compose|draft|rewrite|polish|rephrase|paraphrase|summarize|summary",
+            re.IGNORECASE,
+        ),
+        negative=re.compile(
+            r"搜索|查找|文件|目录|执行|运行|下载|安装|浏览器|监控",
+            re.IGNORECASE,
+        ),
+        priority=90,
+        base_conf=0.85,
+        strong_features=_STRONG_CREATIVE,
+        weak_features=_WEAK_PHRASES,
+    ),
+
+    # ── ask: knowledge Q&A that doesn't need web search ──
+    Rule(
+        rule_id="ask_knowledge",
+        category="ask",
+        pattern=re.compile(
+            r"^(?:你是谁|介绍一下|解释|什么是|什么叫|叫做|为什么|怎么理解|帮我理解|"
+            r"什么意思|怎么回事|有什么区别|有何不同|对比一下|比较)|"
+            r"是什么|的区别|的不同|是什么意思|如何理解|怎样理解|怎么看待|"
+            r"what\s+is|what's|what\s+are|explain|why\s+is|why\s+does|why\s+do|"
+            r"how\s+does|how\s+do|how\s+to\s+understand|can\s+you\s+explain|"
+            r"what.*difference|difference\s+between|what\s+does.*mean|"
+            r"what.*meaning",
+            re.IGNORECASE,
+        ),
+        negative=re.compile(
+            r"搜索|查找|文件|目录|执行|运行|打开|下载|安装|浏览器|"
+            r"监控|报告|删除|移动|复制|编辑|创建|写|翻译|计算|"
+            r"最新|新闻|今天|实时|当前|"
+            r"latest|today|current|recent|now|file|directory|search|find",
+            re.IGNORECASE,
+        ),
+        priority=88,
+        base_conf=0.80,
         weak_features=_WEAK_PHRASES,
     ),
 
@@ -106,7 +188,8 @@ RULES: list[Rule] = [
         category="search",
         pattern=re.compile(
             r"搜索|查找|查询|搜一下|谷歌|百度|google|search|bing|"
-            r"新闻|资讯|最新|天气|汇率|股价|房价|价格|行情|指数",
+            r"新闻|资讯|最新|天气|汇率|股价|房价|价格|行情|指数|"
+            r"find.*(?:recent|latest|new)|look\s+up",
             re.IGNORECASE,
         ),
         priority=70,
@@ -119,7 +202,8 @@ RULES: list[Rule] = [
         category="search",
         pattern=re.compile(
             r"监控|报告|报表|分析|调研|趋势|对比|统计.*(?:数据|信息)|"
-            r"摘要|总结.*(?:信息|新闻|内容)",
+            r"摘要|总结.*(?:信息|新闻|内容)|"
+            r"monitor|report|analyze|compare.*(?:models|products|prices)",
             re.IGNORECASE,
         ),
         negative=re.compile(
@@ -152,7 +236,8 @@ RULES: list[Rule] = [
         pattern=re.compile(
             r"安装|pip\s+install|npm\s+install|apt\s+|brew\s+|"
             r"系统设置|网络配置|防火墙|注册表|registry|systemctl|service\s+|"
-            r"环境变量|PATH|chmod|chown|sudo",
+            r"环境变量|PATH|chmod|chown|sudo|"
+            r"install.*(?:python|node|java|package)",
             re.IGNORECASE,
         ),
         priority=60,
@@ -168,7 +253,9 @@ RULES: list[Rule] = [
         pattern=re.compile(
             r"文件|目录|读取|写入|编辑|创建.*文件|删除.*文件|"
             r"移动.*(?:文件|目录|文件夹)|复制.*(?:文件|目录)|重命名|"
-            r"压缩|解压|整理.*(?:文件|目录|下载)|read_file|write_file|edit_file|list_dir",
+            r"压缩|解压|整理.*(?:文件|目录|下载)|read_file|write_file|edit_file|list_dir|"
+            r"delete.*file|move.*file|copy.*file|read.*(?:file|config)|edit.*\.(py|js|json|txt|md)|"
+            r"list.*(?:file|directory|dir)",
             re.IGNORECASE,
         ),
         priority=50,
